@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Админка - Пользователи')}"></head>
+<body>
+<nav th:replace="~{fragments :: adminNavbar}"></nav>
+<main class="container container-wide py-4">
+    <h1 class="h4 mb-3">Пользователи</h1>
+    <div class="glass-card p-4">
+        <table class="table align-middle">
+            <thead>
+            <tr>
+                <th>ID</th>
+                <th>Логин</th>
+                <th>Email</th>
+                <th>Имя</th>
+                <th>Телефон</th>
+                <th>Роль</th>
+                <th>Статус</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="u : ${users}">
+                <td th:text="${u.id}"></td>
+                <td th:text="${u.username}"></td>
+                <td th:text="${u.email}"></td>
+                <td th:text="${u.fullName}"></td>
+                <td th:text="${u.phone}"></td>
+                <td>
+                    <span class="badge text-bg-primary" th:if="${u.isAdmin}">ADMIN</span>
+                    <span class="badge text-bg-secondary" th:if="${!u.isAdmin}">USER</span>
+                </td>
+                <td>
+                    <span class="badge text-bg-success" th:if="${u.isEnabled}">Активен</span>
+                    <span class="badge text-bg-danger" th:if="${!u.isEnabled}">Отключен</span>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</main>
+<div th:replace="~{fragments :: scripts}"></div>
+</body>
+</html>

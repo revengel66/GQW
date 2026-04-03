@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Регистрация')}"></head>
+<body>
+<nav th:replace="~{fragments :: navbar}"></nav>
+<main class="container py-5" style="max-width:760px;">
+    <div class="glass-card p-4">
+        <h1 class="h4 mb-3">Регистрация</h1>
+        <form th:action="@{/register}" th:object="${registerRequest}" method="post" class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label">Логин</label>
+                <input class="form-control" th:field="*{username}">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">ФИО</label>
+                <input class="form-control" th:field="*{fullName}">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Email</label>
+                <input class="form-control" th:field="*{email}">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Телефон</label>
+                <input class="form-control" th:field="*{phone}">
+            </div>
+            <div class="col-12">
+                <label class="form-label">Пароль</label>
+                <input class="form-control" type="password" th:field="*{password}">
+            </div>
+            <div class="col-12">
+                <button class="btn btn-primary" type="submit">Создать аккаунт</button>
+            </div>
+        </form>
+    </div>
+</main>
+<div th:replace="~{fragments :: scripts}"></div>
+</body>
+</html>
+

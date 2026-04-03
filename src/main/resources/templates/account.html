@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Личный кабинет')}"></head>
+<body>
+<nav th:replace="~{fragments :: navbar}"></nav>
+<main class="container container-wide py-4">
+    <h1 class="h4 mb-3">Личный кабинет</h1>
+    <div class="alert alert-success" th:if="${checkoutSuccess}">
+        Заказ успешно оформлен.
+    </div>
+    <div class="glass-card p-4">
+        <h2 class="h6 mb-3">История заказов</h2>
+        <div th:if="${#lists.isEmpty(orders)}" class="text-muted">Заказов пока нет.</div>
+        <table class="table" th:if="${!#lists.isEmpty(orders)}">
+            <thead>
+            <tr>
+                <th>ID</th>
+                <th>Дата</th>
+                <th>Статус</th>
+                <th>Сумма</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="o : ${orders}">
+                <td th:text="${o.id}"></td>
+                <td th:text="${#temporals.format(o.createdAt, 'dd.MM.yyyy HH:mm')}"></td>
+                <td th:text="${o.status}"></td>
+                <td th:text="${#numbers.formatDecimal(o.totalAmount,1,'COMMA',2,'POINT')} + ' ₽'"></td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</main>
+<div th:replace="~{fragments :: scripts}"></div>
+</body>
+</html>
+

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Админка - Заявки')}"></head>
+<body>
+<nav th:replace="~{fragments :: adminNavbar}"></nav>
+<main class="container container-wide py-4">
+    <h1 class="h4 mb-3">Заявки в поддержку</h1>
+    <div class="glass-card p-4">
+        <div class="text-muted" th:if="${#lists.isEmpty(requests)}">Новых заявок нет.</div>
+        <table class="table align-middle" th:if="${!#lists.isEmpty(requests)}">
+            <thead>
+            <tr>
+                <th>ID</th>
+                <th>Имя</th>
+                <th>Email</th>
+                <th>Телефон</th>
+                <th>Сообщение</th>
+                <th>Дата</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="r : ${requests}">
+                <td th:text="${r.id}"></td>
+                <td th:text="${r.name}"></td>
+                <td th:text="${r.email}"></td>
+                <td th:text="${r.phone}"></td>
+                <td th:text="${r.message}"></td>
+                <td th:text="${#temporals.format(r.createdAt, 'dd.MM.yyyy HH:mm')}"></td>
+                <td>
+                    <form method="post" th:action="@{'/admin/support/' + ${r.id} + '/processed'}">
+                        <button class="btn btn-sm btn-primary" type="submit">Обработано</button>
+                    </form>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</main>
+<div th:replace="~{fragments :: scripts}"></div>
+</body>
+</html>

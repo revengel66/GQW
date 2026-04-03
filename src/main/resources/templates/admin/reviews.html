@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Админка - Отзывы')}"></head>
+<body>
+<nav th:replace="~{fragments :: adminNavbar}"></nav>
+<main class="container container-wide py-4">
+    <h1 class="h4 mb-3">Отзывы на модерации</h1>
+    <div class="glass-card p-4">
+        <div class="text-muted" th:if="${#lists.isEmpty(reviews)}">Нет отзывов, ожидающих модерацию.</div>
+        <table class="table align-middle" th:if="${!#lists.isEmpty(reviews)}">
+            <thead>
+            <tr>
+                <th>ID</th>
+                <th>Товар</th>
+                <th>Пользователь</th>
+                <th>Оценка</th>
+                <th>Текст</th>
+                <th>Дата</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="r : ${reviews}">
+                <td th:text="${r.id}"></td>
+                <td th:text="${r.product != null ? r.product.name : '-'}"></td>
+                <td th:text="${r.user != null ? r.user.username : 'Гость'}"></td>
+                <td th:text="${r.rating != null ? r.rating : '-'}"></td>
+                <td th:text="${r.text}"></td>
+                <td th:text="${#temporals.format(r.createdAt, 'dd.MM.yyyy HH:mm')}"></td>
+                <td>
+                    <div class="d-flex gap-2">
+                        <form method="post" th:action="@{'/admin/reviews/' + ${r.id} + '/moderate'}">
+                            <input type="hidden" name="approved" value="true">
+                            <button class="btn btn-sm btn-success" type="submit">Одобрить</button>
+                        </form>
+                        <form method="post" th:action="@{'/admin/reviews/' + ${r.id} + '/moderate'}">
+                            <input type="hidden" name="approved" value="false">
+                            <button class="btn btn-sm btn-outline-danger" type="submit">Отклонить</button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</main>
+<div th:replace="~{fragments :: scripts}"></div>
+</body>
+</html>

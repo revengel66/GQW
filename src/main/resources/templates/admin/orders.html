@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Админка - Заказы')}"></head>
+<body>
+<nav th:replace="~{fragments :: adminNavbar}"></nav>
+<main class="container container-wide py-4">
+    <h1 class="h4 mb-3">Заказы</h1>
+    <div class="glass-card p-4">
+        <table class="table align-middle">
+            <thead><tr><th>ID</th><th>Покупатель</th><th>Сумма</th><th>Статус</th><th></th></tr></thead>
+            <tbody>
+            <tr th:each="o : ${orders}">
+                <td th:text="${o.id}"></td>
+                <td th:text="${o.customerName + ' (' + o.customerEmail + ')'}"></td>
+                <td th:text="${#numbers.formatDecimal(o.totalAmount,1,'COMMA',2,'POINT')} + ' ₽'"></td>
+                <td>
+                    <form class="d-flex gap-2" th:action="@{'/admin/orders/' + ${o.id} + '/status'}" method="post">
+                        <select class="form-select form-select-sm" name="status">
+                            <option th:each="s : ${statuses}" th:value="${s}" th:selected="${s == o.status}" th:text="${s}"></option>
+                        </select>
+                        <button class="btn btn-primary btn-sm" type="submit">OK</button>
+                    </form>
+                </td>
+                <td th:text="${#temporals.format(o.createdAt, 'dd.MM.yyyy HH:mm')}"></td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</main>
+<div th:replace="~{fragments :: scripts}"></div>
+</body>
+</html>
+

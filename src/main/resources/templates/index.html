@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('GQW Tech - Главная')}"></head>
+<body>
+<nav th:replace="~{fragments :: navbar}"></nav>
+
+<main class="container container-wide py-4">
+    <section class="hero p-5 mb-4">
+        <h1 class="display-6 fw-bold mb-3">Интернет-магазин техники GQW</h1>
+        <p class="mb-4 text-white-50">Ноутбуки, смартфоны и аксессуары. Минималистичный UX, быстрый заказ и встроенная серверная аналитика.</p>
+        <a class="btn btn-light btn-lg" th:href="@{/catalog}">Перейти в каталог</a>
+    </section>
+
+    <section class="section-gap">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="h4 mb-0">Категории</h2>
+        </div>
+        <div class="row g-3">
+            <div class="col-12 col-md-4" th:each="c : ${categories}">
+                <div class="glass-card p-3 h-100">
+                    <img th:src="${c.imageUrl}" class="w-100 rounded-3 mb-3" style="height:180px; object-fit:cover;" alt="">
+                    <h3 class="h6" th:text="${c.name}"></h3>
+                    <p class="small text-muted" th:text="${c.description}"></p>
+                    <a class="btn btn-outline-primary btn-sm" th:href="@{'/category/' + ${c.slug}}">Открыть</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section-gap">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="h4 mb-0">Новые товары</h2>
+        </div>
+        <div class="row g-3">
+            <div class="col-12 col-md-6 col-xl-3" th:each="p : ${products}">
+                <div class="glass-card p-3 h-100 card-product">
+                    <h3 class="h6 mb-2" th:text="${p.name}"></h3>
+                    <p class="small text-muted mb-2" th:text="${p.shortDescription}"></p>
+                    <div class="d-flex gap-2 mb-2">
+                        <span class="badge-soft badge-new" th:if="${p.isNew}">Новинка</span>
+                        <span class="badge-soft badge-hit" th:if="${p.isHit}">Хит</span>
+                        <span class="badge-soft badge-discount" th:if="${p.isDiscount}">Скидка</span>
+                    </div>
+                    <p class="fw-semibold mb-3" th:text="${#numbers.formatDecimal(p.price, 1, 'COMMA', 2, 'POINT')} + ' ₽'"></p>
+                    <a class="btn btn-primary btn-sm w-100" th:href="@{'/product/' + ${p.slug}}">Подробнее</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section-gap glass-card p-4">
+        <h2 class="h5 mb-3">Связаться с поддержкой</h2>
+        <form class="row g-3" th:action="@{/support/request}" th:object="${supportForm}" method="post">
+            <div class="col-md-4">
+                <input class="form-control" th:field="*{name}" placeholder="Ваше имя">
+            </div>
+            <div class="col-md-4">
+                <input class="form-control" th:field="*{email}" placeholder="Email">
+            </div>
+            <div class="col-md-4">
+                <input class="form-control" th:field="*{phone}" placeholder="Телефон">
+            </div>
+            <div class="col-12">
+                <textarea class="form-control" th:field="*{message}" rows="3" placeholder="Сообщение"></textarea>
+            </div>
+            <div class="col-12">
+                <button class="btn btn-primary" type="submit">Отправить заявку</button>
+            </div>
+        </form>
+    </section>
+</main>
+
+<div th:replace="~{fragments :: scripts}"></div>
+</body>
+</html>
+

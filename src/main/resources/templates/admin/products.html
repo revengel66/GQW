@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Админка - Товары')}"></head>
+<body>
+<nav th:replace="~{fragments :: adminNavbar}"></nav>
+<main class="container container-wide py-4">
+    <h1 class="h4 mb-3">Товары</h1>
+    <div class="glass-card p-4 mb-4">
+        <form class="row g-2" method="post" th:action="@{/admin/products/save}">
+            <div class="col-md-4"><input class="form-control" name="name" placeholder="Название"></div>
+            <div class="col-md-3"><input class="form-control" name="slug" placeholder="slug"></div>
+            <div class="col-md-2"><input class="form-control" name="price" placeholder="Цена"></div>
+            <div class="col-md-3"><input class="form-control" name="shortDescription" placeholder="Краткое описание"></div>
+            <div class="col-12"><textarea class="form-control" name="description" rows="2" placeholder="Описание"></textarea></div>
+            <div class="col-12"><button class="btn btn-primary" type="submit">Сохранить</button></div>
+        </form>
+    </div>
+    <div class="glass-card p-4">
+        <table class="table">
+            <thead><tr><th>ID</th><th>Название</th><th>Slug</th><th>Цена</th></tr></thead>
+            <tbody>
+            <tr th:each="p : ${products}">
+                <td th:text="${p.id}"></td>
+                <td th:text="${p.name}"></td>
+                <td th:text="${p.slug}"></td>
+                <td th:text="${#numbers.formatDecimal(p.price,1,'COMMA',2,'POINT')} + ' ₽'"></td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</main>
+<div th:replace="~{fragments :: scripts}"></div>
+</body>
+</html>
+

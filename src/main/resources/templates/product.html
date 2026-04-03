@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head(${product.name})}"></head>
+<body>
+<nav th:replace="~{fragments :: navbar}"></nav>
+<main class="container container-wide py-4">
+    <div class="row g-4">
+        <div class="col-lg-6">
+            <div class="glass-card p-3">
+                <img class="product-main-image mb-3" th:src="'https://picsum.photos/seed/' + ${product.id} + '/800/500'" alt="">
+                <div class="d-flex gap-2">
+                    <img class="thumb" th:src="'https://picsum.photos/seed/' + ${product.id} + 'a/120/120'" alt="">
+                    <img class="thumb" th:src="'https://picsum.photos/seed/' + ${product.id} + 'b/120/120'" alt="">
+                    <img class="thumb" th:src="'https://picsum.photos/seed/' + ${product.id} + 'c/120/120'" alt="">
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="glass-card p-4">
+                <h1 class="h3 mb-2" th:text="${product.name}"></h1>
+                <p class="text-muted" th:text="${product.description}"></p>
+                <div class="d-flex align-items-center gap-2 mb-3">
+                    <span class="badge-soft badge-new" th:if="${product.isNew}">Новинка</span>
+                    <span class="badge-soft badge-hit" th:if="${product.isHit}">Хит продаж</span>
+                    <span class="badge-soft badge-discount" th:if="${product.isDiscount}">Скидка</span>
+                </div>
+                <div class="mb-3">
+                    <span class="fs-4 fw-bold" th:text="${#numbers.formatDecimal(product.price,1,'COMMA',2,'POINT')} + ' ₽'"></span>
+                    <span class="text-decoration-line-through text-muted ms-2" th:if="${product.oldPrice != null}"
+                          th:text="${#numbers.formatDecimal(product.oldPrice,1,'COMMA',2,'POINT')} + ' ₽'"></span>
+                </div>
+                <form class="d-flex gap-2 mb-2" th:action="@{/cart/add}" method="post">
+                    <input type="hidden" name="productId" th:value="${product.id}">
+                    <input class="form-control" type="number" name="quantity" value="1" min="1" style="max-width:120px;">
+                    <button class="btn btn-primary" type="submit"><i class="bi bi-cart-plus"></i> В корзину</button>
+                </form>
+                <form th:action="@{/wishlist/add}" method="post">
+                    <input type="hidden" name="productId" th:value="${product.id}">
+                    <button class="btn btn-outline-secondary" type="submit"><i class="bi bi-heart"></i> В избранное</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <section class="section-gap">
+        <div class="row g-4">
+            <div class="col-lg-6">
+                <div class="glass-card p-4">
+                    <h2 class="h5 mb-3">Характеристики</h2>
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between" th:each="c : ${characteristics}">
+                            <span th:text="${c.name}"></span>
+                            <span class="text-muted" th:text="${c.value}"></span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="glass-card p-4">
+                    <h2 class="h5 mb-3">Опции фильтров</h2>
+                    <div class="d-flex flex-wrap gap-2">
+                        <span class="badge text-bg-light border" th:each="fo : ${filterOptions}" th:text="${fo.filter.name + ': ' + fo.value}"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section-gap">
+        <div class="glass-card p-4">
+            <h2 class="h5 mb-3">Отзывы</h2>
+            <form class="row g-2 mb-4" th:action="@{/review/add}" method="post">
+                <input type="hidden" name="productId" th:value="${product.id}">
+                <div class="col-md-2">
+                    <input class="form-control" type="number" min="1" max="5" name="rating" value="5">
+                </div>
+                <div class="col-md-8">
+                    <input class="form-control" name="text" placeholder="Оставьте отзыв">
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-primary w-100" type="submit">Отправить</button>
+                </div>
+            </form>
+
+            <div class="border rounded-3 p-3 mb-3" th:each="r : ${reviews}">
+                <div class="d-flex justify-content-between">
+                    <strong th:text="${r.user != null ? r.user.username : 'Гость'}"></strong>
+                    <span class="text-muted small" th:text="${r.rating != null ? 'Оценка: ' + r.rating : ''}"></span>
+                </div>
+                <p class="mb-2" th:text="${r.text}"></p>
+                <form class="d-flex gap-2" th:action="@{/review/reply}" method="post">
+                    <input type="hidden" name="reviewId" th:value="${r.id}">
+                    <input class="form-control form-control-sm" name="text" placeholder="Ответить на отзыв">
+                    <button class="btn btn-outline-secondary btn-sm" type="submit">Ответить</button>
+                </form>
+            </div>
+        </div>
+    </section>
+</main>
+<div th:replace="~{fragments :: scripts}"></div>
+</body>
+</html>
+
