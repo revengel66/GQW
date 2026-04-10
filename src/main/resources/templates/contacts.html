@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Контакты')}"></head>
+<body>
+<nav th:replace="~{fragments :: navbar}"></nav>
+<main class="container container-wide py-4 pb-5">
+    <section class="glass-card p-4 p-lg-5">
+        <h1 class="h3 mb-4">Контакты NEXORA</h1>
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="glass-card p-3 h-100">
+                    <h2 class="h6 mb-2"><i class="bi bi-telephone-fill me-2"></i>Телефон</h2>
+                    <a class="text-decoration-none" href="tel:+79991112233">+7 (999) 111-22-33</a>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="glass-card p-3 h-100">
+                    <h2 class="h6 mb-2"><i class="bi bi-geo-alt-fill me-2"></i>Адрес</h2>
+                    <p class="mb-0 text-muted">г. Астрахань, ул. Савушкина, 12</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="glass-card p-3 h-100">
+                    <h2 class="h6 mb-2"><i class="bi bi-clock-fill me-2"></i>График</h2>
+                    <p class="mb-0 text-muted">Ежедневно 10:00-21:00</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section-gap glass-card p-4 p-lg-5" id="support">
+        <h2 class="h4 mb-3">Оставить заявку</h2>
+        <p class="text-muted mb-4">Напишите вопрос, и менеджер свяжется с вами по телефону или email.</p>
+        <form class="row g-3" th:action="@{/support/request}" th:object="${supportForm}" method="post">
+            <div class="col-md-4">
+                <input class="form-control" th:field="*{name}" placeholder="Ваше имя">
+            </div>
+            <div class="col-md-4">
+                <input class="form-control" th:field="*{email}" placeholder="Email">
+            </div>
+            <div class="col-md-4">
+                <input class="form-control" th:field="*{phone}" placeholder="Телефон">
+            </div>
+            <div class="col-12">
+                <textarea class="form-control" th:field="*{message}" rows="3" placeholder="Сообщение"></textarea>
+            </div>
+            <div class="col-12">
+                <button class="btn btn-brand" type="submit">Отправить заявку</button>
+            </div>
+        </form>
+    </section>
+</main>
+<div th:replace="~{fragments :: scripts}"></div>
+</body>
+</html>

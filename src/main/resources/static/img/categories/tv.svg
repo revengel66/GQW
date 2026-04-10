@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1300 1000" role="img" aria-labelledby="title desc">
+  <title id="title">Телевизор</title>
+  <desc id="desc">Телевизор на белом фоне</desc>
+  <rect width="1300" height="1000" fill="#ffffff"/>
+  <ellipse cx="650" cy="825" rx="300" ry="34" fill="#e5e7eb"/>
+  <rect x="280" y="170" width="740" height="470" rx="30" fill="#1e293b"/>
+  <rect x="320" y="210" width="660" height="390" rx="16" fill="#0f172a"/>
+  <rect x="350" y="240" width="600" height="330" rx="10" fill="#dbeafe"/>
+  <rect x="595" y="650" width="110" height="56" rx="18" fill="#334155"/>
+  <rect x="500" y="706" width="300" height="24" rx="12" fill="#475569"/>
+  <circle cx="510" cy="312" r="54" fill="#93c5fd" opacity="0.8"/>
+  <circle cx="590" cy="332" r="24" fill="#bfdbfe"/>
+  <rect x="600" y="420" width="220" height="18" rx="9" fill="#bfdbfe"/>
+  <rect x="600" y="454" width="170" height="18" rx="9" fill="#bfdbfe"/>
+</svg>
