@@ -39,6 +39,27 @@ public class ShopUser {
     @Column(length = 32)
     private String phone;
 
+    @Column(length = 255)
+    private String address;
+
+    @Column(length = 255)
+    private String addressStreet;
+
+    @Column(length = 32)
+    private String addressHouse;
+
+    @Column(length = 32)
+    private String addressApartment;
+
+    @Column(length = 32)
+    private String addressEntrance;
+
+    @Column(length = 32)
+    private String addressFloor;
+
+    @Column(length = 64)
+    private String addressIntercom;
+
     @Column(nullable = false)
     private Boolean isAdmin = false;
 
@@ -50,6 +71,9 @@ public class ShopUser {
 
     @Column(nullable = false)
     private Instant updatedAt;
+
+    @Column
+    private Instant reviewRepliesSeenAt;
 
     @PrePersist
     public void prePersist() {

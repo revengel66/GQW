@@ -4,32 +4,243 @@
 <body>
 <nav th:replace="~{fragments :: adminNavbar}"></nav>
 <main class="container container-wide py-4">
-    <h1 class="h4 mb-3">Товары</h1>
-    <div class="glass-card p-4 mb-4">
-        <form class="row g-2" method="post" th:action="@{/admin/products/save}">
-            <div class="col-md-4"><input class="form-control" name="name" placeholder="Название"></div>
-            <div class="col-md-3"><input class="form-control" name="slug" placeholder="slug"></div>
-            <div class="col-md-2"><input class="form-control" name="price" placeholder="Цена"></div>
-            <div class="col-md-3"><input class="form-control" name="shortDescription" placeholder="Краткое описание"></div>
-            <div class="col-12"><textarea class="form-control" name="description" rows="2" placeholder="Описание"></textarea></div>
-            <div class="col-12"><button class="btn btn-primary" type="submit">Сохранить</button></div>
-        </form>
-    </div>
-    <div class="glass-card p-4">
-        <table class="table">
-            <thead><tr><th>ID</th><th>Название</th><th>Slug</th><th>Цена</th></tr></thead>
-            <tbody>
-            <tr th:each="p : ${products}">
-                <td th:text="${p.id}"></td>
-                <td th:text="${p.name}"></td>
-                <td th:text="${p.slug}"></td>
-                <td th:text="${#numbers.formatDecimal(p.price,1,'COMMA',2,'POINT')} + ' ₽'"></td>
-            </tr>
-            </tbody>
-        </table>
+    <nav class="admin-breadcrumb mb-3" aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a th:href="@{/admin}">Админка</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Товары</li>
+        </ol>
+    </nav>
+
+    <div class="alert alert-success" th:if="${productSuccess}" th:text="${productSuccess}"></div>
+    <div class="alert alert-danger" th:if="${productError}" th:text="${productError}"></div>
+
+    <div class="catalog-layout admin-products-layout">
+        <aside class="catalog-sidebar admin-products-sidebar">
+            <div class="glass-card p-3">
+                <div class="h6 mb-3 catalog-panel-title">Категории</div>
+                <div class="catalog-sections">
+                    <div class="catalog-section-item">
+                        <div class="catalog-section-head">
+                            <a class="catalog-section-link"
+                               th:classappend="${selectedCategoryId == null} ? ' is-active'"
+                               th:href="@{/admin/products(q=${productSearchQuery},addedFrom=${addedFrom},addedTo=${addedTo},sort=${productSort},limit=20)}">
+                                Все товары
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="catalog-section-item"
+                         th:each="node,iter : ${categoryTree}"
+                         th:with="hasChildren=${node.children != null and !#lists.isEmpty(node.children)},
+                                  isOpen=${openedCategoryIds != null and #sets.contains(openedCategoryIds, node.category.id)}">
+                        <div class="catalog-section-head">
+                            <a class="catalog-section-link"
+                               th:classappend="${node.category.id == selectedCategoryId} ? ' is-active'"
+                               th:href="@{/admin/products(categoryId=${node.category.id},q=${productSearchQuery},addedFrom=${addedFrom},addedTo=${addedTo},sort=${productSort},limit=20)}"
+                               th:text="${node.category.name}"></a>
+                            <button class="catalog-section-toggle"
+                                    th:if="${hasChildren}"
+                                    type="button"
+                                    data-bs-toggle="collapse"
+                                    th:attr="data-bs-target=${'#adminCatCollapse-' + iter.index},aria-controls=${'adminCatCollapse-' + iter.index},aria-expanded=${isOpen}">
+                                <i class="bi bi-chevron-down"></i>
+                            </button>
+                        </div>
+                        <div class="collapse catalog-section-children"
+                             th:if="${hasChildren}"
+                             th:classappend="${isOpen} ? ' show'"
+                             th:attr="id=${'adminCatCollapse-' + iter.index}">
+                            <div class="catalog-section-child" th:each="child : ${node.children}">
+                                <a class="catalog-section-child-link"
+                                   th:classappend="${child.category.id == selectedCategoryId} ? ' is-active'"
+                                   th:href="@{/admin/products(categoryId=${child.category.id},q=${productSearchQuery},addedFrom=${addedFrom},addedTo=${addedTo},sort=${productSort},limit=20)}"
+                                   th:text="${child.category.name}"></a>
+                                <div class="catalog-section-children ps-2"
+                                     th:if="${child.children != null and !#lists.isEmpty(child.children)}">
+                                    <div class="catalog-section-child" th:each="grandchild : ${child.children}">
+                                        <a class="catalog-section-child-link"
+                                           th:classappend="${grandchild.category.id == selectedCategoryId} ? ' is-active'"
+                                           th:href="@{/admin/products(categoryId=${grandchild.category.id},q=${productSearchQuery},addedFrom=${addedFrom},addedTo=${addedTo},sort=${productSort},limit=20)}"
+                                           th:text="${grandchild.category.name}"></a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <section>
+            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                <div class="h4 mb-0">Товары</div>
+                <a class="btn btn-primary admin-products-page-btn"
+                   th:href="${selectedCategoryId != null} ? @{/admin/products/new(categoryId=${selectedCategoryId})} : @{/admin/products/new}">
+                    <i class="bi bi-plus-lg"></i>
+                    Добавить товар
+                </a>
+            </div>
+
+            <div class="glass-card p-3 mb-3">
+                <form class="row g-2 align-items-end" method="get" th:action="@{/admin/products}">
+                    <input type="hidden" name="categoryId" th:value="${selectedCategoryId}">
+                    <input type="hidden" name="limit" value="20">
+                    <div class="col-lg-4">
+                        <label class="form-label mb-1">Поиск товара</label>
+                        <input class="form-control" name="q" placeholder="ID, название, slug, артикул" th:value="${productSearchQuery}">
+                    </div>
+                    <div class="col-sm-6 col-lg-2">
+                        <label class="form-label mb-1">Добавлен с</label>
+                        <input class="form-control" type="date" name="addedFrom" th:value="${addedFrom}">
+                    </div>
+                    <div class="col-sm-6 col-lg-2">
+                        <label class="form-label mb-1">Добавлен по</label>
+                        <input class="form-control" type="date" name="addedTo" th:value="${addedTo}">
+                    </div>
+                    <div class="col-sm-8 col-lg-3">
+                        <label class="form-label mb-1">Сортировка</label>
+                        <select class="form-select" name="sort">
+                            <option value="date_desc" th:selected="${productSort == 'date_desc'}">Сначала новые</option>
+                            <option value="date_asc" th:selected="${productSort == 'date_asc'}">Сначала старые</option>
+                            <option value="name_asc" th:selected="${productSort == 'name_asc'}">Название А-Я</option>
+                            <option value="name_desc" th:selected="${productSort == 'name_desc'}">Название Я-А</option>
+                            <option value="price_asc" th:selected="${productSort == 'price_asc'}">Цена по возрастанию</option>
+                            <option value="price_desc" th:selected="${productSort == 'price_desc'}">Цена по убыванию</option>
+                        </select>
+                    </div>
+                    <div class="col-sm-4 col-lg-1">
+                        <div class="d-flex align-items-center gap-1 justify-content-end">
+                            <a class="btn btn-outline-secondary btn-sm admin-products-page-btn admin-products-reset-btn"
+                               th:href="@{/admin/products(categoryId=${selectedCategoryId})}"
+                               title="Сбросить фильтры">
+                                <i class="bi bi-x-lg"></i>
+                            </a>
+                            <button class="btn btn-dark admin-products-page-btn" type="submit">Применить</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                <div class="small text-muted">
+                    Показано <span th:text="${productsShown}">0</span> из <span th:text="${productsTotal}">0</span>
+                </div>
+            </div>
+
+            <div class="glass-card p-4" th:if="${#lists.isEmpty(products)}">
+                <div class="text-muted">По выбранным условиям товары не найдены.</div>
+            </div>
+
+            <div class="glass-card p-3 p-md-4 table-responsive" th:if="${!#lists.isEmpty(products)}">
+                <table class="table align-middle mb-0 admin-products-table">
+                    <colgroup>
+                        <col style="width: 52px;">
+                        <col style="width: 88px;">
+                        <col>
+                        <col style="width: 140px;">
+                        <col style="width: 170px;">
+                    </colgroup>
+                    <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Фото</th>
+                        <th>Товар</th>
+                        <th>Цена</th>
+                        <th class="text-end">Действия</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="p : ${products}">
+                        <td class="text-muted admin-products-col-id" th:text="${p.id}"></td>
+                        <td class="admin-products-col-photo">
+                            <img class="cart-item-thumb"
+                                 th:if="${p.primaryImageUrl != null and !#strings.isEmpty(p.primaryImageUrl)}"
+                                 th:src="${p.primaryImageUrl}"
+                                 alt="">
+                            <div class="cart-item-thumb d-inline-flex align-items-center justify-content-center border bg-light"
+                                 th:if="${p.primaryImageUrl == null or #strings.isEmpty(p.primaryImageUrl)}">
+                                <i class="bi bi-camera"></i>
+                            </div>
+                        </td>
+                        <td class="admin-products-col-product">
+                            <div class="fw-semibold" th:text="${p.name}"></div>
+                        </td>
+                        <td class="admin-products-col-price">
+                            <div th:text="${#numbers.formatDecimal(p.price,1,'COMMA',0,'POINT')} + ' ₽'"></div>
+                            <div class="small text-decoration-line-through text-muted"
+                                 th:if="${p.oldPrice != null}"
+                                 th:text="${#numbers.formatDecimal(p.oldPrice,1,'COMMA',0,'POINT')} + ' ₽'"></div>
+                        </td>
+                        <td class="text-end admin-products-col-actions">
+                            <div class="admin-products-actions">
+                                <form th:action="@{'/admin/products/' + ${p.id} + '/duplicate'}" method="post" class="m-0">
+                                    <button class="btn btn-outline-secondary btn-sm admin-products-action-btn"
+                                            type="submit"
+                                            title="Скопировать товар">
+                                        <i class="bi bi-copy"></i>
+                                    </button>
+                                </form>
+                                <a class="btn btn-outline-primary btn-sm admin-products-action-btn"
+                                   th:href="@{'/admin/products/' + ${p.id} + '/edit'}"
+                                   title="Редактировать товар">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <button class="btn btn-outline-danger btn-sm admin-products-action-btn"
+                                        type="button"
+                                        data-bs-toggle="modal"
+                                        th:attr="data-bs-target=${'#deleteProductModal-' + p.id}"
+                                        title="Удалить товар">
+                                    <i class="bi bi-trash3"></i>
+                                </button>
+                            </div>
+
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <th:block th:if="${!#lists.isEmpty(products)}">
+                <div class="modal fade"
+                     th:each="p : ${products}"
+                     th:attr="id=${'deleteProductModal-' + p.id}"
+                     tabindex="-1"
+                     aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <div class="h6 mb-0">Удаление товара</div>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body text-start">
+                                <p class="mb-0">Удалить товар <strong th:text="${p.name}"></strong>?</p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Отмена</button>
+                                <form th:action="@{'/admin/products/' + ${p.id} + '/delete'}" method="post" class="m-0">
+                                    <button class="btn btn-danger btn-sm" type="submit">Удалить</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </th:block>
+
+            <form method="get"
+                  th:if="${hasMoreProducts}"
+                  th:action="@{/admin/products}"
+                  class="d-grid mt-3">
+                <input type="hidden" name="categoryId" th:value="${selectedCategoryId}">
+                <input type="hidden" name="q" th:value="${productSearchQuery}">
+                <input type="hidden" name="addedFrom" th:value="${addedFrom}">
+                <input type="hidden" name="addedTo" th:value="${addedTo}">
+                <input type="hidden" name="sort" th:value="${productSort}">
+                <input type="hidden" name="limit" th:value="${nextProductLimit}">
+                <button class="btn btn-outline-dark admin-products-page-btn" type="submit">Показать ещё товары</button>
+            </form>
+        </section>
     </div>
 </main>
 <div th:replace="~{fragments :: scripts}"></div>
 </body>
 </html>
-

@@ -13,8 +13,16 @@ public interface CartItemRepository extends JpaRepository<CartItem, Long> {
 
     List<CartItem> findBySessionId(String sessionId);
 
+    List<CartItem> findAllByUserAndProduct(ShopUser user, Product product);
+
+    List<CartItem> findAllBySessionIdAndProduct(String sessionId, Product product);
+
     Optional<CartItem> findByUserAndProduct(ShopUser user, Product product);
 
     Optional<CartItem> findBySessionIdAndProduct(String sessionId, Product product);
+
+    Optional<CartItem> findByIdAndUser(Long id, ShopUser user);
+
+    Optional<CartItem> findByIdAndSessionId(Long id, String sessionId);
 }
 

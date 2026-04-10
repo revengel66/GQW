@@ -4,19 +4,61 @@
 <body>
 <nav th:replace="~{fragments :: adminNavbar}"></nav>
 <main class="container container-wide py-4">
-    <h1 class="h4 mb-3">Отзывы на модерации</h1>
+    <nav class="admin-breadcrumb mb-3" aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a th:href="@{/admin}">Админка</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Отзывы</li>
+        </ol>
+    </nav>
+
+    <h1 class="h4 mb-3">Отзывы</h1>
+    <div class="alert alert-success" th:if="${reviewSuccess}" th:text="${reviewSuccess}"></div>
+    <div class="alert alert-danger" th:if="${reviewError}" th:text="${reviewError}"></div>
+
+    <div class="glass-card p-3 mb-4">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label mb-1">Статус</label>
+                <select class="form-select" name="status">
+                    <option value="PENDING" th:selected="${status == 'PENDING'}">На модерации</option>
+                    <option value="APPROVED" th:selected="${status == 'APPROVED'}">Опубликованные</option>
+                    <option value="REJECTED" th:selected="${status == 'REJECTED'}">Отклонённые</option>
+                    <option value="ALL" th:selected="${status == 'ALL'}">Все</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label mb-1">Рейтинг</label>
+                <select class="form-select" name="rating">
+                    <option value="">Любой</option>
+                    <option th:each="r : ${#numbers.sequence(1,5)}" th:value="${r}" th:selected="${rating != null and rating == r}" th:text="${r}"></option>
+                </select>
+            </div>
+            <div class="col-md-5">
+                <label class="form-label mb-1">Товар</label>
+                <select class="form-select" name="productId">
+                    <option value="">Все товары</option>
+                    <option th:each="p : ${products}" th:value="${p.id}" th:selected="${productId != null and productId == p.id}" th:text="${p.name}"></option>
+                </select>
+            </div>
+            <div class="col-md-2 d-grid">
+                <button class="btn btn-primary" type="submit">Применить</button>
+            </div>
+        </form>
+    </div>
+
     <div class="glass-card p-4">
-        <div class="text-muted" th:if="${#lists.isEmpty(reviews)}">Нет отзывов, ожидающих модерацию.</div>
+        <div class="text-muted" th:if="${#lists.isEmpty(reviews)}">Отзывы не найдены.</div>
         <table class="table align-middle" th:if="${!#lists.isEmpty(reviews)}">
             <thead>
             <tr>
                 <th>ID</th>
                 <th>Товар</th>
-                <th>Пользователь</th>
+                <th>Автор</th>
                 <th>Оценка</th>
                 <th>Текст</th>
+                <th>Статус</th>
                 <th>Дата</th>
-                <th></th>
+                <th class="text-end">Действия</th>
             </tr>
             </thead>
             <tbody>
@@ -25,17 +67,35 @@
                 <td th:text="${r.product != null ? r.product.name : '-'}"></td>
                 <td th:text="${r.user != null ? r.user.username : 'Гость'}"></td>
                 <td th:text="${r.rating != null ? r.rating : '-'}"></td>
-                <td th:text="${r.text}"></td>
-                <td th:text="${#temporals.format(r.createdAt, 'dd.MM.yyyy HH:mm')}"></td>
+                <td style="max-width: 360px;">
+                    <div class="expandable-text js-expandable-text" data-collapsed-lines="4">
+                        <div class="expandable-text-content js-expandable-content" th:text="${r.text}"></div>
+                        <button class="expandable-text-toggle js-expandable-toggle d-none"
+                                type="button"
+                                data-label-more="Показать ещё"
+                                data-label-less="Скрыть">
+                            Показать ещё
+                        </button>
+                    </div>
+                </td>
                 <td>
-                    <div class="d-flex gap-2">
+                    <span class="badge text-bg-warning" th:if="${!r.moderated}">На модерации</span>
+                    <span class="badge text-bg-success" th:if="${r.moderated and r.approved}">Опубликован</span>
+                    <span class="badge text-bg-secondary" th:if="${r.moderated and !r.approved}">Отклонён</span>
+                </td>
+                <td th:text="${#temporals.format(r.createdAt, 'dd.MM.yyyy HH:mm')}"></td>
+                <td class="text-end">
+                    <div class="d-inline-flex gap-2">
                         <form method="post" th:action="@{'/admin/reviews/' + ${r.id} + '/moderate'}">
                             <input type="hidden" name="approved" value="true">
-                            <button class="btn btn-sm btn-success" type="submit">Одобрить</button>
+                            <button class="btn btn-sm btn-success" type="submit">Опубликовать</button>
                         </form>
                         <form method="post" th:action="@{'/admin/reviews/' + ${r.id} + '/moderate'}">
                             <input type="hidden" name="approved" value="false">
-                            <button class="btn btn-sm btn-outline-danger" type="submit">Отклонить</button>
+                            <button class="btn btn-sm btn-outline-secondary" type="submit">Не публиковать</button>
+                        </form>
+                        <form method="post" th:action="@{'/admin/reviews/' + ${r.id} + '/delete'}">
+                            <button class="btn btn-sm btn-outline-danger" type="submit">Удалить</button>
                         </form>
                     </div>
                 </td>

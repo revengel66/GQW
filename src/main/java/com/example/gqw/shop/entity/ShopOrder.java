@@ -15,6 +15,8 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -43,14 +45,47 @@ public class ShopOrder {
     @Column(length = 32)
     private String customerPhone;
 
+    @Column(length = 16)
+    private String deliveryType = "PICKUP";
+
+    @Column(length = 255)
+    private String deliveryAddress;
+
+    @Column(length = 255)
+    private String deliveryStreet;
+
+    @Column(length = 32)
+    private String deliveryHouse;
+
+    @Column(length = 32)
+    private String deliveryApartment;
+
+    @Column(length = 32)
+    private String deliveryEntrance;
+
+    @Column(length = 32)
+    private String deliveryFloor;
+
+    @Column(length = 64)
+    private String deliveryIntercom;
+
+    @Column
+    private LocalDate pickupDate;
+
+    @Column
+    private LocalDate deliveryDate;
+
+    @Column
+    private LocalTime deliveryTime;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)
-    private OrderStatus status = OrderStatus.ACCEPTED;
+    private OrderStatus status = OrderStatus.NEW;
 
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal totalAmount = BigDecimal.ZERO;
 
-    @Column(nullable = false, length = 255)
+    @Column(length = 255)
     private String pickupAddress = "Главный филиал";
 
     @Column(nullable = false)

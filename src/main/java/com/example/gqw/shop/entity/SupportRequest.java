@@ -30,6 +30,10 @@ public class SupportRequest {
     @JoinColumn(name = "user_id")
     private ShopUser user;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "order_id")
+    private ShopOrder order;
+
     @Column(nullable = false, length = 128)
     private String name;
 
@@ -38,6 +42,9 @@ public class SupportRequest {
 
     @Column(length = 32)
     private String phone;
+
+    @Column(length = 255)
+    private String subject;
 
     @Column(nullable = false, length = 2048)
     private String message;

@@ -20,19 +20,27 @@ public class SecurityConfig {
                     "/catalog/**",
                     "/category/**",
                     "/product/**",
+                    "/cart/**",
                     "/register",
                     "/login",
+                    "/error",
                     "/css/**",
                     "/js/**",
-                    "/images/**"
+                    "/images/**",
+                    "/uploads/**"
                 ).permitAll()
                 .requestMatchers("/admin/**").hasRole("ADMIN")
-                .requestMatchers("/account/**", "/cart/**", "/wishlist/**", "/checkout/**", "/review/**").authenticated()
+                .requestMatchers("/review/**").permitAll()
+                .requestMatchers("/account/**", "/checkout/**").authenticated()
                 .anyRequest().permitAll()
             )
             .formLogin(form -> form
                 .loginPage("/login")
-                .defaultSuccessUrl("/", true)
+                .successHandler((request, response, authentication) -> {
+                    boolean admin = authentication.getAuthorities().stream()
+                        .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+                    response.sendRedirect(admin ? "/admin" : "/");
+                })
                 .permitAll()
             )
             .logout(logout -> logout

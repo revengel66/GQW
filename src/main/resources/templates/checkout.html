@@ -12,17 +12,72 @@
                     <div class="col-12">
                         <label class="form-label">ФИО</label>
                         <input class="form-control" th:field="*{customerName}">
+                        <div class="text-danger small mt-1" th:if="${#fields.hasErrors('customerName')}" th:errors="*{customerName}"></div>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Email</label>
                         <input class="form-control" th:field="*{customerEmail}">
+                        <div class="text-danger small mt-1" th:if="${#fields.hasErrors('customerEmail')}" th:errors="*{customerEmail}"></div>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Телефон</label>
                         <input class="form-control" th:field="*{customerPhone}">
                     </div>
-                    <div class="col-12">
-                        <div class="alert alert-light border">Способ получения: <strong>самовывоз (Главный филиал)</strong></div>
+                    <div class="col-md-6">
+                        <label class="form-label">Способ получения</label>
+                        <select class="form-select" th:field="*{deliveryType}" id="delivery-type-select">
+                            <option value="PICKUP">Самовывоз</option>
+                            <option value="DELIVERY">Доставка по городу</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6" id="pickup-date-wrap">
+                        <label class="form-label">Дата самовывоза</label>
+                        <input class="form-control" type="date" th:field="*{pickupDate}">
+                    </div>
+                    <div class="col-md-6 d-none" id="delivery-date-wrap">
+                        <label class="form-label">Дата доставки</label>
+                        <input class="form-control" type="date" th:field="*{deliveryDate}">
+                    </div>
+                    <div class="col-md-6 d-none" id="delivery-time-wrap">
+                        <label class="form-label">К какому времени доставить</label>
+                        <input class="form-control"
+                               type="time"
+                               th:field="*{deliveryTime}"
+                               min="10:00"
+                               max="21:00"
+                               step="300">
+                        <div class="small text-muted mt-1">Рабочие часы доставки: 10:00-21:00</div>
+                    </div>
+                    <div class="col-12 d-none" id="delivery-address-wrap">
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <label class="form-label">Адрес доставки</label>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Улица</label>
+                                <input class="form-control" th:field="*{deliveryStreet}" placeholder="Улица">
+                            </div>
+                            <div class="col-md-2 col-6">
+                                <label class="form-label">Дом</label>
+                                <input class="form-control" th:field="*{deliveryHouse}" placeholder="Дом">
+                            </div>
+                            <div class="col-md-2 col-6">
+                                <label class="form-label">Квартира</label>
+                                <input class="form-control" th:field="*{deliveryApartment}" placeholder="Кв.">
+                            </div>
+                            <div class="col-md-2 col-6">
+                                <label class="form-label">Подъезд</label>
+                                <input class="form-control" th:field="*{deliveryEntrance}" placeholder="Подъезд">
+                            </div>
+                            <div class="col-md-2 col-6">
+                                <label class="form-label">Этаж</label>
+                                <input class="form-control" th:field="*{deliveryFloor}" placeholder="Этаж">
+                            </div>
+                            <div class="col-md-2 col-6">
+                                <label class="form-label">Домофон</label>
+                                <input class="form-control" th:field="*{deliveryIntercom}" placeholder="Домофон">
+                            </div>
+                        </div>
                     </div>
                     <div class="col-12">
                         <button class="btn btn-primary" type="submit">Подтвердить заказ</button>
@@ -47,6 +102,43 @@
     </div>
 </main>
 <div th:replace="~{fragments :: scripts}"></div>
+<script>
+    (function () {
+        const typeSelect = document.getElementById("delivery-type-select");
+        const pickupDateWrap = document.getElementById("pickup-date-wrap");
+        const deliveryDateWrap = document.getElementById("delivery-date-wrap");
+        const deliveryTimeWrap = document.getElementById("delivery-time-wrap");
+        const deliveryAddressWrap = document.getElementById("delivery-address-wrap");
+        const pickupDateInput = document.querySelector("input[name='pickupDate']");
+        const deliveryDateInput = document.querySelector("input[name='deliveryDate']");
+        const deliveryTimeInput = document.querySelector("input[name='deliveryTime']");
+        const deliveryStreetInput = document.querySelector("input[name='deliveryStreet']");
+        if (!typeSelect || !pickupDateWrap || !deliveryDateWrap || !deliveryTimeWrap || !deliveryAddressWrap) {
+            return;
+        }
+        const sync = () => {
+            const delivery = typeSelect.value === "DELIVERY";
+            pickupDateWrap.classList.toggle("d-none", delivery);
+            deliveryDateWrap.classList.toggle("d-none", !delivery);
+            deliveryTimeWrap.classList.toggle("d-none", !delivery);
+            deliveryAddressWrap.classList.toggle("d-none", !delivery);
+            if (pickupDateInput) {
+                pickupDateInput.required = !delivery;
+            }
+            if (deliveryDateInput) {
+                deliveryDateInput.required = delivery;
+            }
+            if (deliveryTimeInput) {
+                deliveryTimeInput.required = delivery;
+            }
+            if (deliveryStreetInput) {
+                deliveryStreetInput.required = delivery;
+            }
+        };
+        typeSelect.addEventListener("change", sync);
+        sync();
+    })();
+</script>
 </body>
 </html>
 

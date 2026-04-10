@@ -26,5 +26,17 @@ public class ProductFilter {
 
     @Column(nullable = false, length = 128)
     private String name;
+
+    @Column(length = 32)
+    private String valueType = "LIST";
+
+    @Column(length = 32)
+    private String viewType = "CHECKBOX";
+
+    @Column
+    private Boolean multiValue = true;
+
+    @Column
+    private Boolean systemFilter = false;
 }
 

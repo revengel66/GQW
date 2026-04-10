@@ -4,23 +4,69 @@
 <body>
 <nav th:replace="~{fragments :: navbar}"></nav>
 <main class="container container-wide py-4">
-    <h1 class="h4 mb-3">Избранное</h1>
-    <div class="glass-card p-4">
-        <div th:if="${#lists.isEmpty(items)}" class="text-muted">Список избранного пуст.</div>
-        <div class="row g-3" th:if="${!#lists.isEmpty(items)}">
-            <div class="col-12 col-md-6 col-xl-4" th:each="it : ${items}">
-                <div class="glass-card p-3 h-100">
-                    <h3 class="h6 mb-2" th:text="${it.product.name}"></h3>
-                    <p class="small text-muted mb-3" th:text="${it.product.shortDescription}"></p>
-                    <div class="d-flex gap-2">
-                        <a class="btn btn-primary btn-sm" th:href="@{'/product/' + ${it.product.slug}}">Открыть</a>
-                        <form th:action="@{/wishlist/remove}" method="post">
-                            <input type="hidden" name="itemId" th:value="${it.id}">
-                            <button class="btn btn-outline-danger btn-sm" type="submit">Удалить</button>
-                        </form>
+    <h1 class="h4 mb-4">Избранное</h1>
+    <div class="text-muted" th:if="${#lists.isEmpty(wishlistProducts)}">Список избранного пуст.</div>
+    <div class="row g-4" th:if="${!#lists.isEmpty(wishlistProducts)}">
+        <div class="col-12 col-md-6 col-xl-3" th:each="p : ${wishlistProducts}">
+            <article class="product-card h-100"
+                     th:with="features=${productCardFeatures[p.id]}, inCartQty=${cartItemQuantities[p.id] != null ? cartItemQuantities[p.id] : 0}">
+                <div class="product-card-media-wrap">
+                    <img class="product-card-media"
+                         th:src="${p.primaryImageUrl != null ? p.primaryImageUrl : '/img/products/placeholder.webp'}"
+                         alt="">
+                    <div class="product-card-badges">
+                        <span class="product-badge badge-hit" th:if="${p.isHit}">Хит</span>
+                        <span class="product-badge badge-new" th:if="${p.isNew}">Новинка</span>
+                        <span class="product-badge badge-discount"
+                              th:if="${p.discountPercent != null}"
+                              th:text="${'-' + p.discountPercent + '%'}"></span>
                     </div>
                 </div>
-            </div>
+                <div class="product-card-body">
+                    <div class="product-title">
+                        <a th:href="@{'/product/' + ${p.slug}}" th:text="${p.name}"></a>
+                    </div>
+                    <div class="small text-danger mb-1" th:if="${!p.inStock}">Нет в наличии</div>
+                    <ul class="product-features" th:if="${features != null and !#lists.isEmpty(features)}">
+                        <li th:each="ch : ${features}" th:text="${ch.name + ': ' + ch.value}"></li>
+                    </ul>
+                    <div class="product-price-row">
+                        <div class="product-price-box">
+                            <div class="product-price-old"
+                                 th:if="${p.oldPrice != null}"
+                                 th:text="${#numbers.formatDecimal(p.oldPrice, 1, 'COMMA', 0, 'POINT')} + ' ₽'"></div>
+                            <div class="product-price-current"
+                                 th:text="${#numbers.formatDecimal(p.price, 1, 'COMMA', 0, 'POINT')} + ' ₽'"></div>
+                        </div>
+                        <div class="product-icon-actions">
+                            <form class="m-0 js-wishlist-toggle-form"
+                                  th:action="@{/api/wishlist/toggle}"
+                                  method="post"
+                                  th:attr="data-product-id=${p.id}">
+                                <input type="hidden" name="productId" th:value="${p.id}">
+                                <button class="wishlist-icon-btn js-wishlist-btn"
+                                        th:classappend="${wishlistProductIds != null and wishlistProductIds.contains(p.id)} ? ' is-active'"
+                                        type="submit"
+                                        title="В избранное">
+                                    <i th:class="${wishlistProductIds != null and wishlistProductIds.contains(p.id)} ? 'bi bi-heart-fill' : 'bi bi-heart'"></i>
+                                </button>
+                            </form>
+                            <form class="m-0 js-cart-toggle-form"
+                                  th:action="@{/api/cart/toggle-one}"
+                                  method="post"
+                                  th:attr="data-product-id=${p.id}">
+                                <input type="hidden" name="productId" th:value="${p.id}">
+                                <button class="cart-icon-btn" type="submit" title="В корзину" th:disabled="${!p.inStock}">
+                                    <i class="bi bi-cart3"></i>
+                                    <span class="product-cart-qty js-product-cart-qty"
+                                          th:classappend="${inCartQty == 0} ? ' d-none'"
+                                          th:text="${inCartQty}"></span>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </article>
         </div>
     </div>
 </main>

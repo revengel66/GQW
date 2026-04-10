@@ -9,5 +9,4 @@ class GqwApplicationTests {
     @Test
     void contextLoads() {
     }
-
 }

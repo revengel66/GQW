@@ -4,13 +4,24 @@
 <body>
 <nav th:replace="~{fragments :: adminNavbar}"></nav>
 <main class="container container-wide py-4">
+    <nav class="admin-breadcrumb mb-3" aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a th:href="@{/admin}">Админка</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Заявки</li>
+        </ol>
+    </nav>
+
     <h1 class="h4 mb-3">Заявки в поддержку</h1>
+    <div class="alert alert-success" th:if="${supportSuccess}" th:text="${supportSuccess}"></div>
+    <div class="alert alert-danger" th:if="${supportError}" th:text="${supportError}"></div>
     <div class="glass-card p-4">
         <div class="text-muted" th:if="${#lists.isEmpty(requests)}">Новых заявок нет.</div>
         <table class="table align-middle" th:if="${!#lists.isEmpty(requests)}">
             <thead>
             <tr>
                 <th>ID</th>
+                <th>Тема</th>
+                <th>Заказ</th>
                 <th>Имя</th>
                 <th>Email</th>
                 <th>Телефон</th>
@@ -22,6 +33,8 @@
             <tbody>
             <tr th:each="r : ${requests}">
                 <td th:text="${r.id}"></td>
+                <td th:text="${r.subject != null ? r.subject : '—'}"></td>
+                <td th:text="${r.order != null ? ('#' + r.order.id) : '—'}"></td>
                 <td th:text="${r.name}"></td>
                 <td th:text="${r.email}"></td>
                 <td th:text="${r.phone}"></td>

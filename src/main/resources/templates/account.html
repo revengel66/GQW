@@ -4,34 +4,583 @@
 <body>
 <nav th:replace="~{fragments :: navbar}"></nav>
 <main class="container container-wide py-4">
-    <h1 class="h4 mb-3">Личный кабинет</h1>
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <h1 class="h4 mb-0">Личный кабинет</h1>
+        <form method="post" th:action="@{/logout}" class="m-0">
+            <button class="btn btn-outline-danger btn-sm" type="submit">Выйти</button>
+        </form>
+    </div>
+
     <div class="alert alert-success" th:if="${checkoutSuccess}">
         Заказ успешно оформлен.
     </div>
-    <div class="glass-card p-4">
-        <h2 class="h6 mb-3">История заказов</h2>
-        <div th:if="${#lists.isEmpty(orders)}" class="text-muted">Заказов пока нет.</div>
-        <table class="table" th:if="${!#lists.isEmpty(orders)}">
-            <thead>
-            <tr>
-                <th>ID</th>
-                <th>Дата</th>
-                <th>Статус</th>
-                <th>Сумма</th>
-            </tr>
-            </thead>
-            <tbody>
-            <tr th:each="o : ${orders}">
-                <td th:text="${o.id}"></td>
-                <td th:text="${#temporals.format(o.createdAt, 'dd.MM.yyyy HH:mm')}"></td>
-                <td th:text="${o.status}"></td>
-                <td th:text="${#numbers.formatDecimal(o.totalAmount,1,'COMMA',2,'POINT')} + ' ₽'"></td>
-            </tr>
-            </tbody>
-        </table>
+    <div class="alert alert-success" th:if="${profileUpdated}">
+        Данные сохранены.
+    </div>
+    <div class="alert alert-success" th:if="${orderSuccess}" th:text="${orderSuccess}"></div>
+    <div class="alert alert-success" th:if="${supportSuccess}" th:text="${supportSuccess}"></div>
+    <div class="alert alert-danger" th:if="${profileError}" th:text="${profileError}"></div>
+    <div class="alert alert-danger" th:if="${orderError}" th:text="${orderError}"></div>
+    <div class="alert alert-danger" th:if="${supportError}" th:text="${supportError}"></div>
+
+    <div class="account-layout" th:if="${currentUser != null}">
+        <aside class="account-sidebar glass-card p-2 p-lg-3">
+            <div class="list-group list-group-flush account-tabs" id="accountTabs" role="tablist">
+                <button class="list-group-item list-group-item-action"
+                        type="button"
+                        role="tab"
+                        data-bs-toggle="tab"
+                        data-bs-target="#account-pane-profile"
+                        th:classappend="${activeAccountTab == 'profile'} ? ' active'">
+                    Профиль
+                </button>
+                <button class="list-group-item list-group-item-action"
+                        type="button"
+                        role="tab"
+                        data-bs-toggle="tab"
+                        data-bs-target="#account-pane-address"
+                        th:classappend="${activeAccountTab == 'address'} ? ' active'">
+                    Адрес
+                </button>
+                <button class="list-group-item list-group-item-action"
+                        type="button"
+                        role="tab"
+                        data-bs-toggle="tab"
+                        data-bs-target="#account-pane-orders"
+                        th:classappend="${activeAccountTab == 'orders'} ? ' active'">
+                    История заказов
+                </button>
+                <button class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+                        type="button"
+                        role="tab"
+                        data-bs-toggle="tab"
+                        data-bs-target="#account-pane-support"
+                        th:classappend="${activeAccountTab == 'support'} ? ' active'">
+                    <span>Поддержка</span>
+                    <span class="badge text-bg-secondary" th:text="${supportRequestsCount}"></span>
+                </button>
+                <button class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+                        type="button"
+                        role="tab"
+                        data-bs-toggle="tab"
+                        data-bs-target="#account-pane-reviews"
+                        th:classappend="${activeAccountTab == 'reviews'} ? ' active'">
+                    <span>Мои отзывы</span>
+                    <span class="badge text-bg-warning text-dark"
+                          th:if="${newReviewRepliesCount > 0}"
+                          th:text="${newReviewRepliesCount}"></span>
+                </button>
+            </div>
+        </aside>
+
+        <section class="account-content tab-content">
+            <div class="tab-pane fade"
+                 id="account-pane-profile"
+                 role="tabpanel"
+                 th:classappend="${activeAccountTab == 'profile'} ? ' show active'">
+                <div class="glass-card p-4">
+                    <h2 class="h6 mb-3">Профиль</h2>
+                    <form class="row g-3" method="post" th:action="@{/account/profile}">
+                        <div class="col-md-4">
+                            <label class="form-label">ФИО</label>
+                            <input class="form-control" name="fullName" th:value="${currentUser.fullName}" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Email</label>
+                            <input class="form-control" name="email" th:value="${currentUser.email}" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Телефон</label>
+                            <input class="form-control" name="phone" th:value="${currentUser.phone}">
+                        </div>
+                        <div class="col-12">
+                            <button class="btn btn-primary btn-sm" type="submit">Сохранить профиль</button>
+                        </div>
+                    </form>
+                    <hr class="my-3">
+                    <form method="post"
+                          th:action="@{/account/delete}"
+                          class="d-flex align-items-center flex-wrap gap-2"
+                          onsubmit="return confirm('Удалить аккаунт? Действие необратимо. История заказов сохранится в отчётах.')">
+                        <button class="btn btn-outline-danger btn-sm" type="submit">Удалить аккаунт</button>
+                        <span class="small text-muted">Вход станет недоступен, история заказов сохранится для отчётности.</span>
+                    </form>
+                </div>
+            </div>
+
+            <div class="tab-pane fade"
+                 id="account-pane-address"
+                 role="tabpanel"
+                 th:classappend="${activeAccountTab == 'address'} ? ' show active'">
+                <div class="glass-card p-4">
+                    <h2 class="h6 mb-3">Адрес доставки по умолчанию</h2>
+                    <form class="row g-3" method="post" th:action="@{/account/address}">
+                        <div class="col-md-6">
+                            <label class="form-label">Улица</label>
+                            <input class="form-control"
+                                   name="addressStreet"
+                                   th:value="${#strings.isEmpty(currentUser.addressStreet) ? currentUser.address : currentUser.addressStreet}">
+                        </div>
+                        <div class="col-md-2 col-6">
+                            <label class="form-label">Дом</label>
+                            <input class="form-control" name="addressHouse" th:value="${currentUser.addressHouse}">
+                        </div>
+                        <div class="col-md-2 col-6">
+                            <label class="form-label">Квартира</label>
+                            <input class="form-control" name="addressApartment" th:value="${currentUser.addressApartment}">
+                        </div>
+                        <div class="col-md-2 col-6">
+                            <label class="form-label">Подъезд</label>
+                            <input class="form-control" name="addressEntrance" th:value="${currentUser.addressEntrance}">
+                        </div>
+                        <div class="col-md-2 col-6">
+                            <label class="form-label">Этаж</label>
+                            <input class="form-control" name="addressFloor" th:value="${currentUser.addressFloor}">
+                        </div>
+                        <div class="col-md-2 col-6">
+                            <label class="form-label">Домофон</label>
+                            <input class="form-control" name="addressIntercom" th:value="${currentUser.addressIntercom}">
+                        </div>
+                        <div class="col-12">
+                            <button class="btn btn-primary btn-sm" type="submit">Сохранить адрес</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="tab-pane fade"
+                 id="account-pane-orders"
+                 role="tabpanel"
+                 th:classappend="${activeAccountTab == 'orders'} ? ' show active'">
+                <div class="row g-3 mb-3">
+                    <div class="col-md-4">
+                        <div class="glass-card p-3 h-100 account-stat-card">
+                            <div class="account-stat-label">Заказов</div>
+                            <div class="account-stat-value" th:text="${ordersCount}">0</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="glass-card p-3 h-100 account-stat-card">
+                            <div class="account-stat-label">Потрачено</div>
+                            <div class="account-stat-value"
+                                 th:text="${#numbers.formatDecimal(totalSpent,1,'COMMA',2,'POINT')} + ' ₽'">0 ₽</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="glass-card p-3 h-100 account-stat-card">
+                            <div class="account-stat-label">Последний заказ</div>
+                            <div class="account-stat-value account-stat-value-sm"
+                                 th:text="${lastOrder != null ? ('#' + lastOrder.id) : '—'}">—</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass-card p-4" th:if="${#lists.isEmpty(orders)}">
+                    <div class="text-muted">Заказов пока нет.</div>
+                </div>
+
+                <div class="account-order-list" th:if="${!#lists.isEmpty(orders)}">
+                    <article class="glass-card p-3 p-md-4 account-order-card" th:each="o : ${orders}">
+                        <div class="account-order-head">
+                            <div class="account-order-id">
+                                <strong th:text="${'Заказ #' + o.id}"></strong>
+                                <span class="text-muted" th:text="${#temporals.format(o.createdAt, 'dd.MM.yyyy HH:mm')}"></span>
+                            </div>
+                            <div class="account-order-meta">
+                                <span class="badge text-bg-primary"
+                                      th:text="${orderStatusRuMap[o.status.name()] != null ? orderStatusRuMap[o.status.name()] : o.status}"></span>
+                                <span class="fw-semibold"
+                                      th:text="${#numbers.formatDecimal(o.totalAmount,1,'COMMA',2,'POINT')} + ' ₽'"></span>
+                                <span class="text-muted"
+                                      th:text="${(orderQuantityByOrderId[o.id] != null ? orderQuantityByOrderId[o.id] : 0) + ' шт.'}"></span>
+                            </div>
+                        </div>
+
+                        <div class="account-order-actions">
+                            <button class="btn btn-outline-dark btn-sm"
+                                    type="button"
+                                    data-bs-toggle="collapse"
+                                    th:attr="data-bs-target=${'#order-details-' + o.id},aria-controls=${'order-details-' + o.id}">
+                                Подробно
+                            </button>
+                            <a class="btn btn-outline-primary btn-sm"
+                               th:href="@{/account(tab='support',orderForSupport=${o.id})}">
+                                Обращение по заказу
+                            </a>
+                            <form th:if="${cancelableOrderById[o.id] == true}" method="post" class="m-0"
+                                  th:action="@{'/account/orders/' + ${o.id} + '/cancel'}">
+                                <button class="btn btn-outline-danger btn-sm" type="submit">Отменить</button>
+                            </form>
+                        </div>
+
+                        <div class="collapse mt-3" th:id="${'order-details-' + o.id}">
+                            <div class="account-order-details-grid">
+                                <div>
+                                    <div class="account-subtitle mb-2">Параметры заказа</div>
+                                    <div class="small mb-1">
+                                        <span class="text-muted">Получатель:</span>
+                                        <span th:text="${o.customerName}"></span>
+                                    </div>
+                                    <div class="small mb-1">
+                                        <span class="text-muted">Email:</span>
+                                        <span th:text="${o.customerEmail}"></span>
+                                    </div>
+                                    <div class="small mb-1" th:if="${o.customerPhone != null and !#strings.isEmpty(o.customerPhone)}">
+                                        <span class="text-muted">Телефон:</span>
+                                        <span th:text="${o.customerPhone}"></span>
+                                    </div>
+                                    <div class="small mb-1">
+                                        <span class="text-muted">Тип:</span>
+                                        <span th:text="${o.deliveryType == 'DELIVERY' ? 'Доставка' : 'Самовывоз'}"></span>
+                                    </div>
+                                    <div class="small mb-1" th:if="${o.deliveryType == 'DELIVERY'}">
+                                        <span class="text-muted">Адрес:</span>
+                                        <span th:text="${o.deliveryAddress}"></span>
+                                    </div>
+                                    <div class="small mb-1" th:if="${o.deliveryType == 'DELIVERY' and o.deliveryDate != null}">
+                                        <span class="text-muted">Дата доставки:</span>
+                                        <span th:text="${#temporals.format(o.deliveryDate, 'dd.MM.yyyy')}"></span>
+                                    </div>
+                                    <div class="small mb-1" th:if="${o.deliveryType == 'DELIVERY' and o.deliveryTime != null}">
+                                        <span class="text-muted">Ко времени:</span>
+                                        <span th:text="${#temporals.format(o.deliveryTime, 'HH:mm')}"></span>
+                                    </div>
+                                    <div class="small mb-1" th:if="${o.deliveryType != 'DELIVERY' and o.pickupDate != null}">
+                                        <span class="text-muted">Дата резерва:</span>
+                                        <span th:text="${#temporals.format(o.pickupDate, 'dd.MM.yyyy')}"></span>
+                                    </div>
+                                    <div class="small mb-1" th:if="${o.deliveryType != 'DELIVERY'}">
+                                        <span class="text-muted">Пункт выдачи:</span>
+                                        <span th:text="${o.pickupAddress}"></span>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <div class="account-subtitle mb-2">История статусов</div>
+                                    <ul class="account-status-history mb-0">
+                                        <li th:each="h : ${orderHistoryByOrderId[o.id]}">
+                                            <div>
+                                                <span class="fw-semibold"
+                                                      th:text="${orderStatusRuMap[h.status.name()] != null ? orderStatusRuMap[h.status.name()] : h.status}"></span>
+                                                <span class="text-muted ms-2"
+                                                      th:text="${#temporals.format(h.changedAt, 'dd.MM.yyyy HH:mm')}"></span>
+                                            </div>
+                                            <div class="text-muted small" th:if="${h.comment != null}" th:text="${h.comment}"></div>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <div class="account-order-items mt-3">
+                                <div class="account-subtitle mb-2">Состав заказа</div>
+                                <div class="table-responsive">
+                                    <table class="table align-middle mb-0">
+                                        <thead>
+                                        <tr>
+                                            <th>Товар</th>
+                                            <th>Цена</th>
+                                            <th>Кол-во</th>
+                                            <th>Сумма</th>
+                                            <th></th>
+                                        </tr>
+                                        </thead>
+                                        <tbody>
+                                        <tr th:each="it : ${orderItemsByOrderId[o.id]}">
+                                            <td>
+                                                <div class="d-flex align-items-center gap-3">
+                                                    <img class="cart-item-thumb"
+                                                         th:src="${it.product != null && it.product.primaryImageUrl != null ? it.product.primaryImageUrl : '/img/products/placeholder.webp'}"
+                                                         alt="">
+                                                    <a th:if="${it.product != null}"
+                                                       th:href="@{'/product/' + ${it.product.slug}}"
+                                                       th:text="${it.productName}"></a>
+                                                    <span th:if="${it.product == null}" th:text="${it.productName}"></span>
+                                                </div>
+                                            </td>
+                                            <td th:text="${#numbers.formatDecimal(it.unitPrice,1,'COMMA',2,'POINT')} + ' ₽'"></td>
+                                            <td th:text="${it.quantity}"></td>
+                                            <td th:text="${#numbers.formatDecimal(it.unitPrice * it.quantity,1,'COMMA',2,'POINT')} + ' ₽'"></td>
+                                            <td>
+                                                <a class="btn btn-outline-secondary btn-sm"
+                                                   th:if="${it.product != null and (o.status == T(com.example.gqw.shop.entity.OrderStatus).WAITING_PICKUP or o.status == T(com.example.gqw.shop.entity.OrderStatus).DELIVERED) and (reviewedProductIds == null or !reviewedProductIds.contains(it.product.id))}"
+                                                   th:href="@{/product/{slug}(slug=${it.product.slug},tab='reviews',openReview=true)}">
+                                                    Оставить отзыв
+                                                </a>
+                                            </td>
+                                        </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div class="mt-3" th:if="${editableOrderById[o.id] == true}">
+                                <button class="btn btn-outline-dark btn-sm"
+                                        type="button"
+                                        data-bs-toggle="collapse"
+                                        th:attr="data-bs-target=${'#order-edit-' + o.id},aria-controls=${'order-edit-' + o.id}">
+                                    Изменить заказ
+                                </button>
+                                <div class="collapse mt-2" th:id="${'order-edit-' + o.id}">
+                                    <form class="row g-2 account-order-edit-form"
+                                          th:action="@{'/account/orders/' + ${o.id} + '/update'}"
+                                          method="post">
+                                        <div class="col-md-4">
+                                            <label class="form-label">Получатель</label>
+                                            <input class="form-control" name="customerName" th:value="${o.customerName}" required>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Email</label>
+                                            <input class="form-control" type="email" name="customerEmail" th:value="${o.customerEmail}" required>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Телефон</label>
+                                            <input class="form-control" name="customerPhone" th:value="${o.customerPhone}">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Тип</label>
+                                            <select class="form-select js-account-order-delivery-type" name="deliveryType">
+                                                <option value="PICKUP" th:selected="${o.deliveryType != 'DELIVERY'}">Самовывоз</option>
+                                                <option value="DELIVERY" th:selected="${o.deliveryType == 'DELIVERY'}">Доставка</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4 js-edit-pickup-only" th:classappend="${o.deliveryType == 'DELIVERY'} ? ' d-none'">
+                                            <label class="form-label">Дата резерва</label>
+                                            <input class="form-control" type="date" name="pickupDate" th:value="${o.pickupDate}">
+                                        </div>
+                                        <div class="col-md-4 js-edit-delivery-only" th:classappend="${o.deliveryType != 'DELIVERY'} ? ' d-none'">
+                                            <label class="form-label">Дата доставки</label>
+                                            <input class="form-control" type="date" name="deliveryDate" th:value="${o.deliveryDate}">
+                                        </div>
+                                        <div class="col-md-4 js-edit-delivery-only" th:classappend="${o.deliveryType != 'DELIVERY'} ? ' d-none'">
+                                            <label class="form-label">Ко времени</label>
+                                            <input class="form-control"
+                                                   type="time"
+                                                   name="deliveryTime"
+                                                   min="10:00"
+                                                   max="21:00"
+                                                   step="300"
+                                                   th:value="${o.deliveryTime != null ? #temporals.format(o.deliveryTime, 'HH:mm') : ''}">
+                                        </div>
+                                        <div class="col-md-6 js-edit-delivery-only" th:classappend="${o.deliveryType != 'DELIVERY'} ? ' d-none'">
+                                            <label class="form-label">Улица</label>
+                                            <input class="form-control" name="deliveryStreet" th:value="${o.deliveryStreet}">
+                                        </div>
+                                        <div class="col-md-2 col-6 js-edit-delivery-only" th:classappend="${o.deliveryType != 'DELIVERY'} ? ' d-none'">
+                                            <label class="form-label">Дом</label>
+                                            <input class="form-control" name="deliveryHouse" th:value="${o.deliveryHouse}">
+                                        </div>
+                                        <div class="col-md-2 col-6 js-edit-delivery-only" th:classappend="${o.deliveryType != 'DELIVERY'} ? ' d-none'">
+                                            <label class="form-label">Квартира</label>
+                                            <input class="form-control" name="deliveryApartment" th:value="${o.deliveryApartment}">
+                                        </div>
+                                        <div class="col-md-2 col-6 js-edit-delivery-only" th:classappend="${o.deliveryType != 'DELIVERY'} ? ' d-none'">
+                                            <label class="form-label">Подъезд</label>
+                                            <input class="form-control" name="deliveryEntrance" th:value="${o.deliveryEntrance}">
+                                        </div>
+                                        <div class="col-md-2 col-6 js-edit-delivery-only" th:classappend="${o.deliveryType != 'DELIVERY'} ? ' d-none'">
+                                            <label class="form-label">Этаж</label>
+                                            <input class="form-control" name="deliveryFloor" th:value="${o.deliveryFloor}">
+                                        </div>
+                                        <div class="col-md-2 col-6 js-edit-delivery-only" th:classappend="${o.deliveryType != 'DELIVERY'} ? ' d-none'">
+                                            <label class="form-label">Домофон</label>
+                                            <input class="form-control" name="deliveryIntercom" th:value="${o.deliveryIntercom}">
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label">Состав заказа</label>
+                                            <div class="table-responsive">
+                                                <table class="table table-sm align-middle mb-0">
+                                                    <thead>
+                                                    <tr>
+                                                        <th>Товар</th>
+                                                        <th>Цена</th>
+                                                        <th style="width: 130px;">Кол-во</th>
+                                                    </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                    <tr th:each="it : ${orderItemsByOrderId[o.id]}">
+                                                        <td th:text="${it.productName}"></td>
+                                                        <td th:text="${#numbers.formatDecimal(it.unitPrice,1,'COMMA',2,'POINT')} + ' ₽'"></td>
+                                                        <td>
+                                                            <input type="hidden" name="itemId" th:value="${it.id}">
+                                                            <input class="form-control form-control-sm"
+                                                                   type="number"
+                                                                   name="itemQuantity"
+                                                                   min="0"
+                                                                   max="999"
+                                                                   th:value="${it.quantity}">
+                                                        </td>
+                                                    </tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                            <div class="small text-muted mt-1">
+                                                Поставьте 0, чтобы убрать товар из заказа. В заказе должен остаться минимум 1 товар.
+                                            </div>
+                                        </div>
+                                        <div class="col-12">
+                                            <button class="btn btn-primary btn-sm" type="submit">Сохранить изменения</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                            <div class="small text-muted mt-3" th:if="${editableOrderById[o.id] != true}">
+                                Изменение заказа доступно только в статусе «Новый».
+                            </div>
+                        </div>
+                    </article>
+                </div>
+            </div>
+
+            <div class="tab-pane fade"
+                 id="account-pane-support"
+                 role="tabpanel"
+                 th:classappend="${activeAccountTab == 'support'} ? ' show active'">
+                <div class="glass-card p-4 mb-3">
+                    <h2 class="h6 mb-3">Создать обращение</h2>
+                    <form class="row g-3" method="post" th:action="@{/account/support/create}">
+                        <div class="col-md-5">
+                            <label class="form-label">Заказ</label>
+                            <select class="form-select" name="orderId">
+                                <option value="">Вопрос не по заказу</option>
+                                <option th:each="o : ${orders}"
+                                        th:value="${o.id}"
+                                        th:selected="${preselectedSupportOrderId != null and preselectedSupportOrderId == o.id}"
+                                        th:text="${'#' + o.id + ' • ' + #temporals.format(o.createdAt, 'dd.MM.yyyy')}"></option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Сообщение</label>
+                            <textarea class="form-control" name="message" rows="4" placeholder="Опишите вопрос" required></textarea>
+                        </div>
+                        <div class="col-12">
+                            <button class="btn btn-primary btn-sm" type="submit">Создать тикет</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="glass-card p-4">
+                    <h2 class="h6 mb-3">Мои обращения</h2>
+                    <div class="text-muted" th:if="${#lists.isEmpty(supportRequests)}">Обращений пока нет.</div>
+                    <div class="account-ticket-list" th:if="${!#lists.isEmpty(supportRequests)}">
+                        <article class="account-ticket-item" th:each="ticket : ${supportRequests}">
+                            <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+                                <div>
+                                    <strong th:text="${ticket.subject != null ? ticket.subject : ('Тикет #' + ticket.id)}"></strong>
+                                    <div class="small text-muted">
+                                        <span th:text="${'Тикет #' + ticket.id}"></span>
+                                        <span>•</span>
+                                        <span th:text="${#temporals.format(ticket.createdAt, 'dd.MM.yyyy HH:mm')}"></span>
+                                        <span th:if="${ticket.order != null}">• Заказ <span th:text="${'#' + ticket.order.id}"></span></span>
+                                    </div>
+                                </div>
+                                <span class="badge"
+                                      th:classappend="${ticket.processed} ? ' text-bg-success' : ' text-bg-warning text-dark'"
+                                      th:text="${ticket.processed} ? 'Обработан' : 'В работе'"></span>
+                            </div>
+                            <p class="mb-0 mt-2" th:text="${ticket.message}"></p>
+                        </article>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade"
+                 id="account-pane-reviews"
+                 role="tabpanel"
+                 th:classappend="${activeAccountTab == 'reviews'} ? ' show active'">
+                <div class="alert alert-info" th:if="${newReviewRepliesCount > 0}">
+                    Новых ответов на ваши отзывы: <strong th:text="${newReviewRepliesCount}"></strong>
+                </div>
+                <div class="glass-card p-4">
+                    <h2 class="h6 mb-3">Мои отзывы</h2>
+                    <div class="text-muted" th:if="${#lists.isEmpty(accountReviews)}">Вы ещё не оставляли отзывы.</div>
+                    <div class="account-review-list" th:if="${!#lists.isEmpty(accountReviews)}">
+                        <article class="account-review-item" th:each="r : ${accountReviews}">
+                            <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+                                <div>
+                                    <a th:if="${r.product != null}"
+                                       th:href="@{'/product/' + ${r.product.slug}}"
+                                       th:text="${r.product.name}"></a>
+                                    <span th:if="${r.product == null}">Товар удалён</span>
+                                    <div class="small text-muted" th:text="${#temporals.format(r.createdAt, 'dd.MM.yyyy HH:mm')}"></div>
+                                </div>
+                                <div class="review-stars" th:if="${r.rating != null}">
+                                    <i th:each="idx : ${#numbers.sequence(1,5)}"
+                                       th:class="${idx <= r.rating} ? 'bi bi-star-fill' : 'bi bi-star'"></i>
+                                </div>
+                            </div>
+                            <div class="expandable-text js-expandable-text mb-2 mt-2" data-collapsed-lines="4">
+                                <div class="expandable-text-content js-expandable-content" th:text="${r.text}"></div>
+                                <button class="expandable-text-toggle js-expandable-toggle d-none"
+                                        type="button"
+                                        data-label-more="Показать ещё"
+                                        data-label-less="Скрыть">
+                                    Показать ещё
+                                </button>
+                            </div>
+
+                            <div class="account-reply-list" th:if="${reviewRepliesByParentId[r.id] != null and !#lists.isEmpty(reviewRepliesByParentId[r.id])}">
+                                <div class="account-subtitle mb-1">Ответы:</div>
+                                <div class="account-reply-item" th:each="reply : ${reviewRepliesByParentId[r.id]}">
+                                    <div class="small text-muted mb-1"
+                                         th:text="${#temporals.format(reply.createdAt, 'dd.MM.yyyy HH:mm')}"></div>
+                                    <div class="expandable-text js-expandable-text" data-collapsed-lines="4">
+                                        <div class="expandable-text-content js-expandable-content" th:text="${reply.text}"></div>
+                                        <button class="expandable-text-toggle js-expandable-toggle d-none"
+                                                type="button"
+                                                data-label-more="Показать ещё"
+                                                data-label-less="Скрыть">
+                                            Показать ещё
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </article>
+                    </div>
+                </div>
+            </div>
+        </section>
     </div>
 </main>
 <div th:replace="~{fragments :: scripts}"></div>
+<script>
+    (() => {
+        const tabsRoot = document.getElementById("accountTabs");
+        if (tabsRoot && window.bootstrap && typeof window.bootstrap.Tab === "function") {
+            const tabButtons = Array.from(tabsRoot.querySelectorAll("[data-bs-toggle='tab']"));
+            tabButtons.forEach((button) => {
+                button.addEventListener("shown.bs.tab", () => {
+                    const targetId = button.getAttribute("data-bs-target") || "";
+                    const tabName = targetId.replace("#account-pane-", "");
+                    if (!tabName) {
+                        return;
+                    }
+                    const url = new URL(window.location.href);
+                    url.searchParams.set("tab", tabName);
+                    window.history.replaceState({}, "", url);
+                });
+            });
+        }
+
+        const syncOrderEditForm = (form) => {
+            const typeSelect = form.querySelector(".js-account-order-delivery-type");
+            if (!(typeSelect instanceof HTMLSelectElement)) {
+                return;
+            }
+            const delivery = typeSelect.value === "DELIVERY";
+            form.querySelectorAll(".js-edit-delivery-only")
+                .forEach((el) => el.classList.toggle("d-none", !delivery));
+            form.querySelectorAll(".js-edit-pickup-only")
+                .forEach((el) => el.classList.toggle("d-none", delivery));
+        };
+
+        document.querySelectorAll(".account-order-edit-form").forEach((form) => {
+            syncOrderEditForm(form);
+            const typeSelect = form.querySelector(".js-account-order-delivery-type");
+            if (typeSelect) {
+                typeSelect.addEventListener("change", () => syncOrderEditForm(form));
+            }
+        });
+    })();
+</script>
 </body>
 </html>
-

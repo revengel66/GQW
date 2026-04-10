@@ -4,7 +4,16 @@
 <body>
 <nav th:replace="~{fragments :: adminNavbar}"></nav>
 <main class="container container-wide py-4">
+    <nav class="admin-breadcrumb mb-3" aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a th:href="@{/admin}">Админка</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Заказы</li>
+        </ol>
+    </nav>
+
     <h1 class="h4 mb-3">Заказы</h1>
+    <div class="alert alert-success" th:if="${orderSuccess}" th:text="${orderSuccess}"></div>
+    <div class="alert alert-danger" th:if="${orderError}" th:text="${orderError}"></div>
     <div class="glass-card p-4">
         <table class="table align-middle">
             <thead><tr><th>ID</th><th>Покупатель</th><th>Сумма</th><th>Статус</th><th></th></tr></thead>
