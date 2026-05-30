@@ -35,3 +35,7 @@ out/
 
 ### VS Code ###
 .vscode/
+
+# local load-test artifacts
+logs/load/
+reports/
