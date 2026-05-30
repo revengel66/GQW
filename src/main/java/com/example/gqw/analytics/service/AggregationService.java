@@ -50,7 +50,7 @@ public class AggregationService {
         run = aggregationRunRepository.save(run);
 
         try {
-            List<AnalyticsEvent> events = eventRepository.findAllForAggregation(periodStart, periodEnd, null);
+            List<AnalyticsEvent> events = eventRepository.findAllForAggregation(periodStart, periodEnd, null, null);
             Map<String, List<AnalyticsEvent>> byType = events.stream()
                 .collect(Collectors.groupingBy(AnalyticsEvent::getEventTypeCode));
 

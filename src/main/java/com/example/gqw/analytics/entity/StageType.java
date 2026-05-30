@@ -26,6 +26,9 @@ public class StageType {
     private String description;
 
     @Column(nullable = false)
+    private Boolean isSystem = false;
+
+    @Column(nullable = false)
     private Boolean isActive = true;
 }
 

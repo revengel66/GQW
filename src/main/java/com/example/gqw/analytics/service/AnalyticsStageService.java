@@ -7,6 +7,7 @@ import com.example.gqw.analytics.repository.StageTypeRepository;
 import java.time.Duration;
 import java.time.Instant;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -20,7 +21,7 @@ public class AnalyticsStageService {
         this.stageTypeRepository = stageTypeRepository;
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public AnalyticsStage createStage(AnalyticsEvent event, String stageTypeCode, int stageOrder) {
         stageTypeRepository.findById(stageTypeCode)
             .orElseThrow(() -> new IllegalArgumentException("Unknown stage type: " + stageTypeCode));
@@ -34,7 +35,7 @@ public class AnalyticsStageService {
         return stageRepository.save(stage);
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void finishStageSuccess(Long stageId) {
         AnalyticsStage stage = stageRepository.findById(stageId)
             .orElseThrow(() -> new IllegalArgumentException("Stage not found: " + stageId));
@@ -45,7 +46,7 @@ public class AnalyticsStageService {
         stageRepository.save(stage);
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void finishStageError(Long stageId, String errorMessage) {
         AnalyticsStage stage = stageRepository.findById(stageId)
             .orElseThrow(() -> new IllegalArgumentException("Stage not found: " + stageId));
@@ -54,6 +55,21 @@ public class AnalyticsStageService {
         stage.setIsError(true);
         stage.setErrorMessage(errorMessage);
         stage.setDurationMs((int) Duration.between(stage.getStartedAt(), endedAt).toMillis());
+        stageRepository.save(stage);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void markStageLogWindow(Long stageId, Instant logStartedAt, Instant logEndedAt) {
+        if (stageId == null || logStartedAt == null || logEndedAt == null) {
+            return;
+        }
+        AnalyticsStage stage = stageRepository.findById(stageId)
+            .orElseThrow(() -> new IllegalArgumentException("Stage not found: " + stageId));
+        if (stage.getLogStartedAt() != null && stage.getLogEndedAt() != null) {
+            return;
+        }
+        stage.setLogStartedAt(logStartedAt);
+        stage.setLogEndedAt(logEndedAt);
         stageRepository.save(stage);
     }
 }

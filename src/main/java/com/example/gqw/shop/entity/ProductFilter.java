@@ -37,6 +37,9 @@ public class ProductFilter {
     private Boolean multiValue = true;
 
     @Column
+    private Boolean isEnabled = true;
+
+    @Column
     private Boolean systemFilter = false;
 }
 

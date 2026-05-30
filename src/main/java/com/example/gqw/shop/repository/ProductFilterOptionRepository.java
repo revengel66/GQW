@@ -2,6 +2,7 @@ package com.example.gqw.shop.repository;
 
 import com.example.gqw.shop.entity.FilterOption;
 import com.example.gqw.shop.entity.Product;
+import com.example.gqw.shop.entity.ProductFilter;
 import com.example.gqw.shop.entity.ProductFilterOption;
 import java.util.List;
 import java.util.Optional;
@@ -28,5 +29,13 @@ public interface ProductFilterOptionRepository extends JpaRepository<ProductFilt
         where pfo.product = :product
         """)
     void deleteByProduct(@Param("product") Product product);
+
+    @Modifying
+    @Transactional
+    @Query("""
+        delete from ProductFilterOption pfo
+        where pfo.filterOption.filter = :filter
+        """)
+    void deleteByFilter(@Param("filter") ProductFilter filter);
 }
 

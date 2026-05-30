@@ -13,6 +13,8 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
 
     List<OrderItem> findByOrder(ShopOrder order);
 
+    void deleteByOrder(ShopOrder order);
+
     List<OrderItem> findByProductInOrderByOrder_CreatedAtDesc(List<Product> products);
 
     boolean existsByOrderUserAndProductAndOrderStatus(ShopUser user, Product product, OrderStatus status);

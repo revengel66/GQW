@@ -9,16 +9,21 @@ import org.springframework.data.repository.query.Param;
 
 public interface EventAttributeTypeRepository extends JpaRepository<EventAttributeType, String> {
 
+    java.util.List<EventAttributeType> findByIsActiveTrueOrderByNameAsc();
+
+    java.util.List<EventAttributeType> findByIsSystemTrueOrderByCodeAsc();
+
     @Modifying
     @Transactional
     @Query(value = """
-        INSERT INTO analytics.event_attribute_type(code, name, description, value_kind, unit_default, is_active)
-        VALUES (:code, :name, :description, :valueKind, :unitDefault, :isActive)
+        INSERT INTO analytics.event_attribute_type(code, name, description, value_kind, unit_default, is_system, is_active)
+        VALUES (:code, :name, :description, :valueKind, :unitDefault, :isSystem, :isActive)
         ON CONFLICT (code) DO UPDATE
         SET name = EXCLUDED.name,
             description = EXCLUDED.description,
             value_kind = EXCLUDED.value_kind,
             unit_default = EXCLUDED.unit_default,
+            is_system = EXCLUDED.is_system,
             is_active = EXCLUDED.is_active
         """, nativeQuery = true)
     void upsert(
@@ -27,6 +32,7 @@ public interface EventAttributeTypeRepository extends JpaRepository<EventAttribu
         @Param("description") String description,
         @Param("valueKind") String valueKind,
         @Param("unitDefault") String unitDefault,
+        @Param("isSystem") boolean isSystem,
         @Param("isActive") boolean isActive
     );
 }

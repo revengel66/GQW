@@ -11,5 +11,7 @@ public interface OrderStatusHistoryRepository extends JpaRepository<OrderStatusH
 
     List<OrderStatusHistory> findByOrderInOrderByChangedAtAsc(List<ShopOrder> orders);
 
+    void deleteByOrder(ShopOrder order);
+
     boolean existsByOrder(ShopOrder order);
 }

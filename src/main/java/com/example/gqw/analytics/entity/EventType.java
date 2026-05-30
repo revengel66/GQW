@@ -15,6 +15,8 @@ import lombok.Setter;
 @Table(name = "event_type", schema = "analytics")
 public class EventType {
 
+    public static final String DEFAULT_MODULE_CODE = "DEFAULT";
+
     @Id
     @Column(nullable = false, length = 64)
     private String code;
@@ -24,6 +26,12 @@ public class EventType {
 
     @Column(length = 512)
     private String description;
+
+    @Column(nullable = false, length = 64)
+    private String moduleCode = DEFAULT_MODULE_CODE;
+
+    @Column(nullable = false)
+    private Boolean isSystem = false;
 
     @Column(nullable = false)
     private Boolean isActive = true;

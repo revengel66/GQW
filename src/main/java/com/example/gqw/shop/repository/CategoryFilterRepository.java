@@ -15,6 +15,8 @@ public interface CategoryFilterRepository extends JpaRepository<CategoryFilter, 
 	
     List<CategoryFilter> findByCategory(Category category);
 
+    List<CategoryFilter> findByCategoryIn(List<Category> categories);
+
     List<CategoryFilter> findByFilter(ProductFilter filter);
 
     Optional<CategoryFilter> findByCategoryAndFilter(Category category, ProductFilter filter);

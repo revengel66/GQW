@@ -35,6 +35,9 @@ public class EventAttributeType {
     private String unitDefault;
 
     @Column(nullable = false)
+    private Boolean isSystem = false;
+
+    @Column(nullable = false)
     private Boolean isActive = true;
 }
 

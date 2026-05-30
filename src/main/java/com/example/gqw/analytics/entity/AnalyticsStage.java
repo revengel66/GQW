@@ -51,6 +51,12 @@ public class AnalyticsStage {
     @Column
     private Integer durationMs;
 
+    @Column
+    private Instant logStartedAt;
+
+    @Column
+    private Instant logEndedAt;
+
     @Column(nullable = false)
     private Boolean isError = false;
 

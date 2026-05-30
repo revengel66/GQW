@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Аналитика')}"></head>
+<body>
+<nav th:replace="~{fragments :: adminNavbar}"></nav>
+<main class="container container-wide py-4 analytics-page">
+    <nav class="admin-breadcrumb mb-3" aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a th:href="@{/admin}">Админка</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Аналитика</li>
+        </ol>
+    </nav>
+
+    <button class="btn btn-dark analytics-filter-fab" type="button" aria-label="Фильтры">
+        <i class="bi bi-funnel"></i>
+    </button>
+    <section class="glass-card p-3 p-lg-4 analytics-hero analytics-hero-floating mb-4">
+        <div class="d-flex align-items-center mb-3">
+            <h1 class="h6 mb-0 analytics-title">Фильтр</h1>
+        </div>
+
+        <form class="analytics-controls" id="analytics-main-form">
+            <input type="hidden" id="analytics-request-path" value="">
+            <section class="analytics-filter-block">
+                <div class="analytics-filter-block-title">Основные параметры</div>
+                <div class="analytics-filter-row analytics-filter-row-2">
+                    <div class="analytics-filter-field">
+                        <label class="form-label mb-1">Период с</label>
+                        <input class="form-control" type="datetime-local" id="analytics-from" th:value="${analyticsFrom}">
+                    </div>
+                    <div class="analytics-filter-field">
+                        <label class="form-label mb-1">По</label>
+                        <input class="form-control" type="datetime-local" id="analytics-to" th:value="${analyticsTo}">
+                    </div>
+                </div>
+                <div class="analytics-filter-row analytics-filter-row-2">
+                    <div class="analytics-filter-field">
+                        <label class="form-label mb-1">Бакет, мин</label>
+                        <select class="form-select" id="analytics-bucket">
+                            <option value="">Авто</option>
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="5">5</option>
+                            <option value="15">15</option>
+                            <option value="30">30</option>
+                            <option value="60">60</option>
+                            <option value="180">180</option>
+                            <option value="360">360</option>
+                            <option value="1440">1440</option>
+                        </select>
+                    </div>
+                    <div class="analytics-filter-field">
+                        <label class="form-label mb-1">Быстрые пресеты</label>
+                        <select class="form-select analytics-quick-preset-select" id="analytics-quick-preset-select">
+                            <option value="15m">15 минут</option>
+                            <option value="30m">30 минут</option>
+                            <option value="1h">1 час</option>
+                            <option value="3h">3 часа</option>
+                            <option value="6h">6 часов</option>
+                            <option value="12h">12 часов</option>
+                            <option value="24h" selected>24 часа</option>
+                            <option value="1w">1 неделя</option>
+                            <option value="1mo">1 месяц</option>
+                            <option value="3mo">3 месяца</option>
+                            <option value="6mo">6 месяцев</option>
+                            <option value="1y">1 год</option>
+                            <option value="all">Все время</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="analytics-filter-row analytics-filter-row-1">
+                    <div class="analytics-quick-range">
+                        <div class="analytics-quick-range-main">
+                            <span class="analytics-quick-range-label">Быстрый период</span>
+                            <input class="form-control form-control-sm analytics-quick-input" type="number" id="analytics-range-n" min="1" step="1" value="24">
+                            <select class="form-select form-select-sm analytics-quick-select" id="analytics-range-unit">
+                                <option value="minutes">минут</option>
+                                <option value="hours" selected>часов</option>
+                                <option value="days">дней</option>
+                                <option value="weeks">недель</option>
+                                <option value="months">месяцев</option>
+                            </select>
+                            <button class="btn btn-sm btn-outline-dark" type="button" id="analytics-range-apply">Применить</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <section class="analytics-filter-block">
+                <div class="analytics-filter-block-title">Контекст событий</div>
+                <div class="analytics-filter-row analytics-filter-row-2">
+                    <div class="analytics-filter-field">
+                        <label class="form-label mb-1">Модуль</label>
+                        <select class="form-select" id="analytics-module-type"></select>
+                    </div>
+                    <div class="analytics-filter-field">
+                        <label class="form-label mb-1">Тип события</label>
+                        <select class="form-select" id="analytics-event-type"></select>
+                    </div>
+                </div>
+            </section>
+            <section class="analytics-filter-block">
+                <div class="analytics-filter-block-title">Сравнение</div>
+                <div class="analytics-filter-row analytics-filter-row-2">
+                    <div class="analytics-filter-field">
+                        <label class="form-label mb-1">До/после</label>
+                        <div class="form-check mt-1">
+                            <input class="form-check-input" type="checkbox" id="analytics-global-compare-enabled">
+                            <label class="form-check-label" for="analytics-global-compare-enabled">Включить для всех графиков</label>
+                        </div>
+                    </div>
+                    <div class="analytics-filter-field">
+                        <label class="form-label mb-1">Разрез сравнения</label>
+                        <select class="form-select" id="analytics-global-compare-preset">
+                            <option value="">По текущему периоду</option>
+                            <option value="15m">15 минут</option>
+                            <option value="30m">30 минут</option>
+                            <option value="1h">1 час</option>
+                            <option value="3h">3 часа</option>
+                            <option value="6h">6 часов</option>
+                            <option value="12h">12 часов</option>
+                            <option value="24h">24 часа</option>
+                            <option value="1w">1 неделя</option>
+                            <option value="1mo">1 месяц</option>
+                            <option value="3mo">3 месяца</option>
+                            <option value="6mo">6 месяцев</option>
+                            <option value="1y">1 год</option>
+                            <option value="all">Все время</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="analytics-filter-row analytics-filter-row-1">
+                    <div class="analytics-filter-field">
+                        <label class="form-label mb-1">Наложение</label>
+                        <div class="form-check mt-1">
+                            <input class="form-check-input" type="checkbox" id="analytics-global-compare-ghost" checked>
+                            <label class="form-check-label" for="analytics-global-compare-ghost">Пунктиры/бледные столбцы «До» на графике «После»</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="analytics-filter-row analytics-filter-row-2 d-none" id="analytics-global-before-row">
+                    <div class="analytics-filter-field">
+                        <label class="form-label mb-1">Период до: с</label>
+                        <input class="form-control" type="datetime-local" id="analytics-global-before-from">
+                    </div>
+                    <div class="analytics-filter-field">
+                        <label class="form-label mb-1">По</label>
+                        <input class="form-control" type="datetime-local" id="analytics-global-before-to">
+                    </div>
+                </div>
+            </section>
+            <section class="analytics-filter-block">
+                <div class="analytics-filter-block-title">Атрибут</div>
+                <div class="analytics-filter-row analytics-filter-row-1">
+                    <div class="analytics-filter-field">
+                        <label class="form-label mb-1">Атрибут</label>
+                        <select class="form-select" id="analytics-global-attr-code">
+                            <option value="">Не выбран</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="analytics-filter-row analytics-filter-row-1" id="analytics-global-attr-value-row">
+                    <div class="analytics-filter-field">
+                        <label class="form-label mb-1">Значение</label>
+                        <select class="form-select" id="analytics-global-attr-value-select">
+                            <option value="">Не выбрано</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="analytics-filter-row analytics-filter-row-2 d-none" id="analytics-global-attr-range-row">
+                    <div class="analytics-filter-field">
+                        <label class="form-label mb-1">Диапазон от</label>
+                        <input class="form-range" type="range" id="analytics-global-attr-min-range" min="0" max="100" step="1" value="0">
+                        <input class="form-control form-control-sm mt-1" type="number" step="any" id="analytics-global-attr-min">
+                    </div>
+                    <div class="analytics-filter-field">
+                        <label class="form-label mb-1">До</label>
+                        <input class="form-range" type="range" id="analytics-global-attr-max-range" min="0" max="100" step="1" value="100">
+                        <input class="form-control form-control-sm mt-1" type="number" step="any" id="analytics-global-attr-max">
+                    </div>
+                </div>
+                <div class="analytics-filter-row analytics-filter-row-1">
+                    <div class="analytics-filter-field">
+                        <label class="form-label mb-1">Ручной ввод значения</label>
+                        <input class="form-control" type="text" id="analytics-global-attr-value-input" placeholder="Можно ввести вручную">
+                    </div>
+                </div>
+            </section>
+            <button class="d-none" id="analytics-refresh-btn" type="submit" aria-hidden="true"></button>
+        </form>
+        <div class="analytics-floating-reset-wrap">
+            <button class="btn btn-outline-dark w-100" type="button" id="analytics-floating-reset">
+                <i class="bi bi-arrow-counterclockwise"></i>
+                Сбросить фильтры
+            </button>
+        </div>
+    </section>
+
+    <section class="analytics-view-tabs mb-4">
+        <div class="nav nav-pills analytics-subtabs" role="tablist" aria-label="Вкладки аналитики">
+            <button class="nav-link active" type="button" id="analytics-tab-overview" data-analytics-tab="overview">Обзор</button>
+            <button class="nav-link" type="button" id="analytics-tab-universal" data-analytics-tab="universal">Универсальный анализ</button>
+            <button class="nav-link" type="button" id="analytics-tab-raw" data-analytics-tab="raw">Raw события</button>
+        </div>
+    </section>
+
+    <section class="glass-card analytics-panel p-3 p-lg-4 mb-4" data-analytics-view="universal" hidden>
+        <div class="analytics-panel-head mb-3">
+            <div class="analytics-panel-title">Универсальный анализ по атрибуту</div>
+            <div class="analytics-panel-sub">Сценарии расследования: событие, слой, атрибут, значение и сравнение до/после</div>
+        </div>
+        <form class="analytics-universal-form mb-3" id="analytics-universal-form">
+            <div class="analytics-universal-main-row">
+                <div class="analytics-universal-field analytics-universal-field-event">
+                    <label class="form-label mb-1">Событие</label>
+                    <div class="analytics-universal-events-inline">
+                        <button class="btn btn-outline-secondary analytics-universal-events-toggle" type="button" id="universal-event-type-toggle" aria-expanded="false">
+                            События
+                        </button>
+                        <div class="analytics-universal-events-popup d-none" id="universal-event-type-popup">
+                            <div class="analytics-universal-events-popup-head">
+                                <label class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="universal-event-overall" checked>
+                                    <span class="form-check-label">Общая статистика</span>
+                                </label>
+                            </div>
+                            <select class="form-select" id="universal-event-type-list" multiple size="10"></select>
+                        </div>
+                    </div>
+                </div>
+                <div class="analytics-universal-field analytics-universal-field-stage">
+                    <label class="form-label mb-1">Слой</label>
+                    <select class="form-select" id="universal-stage-type"></select>
+                </div>
+                <div class="analytics-universal-field analytics-universal-field-attr">
+                    <label class="form-label mb-1">Атрибут</label>
+                    <select class="form-select" id="universal-attr-code"></select>
+                </div>
+                <div class="analytics-universal-field analytics-universal-field-value">
+                    <label class="form-label mb-1">Значение атрибута</label>
+                    <input class="form-control" id="universal-attr-value" type="text" placeholder="например, user hash">
+                </div>
+                <div class="analytics-universal-field analytics-universal-field-scenario">
+                    <label class="form-label mb-1">Сценарий</label>
+                    <select class="form-select" id="universal-scenario">
+                        <option value="load_vs_degradation" selected>Нагрузка vs деградация</option>
+                        <option value="tail_issue">Проблема в хвосте</option>
+                        <option value="error_without_load">Ошибка при нормальной нагрузке</option>
+                        <option value="layer_bottleneck">Узкое место по слоям</option>
+                        <option value="release_compare">До/после релиза</option>
+                    </select>
+                </div>
+                <div class="analytics-universal-compare-wrap">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="universal-compare-enabled">
+                        <label class="form-check-label" for="universal-compare-enabled">До/после</label>
+                    </div>
+                    <div class="form-check mt-1">
+                        <input class="form-check-input" type="checkbox" id="universal-compare-ghost" checked>
+                        <label class="form-check-label" for="universal-compare-ghost">Показывать «До» поверх «После»</label>
+                    </div>
+                </div>
+                <div class="analytics-universal-series">
+                    <div class="analytics-universal-metrics-inline">
+                        <button class="btn btn-outline-secondary analytics-universal-metrics-toggle" type="button" id="universal-series-metric-toggle" aria-expanded="false">
+                            Метрики таймлайна
+                        </button>
+                        <div class="analytics-universal-metrics-popup d-none" id="universal-series-metric-popup">
+                            <select class="form-select" id="universal-series-metric-list" multiple size="8">
+                                <option value="count" selected>Count</option>
+                                <option value="avg" selected>AVG</option>
+                                <option value="p95" selected>P95</option>
+                                <option value="error" selected>Error rate</option>
+                            </select>
+                        </div>
+                    </div>
+                    <label class="form-check"><input class="form-check-input" type="checkbox" data-universal-series="stages" checked><span class="form-check-label">Слои</span></label>
+                </div>
+            </div>
+            <div class="analytics-universal-range-row mt-2">
+                <div class="analytics-universal-field d-none" id="universal-before-wrap">
+                    <label class="form-label mb-1">До: с</label>
+                    <input class="form-control" type="datetime-local" id="universal-before-from">
+                </div>
+                <div class="analytics-universal-field d-none" id="universal-before-wrap-to">
+                    <label class="form-label mb-1">До: по</label>
+                    <input class="form-control" type="datetime-local" id="universal-before-to">
+                </div>
+                <div class="analytics-universal-field">
+                    <label class="form-label mb-1">После: с</label>
+                    <input class="form-control" type="datetime-local" id="universal-from">
+                </div>
+                <div class="analytics-universal-field">
+                    <label class="form-label mb-1">После: по</label>
+                    <input class="form-control" type="datetime-local" id="universal-to">
+                </div>
+                <div class="analytics-universal-field analytics-universal-field-bucket">
+                    <label class="form-label mb-1">Бакет, мин</label>
+                    <select class="form-select" id="universal-bucket">
+                        <option value="">Авто</option>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="5">5</option>
+                        <option value="15">15</option>
+                        <option value="30">30</option>
+                        <option value="60">60</option>
+                        <option value="180">180</option>
+                        <option value="360">360</option>
+                        <option value="1440">1440</option>
+                    </select>
+                </div>
+                <div class="analytics-universal-field analytics-universal-field-preset">
+                    <label class="form-label mb-1">Пресет</label>
+                    <select class="form-select" id="universal-quick-preset">
+                        <option value="15m">15 минут</option>
+                        <option value="30m">30 минут</option>
+                        <option value="1h">1 час</option>
+                        <option value="3h">3 часа</option>
+                        <option value="6h">6 часов</option>
+                        <option value="12h">12 часов</option>
+                        <option value="24h" selected>24 часа</option>
+                        <option value="1w">1 неделя</option>
+                        <option value="1mo">1 месяц</option>
+                        <option value="3mo">3 месяца</option>
+                        <option value="6mo">6 месяцев</option>
+                        <option value="1y">1 год</option>
+                        <option value="all">Все время</option>
+                    </select>
+                </div>
+            </div>
+        </form>
+        <div class="analytics-grid analytics-grid-2 mb-3" id="analytics-universal-grid">
+            <div class="glass-card p-2" id="analytics-universal-timeline-card">
+                <div class="d-flex align-items-center justify-content-between mb-1">
+                    <div class="small text-muted">Таймлайн</div>
+                </div>
+                <div class="analytics-chart-wrap">
+                    <canvas id="chart-universal-timeline" height="150"></canvas>
+                </div>
+            </div>
+            <div class="glass-card p-2" id="analytics-universal-stages-card">
+                <div class="d-flex align-items-center justify-content-between mb-1">
+                    <div class="small text-muted">Слои</div>
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="analytics-universal-stage-metrics-inline">
+                            <button class="btn btn-outline-secondary analytics-universal-stage-metrics-toggle" type="button" id="universal-stage-metric-toggle" aria-expanded="false">
+                                Метрики слоёв
+                            </button>
+                            <div class="analytics-universal-stage-metrics-popup d-none" id="universal-stage-metric-popup">
+                                <select class="form-select" id="universal-stage-metric-list" multiple size="6">
+                                    <option value="avg" selected>AVG</option>
+                                    <option value="p95" selected>P95</option>
+                                    <option value="error">Error rate</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="analytics-chart-wrap">
+                    <canvas id="chart-universal-stages" height="150"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="glass-card p-2 mb-2" id="analytics-universal-event-kpi-card">
+            <div class="d-flex align-items-center justify-content-between mb-1">
+                <div class="small text-muted">KPI по типам событий</div>
+            </div>
+            <div class="analytics-chart-wrap">
+                <canvas id="chart-universal-event-kpi" height="220"></canvas>
+            </div>
+        </div>
+    </section>
+
+    <section class="analytics-kpi-grid mb-4" data-analytics-view="overview">
+        <article class="glass-card analytics-kpi-card p-3">
+            <div class="analytics-kpi-label">Событий</div>
+            <div class="analytics-kpi-value" id="kpi-total-events">0</div>
+        </article>
+        <article class="glass-card analytics-kpi-card p-3">
+            <div class="analytics-kpi-label">AVG, ms</div>
+            <div class="analytics-kpi-value" id="kpi-avg-ms">0</div>
+        </article>
+        <article class="glass-card analytics-kpi-card p-3">
+            <div class="analytics-kpi-label">P95, ms</div>
+            <div class="analytics-kpi-value" id="kpi-p95-ms">0</div>
+        </article>
+        <article class="glass-card analytics-kpi-card p-3">
+            <div class="analytics-kpi-label">Error rate</div>
+            <div class="analytics-kpi-value" id="kpi-error-rate">0%</div>
+        </article>
+        <article class="glass-card analytics-kpi-card p-3">
+            <div class="analytics-kpi-label">Ошибок</div>
+            <div class="analytics-kpi-value" id="kpi-errors">0</div>
+        </article>
+        <article class="glass-card analytics-kpi-card p-3">
+            <div class="analytics-kpi-label">P99, ms</div>
+            <div class="analytics-kpi-value" id="kpi-p99-ms">0</div>
+        </article>
+    </section>
+
+    <section class="analytics-grid analytics-grid-2 mb-4" data-analytics-view="overview">
+        <article class="glass-card analytics-panel p-3 p-lg-4">
+            <div class="analytics-panel-head">
+                <div class="analytics-panel-title">Поток событий</div>
+                <div class="analytics-panel-sub">Количество событий по времени</div>
+            </div>
+            <div class="analytics-chart-wrap">
+                <canvas id="chart-events-count" height="130"></canvas>
+            </div>
+        </article>
+        <article class="glass-card analytics-panel p-3 p-lg-4">
+            <div class="analytics-panel-head">
+                <div class="analytics-panel-title">Latency trend</div>
+                <div class="analytics-panel-sub">AVG / P95 / P99</div>
+            </div>
+            <div class="analytics-chart-wrap">
+                <canvas id="chart-latency" height="130"></canvas>
+            </div>
+        </article>
+        <article class="glass-card analytics-panel p-3 p-lg-4">
+            <div class="analytics-panel-head">
+                <div class="analytics-panel-title">Error rate trend</div>
+                <div class="analytics-panel-sub">Доля ошибок по времени</div>
+            </div>
+            <div class="analytics-chart-wrap">
+                <canvas id="chart-error-rate" height="130"></canvas>
+            </div>
+        </article>
+        <article class="glass-card analytics-panel p-3 p-lg-4">
+            <div class="analytics-panel-head">
+                <div class="analytics-panel-title">KPI по типам событий</div>
+                <div class="analytics-panel-sub">Count / P95 / Error rate</div>
+            </div>
+            <div class="analytics-chart-wrap">
+                <canvas id="chart-event-kpi" height="130"></canvas>
+            </div>
+        </article>
+    </section>
+
+    <section class="glass-card analytics-panel p-3 p-lg-4 mb-4" data-analytics-view="overview">
+        <div class="analytics-panel-head mb-3">
+            <div class="analytics-panel-title">Этапы выполнения</div>
+            <div class="analytics-panel-sub">Drill-down по CONTROLLER/SERVICE/DATABASE/FRONTEND</div>
+        </div>
+        <div class="analytics-grid analytics-grid-2">
+            <div>
+                <div class="analytics-chart-wrap">
+                    <canvas id="chart-stage-latency" height="135"></canvas>
+                </div>
+            </div>
+            <div>
+                <div class="analytics-chart-wrap">
+                    <canvas id="chart-stage-errors" height="135"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="small text-muted mt-3 mb-1">
+            Сводка ниже всегда показывает общую статистику по верхним фильтрам (период, модуль, path, тип события), без учёта выбора событий в графиках этого блока.
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle analytics-table" id="analytics-stage-table">
+                <thead>
+                <tr>
+                    <th>Этап</th>
+                    <th class="text-end">Count</th>
+                    <th class="text-end">AVG</th>
+                    <th class="text-end">P95</th>
+                    <th class="text-end">P99</th>
+                    <th class="text-end">Error rate</th>
+                </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="glass-card analytics-panel p-3 p-lg-4 mb-4" data-analytics-view="overview">
+        <div class="analytics-panel-head mb-3">
+            <div class="analytics-panel-title">Метрики этапов</div>
+            <div class="analytics-panel-sub">Количество SQL-запросов, повторы, размер ответа, код ошибки</div>
+        </div>
+        <form class="mb-3 analytics-stage-metric-form-grid" id="analytics-stage-metrics-form">
+            <div class="analytics-stage-metric-main-row">
+                <div class="analytics-stage-metric-field">
+                    <label class="form-label mb-1">Этап</label>
+                    <select class="form-select" id="stage-metric-stage-type">
+                        <option value="">Все этапы</option>
+                    </select>
+                </div>
+                <div class="analytics-stage-metric-field analytics-stage-metric-quick-range-wrap">
+                    <label class="form-label mb-1">Быстрый период</label>
+                    <select class="form-select" id="stage-metric-quick-range">
+                        <option value="15m">15 минут</option>
+                        <option value="30m">30 минут</option>
+                        <option value="1h">1 час</option>
+                        <option value="3h">3 часа</option>
+                        <option value="6h">6 часов</option>
+                        <option value="12h">12 часов</option>
+                        <option value="24h" selected>24 часа</option>
+                        <option value="1w">1 неделя</option>
+                        <option value="1mo">1 месяц</option>
+                        <option value="3mo">3 месяца</option>
+                        <option value="6mo">6 месяцев</option>
+                        <option value="1y">1 год</option>
+                        <option value="all">Все время</option>
+                    </select>
+                </div>
+                <div class="analytics-stage-metric-period-row">
+                    <div class="analytics-stage-metric-range-col analytics-stage-metric-range-col-before">
+                        <div class="analytics-stage-metric-range-title">До</div>
+                        <div class="analytics-stage-metric-range-row">
+                            <input class="form-control" type="datetime-local" id="stage-metric-from-a">
+                            <input class="form-control" type="datetime-local" id="stage-metric-to-a">
+                        </div>
+                    </div>
+                    <div class="analytics-stage-metric-range-col analytics-stage-metric-range-col-after" id="stage-metric-compare-controls-wrap">
+                        <div class="analytics-stage-metric-range-title">После</div>
+                        <div class="analytics-stage-metric-range-row">
+                            <input class="form-control" type="datetime-local" id="stage-metric-from-b">
+                            <input class="form-control" type="datetime-local" id="stage-metric-to-b">
+                        </div>
+                    </div>
+                </div>
+                <div class="analytics-stage-metric-compare-toggle-wrap">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="stage-metric-compare-enabled">
+                        <label class="form-check-label" for="stage-metric-compare-enabled">До/после</label>
+                    </div>
+                </div>
+                <div class="analytics-stage-metric-action">
+                    <button class="btn btn-outline-secondary analytics-chart-icon-btn" type="button" id="stage-metric-reset" title="Сбросить к верхнему фильтру" aria-label="Сбросить к верхнему фильтру">
+                        <i class="bi bi-arrow-clockwise"></i>
+                    </button>
+                </div>
+            </div>
+        </form>
+        <div class="analytics-stage-metric-split">
+            <section class="analytics-stage-metric-block">
+                <div class="analytics-stage-metric-block-title">Числовые метрики</div>
+                <div class="analytics-stage-metric-charts-wrap" id="analytics-stage-metric-charts-wrap">
+                    <div class="analytics-grid analytics-grid-2 analytics-stage-metric-charts" id="analytics-stage-metric-charts">
+                        <div class="analytics-stage-metric-series-col">
+                            <div class="small text-muted mb-1">До</div>
+                            <div class="analytics-chart-wrap">
+                                <canvas id="chart-stage-metric-series" height="130"></canvas>
+                            </div>
+                        </div>
+                        <div class="analytics-stage-metric-series-col" id="analytics-stage-metric-compare-col">
+                            <div class="small text-muted mb-1">После</div>
+                            <div class="analytics-chart-wrap">
+                                <canvas id="chart-stage-metric-series-compare" height="130"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="table-responsive mt-3 analytics-stage-metric-table-wrap">
+                    <table class="table table-sm align-middle analytics-table" id="analytics-stage-metric-table">
+                        <thead>
+                        <tr>
+                            <th>Метрика</th>
+                            <th class="text-end">Выборка</th>
+                            <th class="text-end">Среднее</th>
+                            <th class="text-end">P95</th>
+                            <th class="text-end">MAX</th>
+                            <th>Топ значения</th>
+                        </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </section>
+            <section class="analytics-stage-metric-block">
+                <div class="analytics-stage-metric-block-title">Текстовые метрики</div>
+                <form class="mb-2 analytics-stage-metric-form-grid" id="analytics-stage-text-form">
+                    <div class="analytics-stage-metric-main-row">
+                        <div class="analytics-stage-metric-field">
+                            <label class="form-label mb-1">Этап</label>
+                            <select class="form-select" id="stage-text-stage-type">
+                                <option value="">Все этапы</option>
+                            </select>
+                        </div>
+                        <div class="analytics-stage-metric-field analytics-stage-metric-quick-range-wrap">
+                            <label class="form-label mb-1">Быстрый период</label>
+                            <select class="form-select" id="stage-text-quick-range">
+                                <option value="15m">15 минут</option>
+                                <option value="30m">30 минут</option>
+                                <option value="1h">1 час</option>
+                                <option value="3h">3 часа</option>
+                                <option value="6h">6 часов</option>
+                                <option value="12h">12 часов</option>
+                                <option value="24h" selected>24 часа</option>
+                                <option value="1w">1 неделя</option>
+                                <option value="1mo">1 месяц</option>
+                                <option value="3mo">3 месяца</option>
+                                <option value="6mo">6 месяцев</option>
+                                <option value="1y">1 год</option>
+                                <option value="all">Все время</option>
+                            </select>
+                        </div>
+                        <div class="analytics-stage-metric-period-row">
+                            <div class="analytics-stage-metric-range-col analytics-stage-metric-range-col-before">
+                                <div class="analytics-stage-metric-range-title">До</div>
+                                <div class="analytics-stage-metric-range-row">
+                                    <input class="form-control" type="datetime-local" id="stage-text-from-a">
+                                    <input class="form-control" type="datetime-local" id="stage-text-to-a">
+                                </div>
+                            </div>
+                            <div class="analytics-stage-metric-range-col analytics-stage-metric-range-col-after" id="stage-text-compare-controls-wrap">
+                                <div class="analytics-stage-metric-range-title">После</div>
+                                <div class="analytics-stage-metric-range-row">
+                                    <input class="form-control" type="datetime-local" id="stage-text-from-b">
+                                    <input class="form-control" type="datetime-local" id="stage-text-to-b">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="analytics-stage-metric-field">
+                            <label class="form-label mb-1">Текстовая метрика</label>
+                            <select class="form-select" id="stage-text-metric-type"></select>
+                        </div>
+                        <div class="analytics-stage-metric-compare-toggle-wrap">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="stage-text-compare-enabled">
+                                <label class="form-check-label" for="stage-text-compare-enabled">До/после</label>
+                            </div>
+                        </div>
+                        <div class="analytics-stage-metric-action">
+                            <button class="btn btn-outline-secondary analytics-chart-icon-btn" type="button" id="stage-text-reset" title="Сбросить к верхнему фильтру" aria-label="Сбросить к верхнему фильтру">
+                                <i class="bi bi-arrow-clockwise"></i>
+                            </button>
+                        </div>
+                    </div>
+                </form>
+                <div class="analytics-grid analytics-grid-2 analytics-stage-metric-charts">
+                    <div class="analytics-stage-metric-top-col">
+                        <div class="small text-muted mb-1">До</div>
+                        <div class="analytics-chart-wrap">
+                            <canvas id="chart-stage-metric-text" height="130"></canvas>
+                        </div>
+                    </div>
+                    <div class="analytics-stage-metric-top-col" id="analytics-stage-metric-text-compare-col">
+                        <div class="small text-muted mb-1">После</div>
+                        <div class="analytics-chart-wrap">
+                            <canvas id="chart-stage-metric-text-compare" height="130"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="table-responsive mt-3 analytics-stage-metric-table-wrap">
+                    <table class="table table-sm align-middle analytics-table" id="analytics-stage-metric-text-table">
+                        <thead>
+                        <tr>
+                            <th>Метрика</th>
+                            <th class="text-end">Выборка</th>
+                            <th>Топ значения</th>
+                        </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+    </section>
+
+    <section class="glass-card analytics-panel p-3 p-lg-4 mb-4" data-analytics-view="raw">
+        <div class="analytics-panel-head mb-3">
+            <div class="analytics-panel-title">Raw события</div>
+            <div class="analytics-panel-sub">Фильтрация проблемных кейсов и переход к деталям</div>
+        </div>
+        <form class="mb-3 analytics-events-form" id="analytics-events-form">
+            <section class="analytics-filter-group mb-2">
+                <div class="analytics-filter-group-title">Базовые фильтры</div>
+                <div class="analytics-events-base-row">
+                    <div class="analytics-events-field analytics-events-field-date">
+                        <label class="form-label mb-1">Период с</label>
+                        <input class="form-control" type="datetime-local" id="events-from">
+                    </div>
+                    <div class="analytics-events-field analytics-events-field-date">
+                        <label class="form-label mb-1">Период по</label>
+                        <input class="form-control" type="datetime-local" id="events-to">
+                    </div>
+                    <div class="analytics-events-field analytics-events-field-sm">
+                        <label class="form-label mb-1">Пресет</label>
+                        <select class="form-select" id="events-quick-range">
+                            <option value="">—</option>
+                            <option value="15m">15 минут</option>
+                            <option value="30m">30 минут</option>
+                            <option value="1h">1 час</option>
+                            <option value="3h">3 часа</option>
+                            <option value="6h">6 часов</option>
+                            <option value="12h">12 часов</option>
+                            <option value="24h">24 часа</option>
+                            <option value="1w">1 неделя</option>
+                            <option value="1mo">1 месяц</option>
+                            <option value="3mo">3 месяца</option>
+                            <option value="6mo">6 месяцев</option>
+                            <option value="1y">1 год</option>
+                            <option value="all">Все время</option>
+                        </select>
+                    </div>
+                    <div class="analytics-events-field analytics-events-field-sm">
+                        <label class="form-label mb-1">Статус</label>
+                        <select class="form-select" id="events-is-error">
+                            <option value="">Все</option>
+                            <option value="true">Только ошибки</option>
+                            <option value="false">Только успешные</option>
+                        </select>
+                    </div>
+                    <div class="analytics-events-field analytics-events-field-sm d-none" id="events-error-class-wrap">
+                        <label class="form-label mb-1">Класс ошибки</label>
+                        <select class="form-select" id="events-error-class">
+                            <option value="">Все</option>
+                            <option value="VALIDATION">VALIDATION</option>
+                            <option value="BUSINESS">BUSINESS</option>
+                            <option value="SYSTEM">SYSTEM</option>
+                        </select>
+                    </div>
+                    <div class="analytics-events-field analytics-events-field-lg">
+                        <label class="form-label mb-1">Событие</label>
+                        <select class="form-select" id="events-event-type">
+                            <option value="">Все события</option>
+                        </select>
+                    </div>
+                    <div class="analytics-events-field analytics-events-field-sort">
+                        <label class="form-label mb-1">Сортировка</label>
+                        <select class="form-select" id="events-sort-by">
+                            <option value="startedAt">Время</option>
+                            <option value="durationMs">Длительность</option>
+                            <option value="statusCode">HTTP</option>
+                            <option value="eventTypeCode">Событие</option>
+                            <option value="traceId">Trace</option>
+                            <option value="requestPath">Path</option>
+                            <option value="isError">Статус</option>
+                            <option value="metricValue">Значение метрики</option>
+                        </select>
+                    </div>
+                    <div class="analytics-events-field analytics-events-field-sm analytics-events-field-order">
+                        <label class="form-label mb-1">Порядок</label>
+                        <select class="form-select" id="events-sort-dir">
+                            <option value="desc">↓</option>
+                            <option value="asc">↑</option>
+                        </select>
+                    </div>
+                    <div class="analytics-events-toggle-wrap analytics-events-toggle-wrap-sm">
+                        <label class="form-label mb-1 d-none d-lg-block">&nbsp;</label>
+                        <button class="btn btn-sm btn-outline-secondary" type="button" id="events-advanced-toggle">
+                            Доп. фильтры
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <div class="analytics-events-advanced d-none" id="events-advanced-wrap">
+                <section class="analytics-filter-group">
+                    <div class="analytics-filter-group-title">Метрики</div>
+                    <div class="analytics-events-inline-row analytics-events-inline-row-metrics">
+                        <div class="analytics-events-field analytics-events-field-metric-type">
+                            <label class="form-label mb-1">Метрика этапа</label>
+                            <select class="form-select" id="events-metric-type">
+                                <option value="">Любая метрика</option>
+                            </select>
+                        </div>
+                        <div class="analytics-events-field">
+                            <label class="form-label mb-1">Метрика от</label>
+                            <input class="form-control" type="number" id="events-metric-min" step="0.001" placeholder="0">
+                        </div>
+                        <div class="analytics-events-field">
+                            <label class="form-label mb-1">Метрика до</label>
+                            <input class="form-control" type="number" id="events-metric-max" step="0.001" placeholder="1000">
+                        </div>
+                        <div class="analytics-events-field">
+                            <label class="form-label mb-1">Мин. длительность, ms</label>
+                            <input class="form-control" type="number" id="events-min-duration" min="0" step="1" placeholder="0">
+                        </div>
+                    </div>
+                </section>
+
+                <section class="analytics-filter-group analytics-filter-group-attrs">
+                    <div class="analytics-filter-group-title">Атрибуты</div>
+                    <div class="analytics-events-inline-row analytics-events-inline-row-attrs">
+                        <div class="analytics-events-field">
+                            <label class="form-label mb-1">Атрибут</label>
+                            <select class="form-select" id="events-attribute-code">
+                                <option value="">Без фильтра</option>
+                            </select>
+                        </div>
+                        <div class="analytics-events-field">
+                            <label class="form-label mb-1">Значение</label>
+                            <input class="form-control" type="text" id="events-attribute-value" placeholder="например, 123">
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </form>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle analytics-table analytics-events-table" id="analytics-events-table">
+                <thead>
+                <tr>
+                    <th>Время</th>
+                    <th>Событие</th>
+                    <th class="text-end">ms</th>
+                    <th class="text-end">HTTP</th>
+                    <th>Path</th>
+                    <th>Trace</th>
+                    <th>Класс</th>
+                    <th>Статус</th>
+                    <th class="text-end"></th>
+                </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        <div class="d-flex justify-content-center pt-2">
+            <button class="btn btn-outline-dark" id="events-load-more" type="button">Показать ещё</button>
+        </div>
+    </section>
+
+    <section class="glass-card analytics-panel p-3 p-lg-4 mb-4" data-analytics-view="overview">
+        <div class="analytics-panel-head mb-3">
+            <div class="analytics-panel-title">Сравнение до/после</div>
+        </div>
+        <form class="row g-2 mb-3" id="analytics-compare-form">
+            <div class="col-12 col-lg-2">
+                <label class="form-label mb-1">Быстрый период</label>
+                <select class="form-select" id="compare-quick-range">
+                    <option value="15m">15 минут</option>
+                    <option value="30m">30 минут</option>
+                    <option value="1h">1 час</option>
+                    <option value="3h">3 часа</option>
+                    <option value="6h">6 часов</option>
+                    <option value="12h">12 часов</option>
+                    <option value="24h" selected>24 часа</option>
+                    <option value="1w">1 неделя</option>
+                    <option value="1mo">1 месяц</option>
+                    <option value="3mo">3 месяца</option>
+                    <option value="6mo">6 месяцев</option>
+                    <option value="1y">1 год</option>
+                    <option value="all">Все время</option>
+                </select>
+            </div>
+            <div class="col-6 col-lg-3">
+                <label class="form-label mb-1">База: с</label>
+                <input class="form-control" type="datetime-local" id="compare-baseline-from">
+            </div>
+            <div class="col-6 col-lg-3">
+                <label class="form-label mb-1">База: по</label>
+                <input class="form-control" type="datetime-local" id="compare-baseline-to">
+            </div>
+            <div class="col-6 col-lg-3">
+                <label class="form-label mb-1">Текущий: с</label>
+                <input class="form-control" type="datetime-local" id="compare-target-from">
+            </div>
+            <div class="col-6 col-lg-2">
+                <label class="form-label mb-1">Текущий: по</label>
+                <input class="form-control" type="datetime-local" id="compare-target-to">
+            </div>
+            <div class="col-12 col-lg-1 d-grid">
+                <label class="form-label mb-1 d-none d-lg-block">&nbsp;</label>
+                <button class="btn btn-dark" type="submit">OK</button>
+            </div>
+        </form>
+        <div class="analytics-grid analytics-grid-3 mb-3" id="compare-kpi-cards"></div>
+        <div class="analytics-chart-wrap analytics-chart-wrap-sm">
+            <canvas id="chart-compare-delta" height="100"></canvas>
+        </div>
+    </section>
+</main>
+
+<div class="modal fade" id="analytics-event-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable analytics-event-modal-dialog">
+        <div class="modal-content review-modal-content">
+            <div class="modal-header">
+                <div class="modal-title h6 mb-0">Детали события</div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body" id="analytics-event-modal-body"></div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="analytics-help-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content review-modal-content">
+            <div class="modal-header">
+                <div class="modal-title h6 mb-0" id="analytics-help-modal-title">Как читать график</div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body" id="analytics-help-modal-body"></div>
+        </div>
+    </div>
+</div>
+
+<div th:replace="~{fragments :: scripts}"></div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script th:inline="javascript">
+    window.analyticsApiBase = [[${analyticsApiBase}]];
+</script>
+<script th:src="@{/analytics/js/analytics-dashboard.js(v='20260519-11')}"></script>
+</body>
+</html>

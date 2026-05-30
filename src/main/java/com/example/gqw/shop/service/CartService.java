@@ -66,6 +66,15 @@ public class CartService {
         cartItemRepository.delete(item);
     }
 
+    @Transactional(readOnly = true)
+    public Optional<Long> findProductIdByItemId(Long itemId, String sessionId) {
+        ShopUser user = currentUserService.findCurrentUser().orElse(null);
+        Optional<CartItem> item = user != null
+            ? cartItemRepository.findByIdAndUser(itemId, user)
+            : cartItemRepository.findByIdAndSessionId(itemId, sessionId);
+        return item.map(cartItem -> cartItem.getProduct().getId());
+    }
+
     @Transactional
     public void updateQuantity(Long itemId, int quantity, String sessionId) {
         ShopUser user = currentUserService.findCurrentUser().orElse(null);

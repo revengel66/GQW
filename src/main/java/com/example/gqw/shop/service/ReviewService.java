@@ -10,8 +10,10 @@ import com.example.gqw.shop.repository.ProductRepository;
 import com.example.gqw.shop.repository.ReviewImageRepository;
 import com.example.gqw.shop.repository.ReviewRepository;
 import java.util.EnumSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -177,7 +179,7 @@ public class ReviewService {
         if (reviews == null || reviews.isEmpty()) {
             return List.of();
         }
-        return reviewRepository.findByParentInAndApprovedTrueOrderByCreatedAtDesc(reviews);
+        return reviewRepository.findByParentInAndApprovedTrueOrderByParentIdAscCreatedAtAsc(reviews);
     }
 
     @Transactional(readOnly = true)
@@ -202,6 +204,21 @@ public class ReviewService {
             .toList();
     }
 
+    @Transactional(readOnly = true)
+    public Map<Long, List<ReviewImage>> imagesByReviews(List<Review> reviews) {
+        if (reviews == null || reviews.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, List<ReviewImage>> map = new LinkedHashMap<>();
+        for (Review review : reviews) {
+            if (review == null || review.getId() == null) {
+                continue;
+            }
+            map.put(review.getId(), reviewImageRepository.findByReviewOrderBySortOrderAscIdAsc(review));
+        }
+        return map;
+    }
+
     @Transactional
     public void deleteReview(Long reviewId) {
         Review review = reviewRepository.findById(reviewId)
@@ -213,6 +230,18 @@ public class ReviewService {
         reviewImageRepository.deleteByReview(review);
         reviewRepository.delete(review);
         refreshProductRating(review.getProduct());
+    }
+
+    @Transactional
+    public Review updateReviewText(Long reviewId, String text) {
+        Review review = reviewRepository.findById(reviewId)
+            .orElseThrow(() -> new IllegalArgumentException("Отзыв не найден"));
+        String normalizedText = text == null ? "" : text.trim();
+        if (normalizedText.isBlank()) {
+            throw new IllegalArgumentException("Текст не может быть пустым");
+        }
+        review.setText(normalizedText);
+        return reviewRepository.save(review);
     }
 
     private void saveReviewImages(Review review, List<MultipartFile> files) {

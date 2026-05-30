@@ -31,7 +31,7 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
 
     List<Review> findByUserAndParentIsNullOrderByCreatedAtDesc(ShopUser user);
 
-    List<Review> findByParentInAndApprovedTrueOrderByCreatedAtDesc(List<Review> parents);
+    List<Review> findByParentInAndApprovedTrueOrderByParentIdAscCreatedAtAsc(List<Review> parents);
 
     boolean existsByProduct(Product product);
 

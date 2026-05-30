@@ -13,5 +13,7 @@ public interface FilterOptionRepository extends JpaRepository<FilterOption, Long
     List<FilterOption> findByFilterIn(List<ProductFilter> filters);
 
     Optional<FilterOption> findByFilterAndCode(ProductFilter filter, String code);
+
+    Optional<FilterOption> findByFilterAndValueIgnoreCase(ProductFilter filter, String value);
 }
 

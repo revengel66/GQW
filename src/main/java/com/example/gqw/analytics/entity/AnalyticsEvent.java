@@ -24,6 +24,7 @@ import lombok.Setter;
     indexes = {
         @Index(name = "idx_analytics_event_uid", columnList = "event_uid"),
         @Index(name = "idx_analytics_event_type", columnList = "event_type_code"),
+        @Index(name = "idx_analytics_event_module", columnList = "module_code"),
         @Index(name = "idx_analytics_event_started_at", columnList = "started_at")
     }
 )
@@ -44,6 +45,9 @@ public class AnalyticsEvent {
 
     @Column(nullable = false, length = 64)
     private String eventTypeCode;
+
+    @Column(nullable = false, length = 64)
+    private String moduleCode = EventType.DEFAULT_MODULE_CODE;
 
     @Column(length = 1024)
     private String requestPath;

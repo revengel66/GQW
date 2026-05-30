@@ -10,6 +10,7 @@ import com.example.gqw.shop.entity.ShopUser;
 import com.example.gqw.shop.repository.OrderItemRepository;
 import com.example.gqw.shop.repository.OrderStatusHistoryRepository;
 import com.example.gqw.shop.repository.ShopOrderRepository;
+import com.example.gqw.shop.repository.SupportRequestRepository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -29,6 +30,7 @@ public class OrderService {
     private final ShopOrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final OrderStatusHistoryRepository orderStatusHistoryRepository;
+    private final SupportRequestRepository supportRequestRepository;
     private final CartService cartService;
     private final CurrentUserService currentUserService;
     private final EmailNotificationService emailNotificationService;
@@ -37,6 +39,7 @@ public class OrderService {
         ShopOrderRepository orderRepository,
         OrderItemRepository orderItemRepository,
         OrderStatusHistoryRepository orderStatusHistoryRepository,
+        SupportRequestRepository supportRequestRepository,
         CartService cartService,
         CurrentUserService currentUserService,
         EmailNotificationService emailNotificationService
@@ -44,6 +47,7 @@ public class OrderService {
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.orderStatusHistoryRepository = orderStatusHistoryRepository;
+        this.supportRequestRepository = supportRequestRepository;
         this.cartService = cartService;
         this.currentUserService = currentUserService;
         this.emailNotificationService = emailNotificationService;
@@ -51,10 +55,16 @@ public class OrderService {
 
     @Transactional
     public ShopOrder checkout(CheckoutRequest request, String sessionId) {
+        return checkout(request, sessionId, false);
+    }
+
+    @Transactional
+    public ShopOrder checkout(CheckoutRequest request, String sessionId, boolean forceDemoReservationFailure) {
         List<CartItem> cartItems = cartService.items(sessionId);
         if (cartItems.isEmpty()) {
             throw new IllegalStateException("Корзина пуста");
         }
+        validateCartItemsAvailability(cartItems);
 
         ShopOrder order = new ShopOrder();
         ShopUser user = currentUserService.findCurrentUser().orElse(null);
@@ -100,6 +110,9 @@ public class OrderService {
         order.setDeliveryTime(deliveryTime);
         order.setStatus(OrderStatus.NEW);
         order.setPickupAddress("Главный филиал");
+        if (forceDemoReservationFailure) {
+            throw new IllegalStateException("Не удалось подтвердить резерв товара при оформлении заказа");
+        }
 
         BigDecimal total = cartItems.stream()
             .map(item -> item.getProduct().getPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
@@ -121,6 +134,20 @@ public class OrderService {
         cartService.clear(sessionId);
         emailNotificationService.notifyOrderStatus(order);
         return order;
+    }
+
+    private static void validateCartItemsAvailability(List<CartItem> cartItems) {
+        for (CartItem cartItem : cartItems) {
+            if (cartItem == null || cartItem.getProduct() == null) {
+                throw new IllegalStateException("В корзине обнаружен некорректный товар");
+            }
+            if (!Boolean.TRUE.equals(cartItem.getProduct().getIsPublished())) {
+                throw new IllegalStateException("Товар снят с публикации: " + cartItem.getProduct().getName());
+            }
+            if (!Boolean.TRUE.equals(cartItem.getProduct().getInStock())) {
+                throw new IllegalStateException("Товар отсутствует в наличии: " + cartItem.getProduct().getName());
+            }
+        }
     }
 
     private static String normalizeNullable(String value) {
@@ -176,10 +203,15 @@ public class OrderService {
         return orderStatusHistoryRepository.findByOrderOrderByChangedAtAsc(order);
     }
 
+    @Transactional(readOnly = true)
+    public ShopOrder orderById(Long orderId) {
+        return orderRepository.findById(orderId)
+            .orElseThrow(() -> new IllegalArgumentException("Заказ не найден"));
+    }
+
     @Transactional
     public ShopOrder changeStatus(Long orderId, OrderStatus status) {
-        ShopOrder order = orderRepository.findById(orderId)
-            .orElseThrow(() -> new IllegalArgumentException("Заказ не найден"));
+        ShopOrder order = orderById(orderId);
         OrderStatus normalizedStatus = normalizeStatusForDeliveryType(order.getDeliveryType(), status);
         OrderStatus prevStatus = order.getStatus();
         order.setStatus(normalizedStatus);
@@ -189,6 +221,18 @@ public class OrderService {
         }
         emailNotificationService.notifyOrderStatus(order);
         return order;
+    }
+
+    @Transactional
+    public void deleteByAdmin(Long orderId) {
+        ShopOrder order = orderById(orderId);
+        supportRequestRepository.findByOrder(order).forEach(request -> {
+            request.setOrder(null);
+            supportRequestRepository.save(request);
+        });
+        orderStatusHistoryRepository.deleteByOrder(order);
+        orderItemRepository.deleteByOrder(order);
+        orderRepository.delete(order);
     }
 
     @Transactional

@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head(${filterFormMode == 'edit' ? 'Админка - Редактирование фильтра' : 'Админка - Новый фильтр'})}"></head>
+<body>
+<nav th:replace="~{fragments :: adminNavbar}"></nav>
+<main class="container container-wide py-4">
+    <nav class="admin-breadcrumb mb-3" aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a th:href="@{/admin}">Админка</a></li>
+            <li class="breadcrumb-item"><a th:href="@{/admin/filters}">Фильтры</a></li>
+            <li class="breadcrumb-item active"
+                aria-current="page"
+                th:text="${filterFormMode == 'edit' ? 'Редактирование' : 'Создание'}">Создание</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <h1 class="h4 mb-0" th:text="${filterFormMode == 'edit' ? 'Редактирование фильтра' : 'Создание фильтра'}">Создание фильтра</h1>
+        <div class="d-flex align-items-center gap-2">
+            <a class="btn btn-outline-secondary btn-sm" th:href="@{/admin/filters}">
+                <i class="bi bi-arrow-left me-1"></i>
+                Назад к списку
+            </a>
+            <button class="btn btn-primary btn-sm" type="button" id="filter-form-submit-btn">
+                <span th:text="${filterFormMode == 'edit' ? 'Сохранить изменения' : 'Сохранить фильтр'}">Сохранить фильтр</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="alert alert-success" th:if="${filterSuccess}" th:text="${filterSuccess}"></div>
+    <div class="alert alert-danger" th:if="${filterError}" th:text="${filterError}"></div>
+
+    <form id="filter-form" method="post" th:action="@{/admin/filters/save}">
+        <input type="hidden" name="filterId" th:if="${editingFilter != null}" th:value="${editingFilter.id}">
+
+        <div class="row g-4">
+            <aside class="col-12 col-xl-3">
+                <div class="glass-card p-3 admin-sticky-column">
+                    <div class="catalog-panel-title mb-3">Привязка к категориям</div>
+                    <div class="small text-muted mb-2">Категории раскрыты по умолчанию. Можно выбрать несколько.</div>
+                    <div class="admin-tree-list" id="filter-category-tree">
+                        <div class="admin-tree-node"
+                             th:each="row : ${categoryRows}"
+                             th:attr="data-id=${row.category.id},data-parent=${row.parentId != null ? row.parentId : ''}">
+                            <div class="admin-tree-node-inner" th:style="'--tree-depth:' + ${row.depth}">
+                                <button class="admin-tree-toggle"
+                                        th:if="${!row.leaf}"
+                                        type="button"
+                                        th:attr="data-tree-toggle=${row.category.id},aria-expanded=true"
+                                        title="Свернуть/развернуть">
+                                    <i class="bi bi-chevron-down"></i>
+                                </button>
+                                <span class="admin-tree-toggle-placeholder" th:if="${row.leaf}"></span>
+                                <label class="form-check mb-0 admin-tree-choice">
+                                    <input class="form-check-input"
+                                           type="checkbox"
+                                           name="categoryIds"
+                                           th:value="${row.category.id}"
+                                           th:checked="${selectedCategoryIds != null and selectedCategoryIds.contains(row.category.id)}">
+                                    <span class="form-check-label admin-tree-label" th:text="${row.category.name}">Категория</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <section class="col-12 col-xl-9">
+                <div class="glass-card p-4">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Название фильтра</label>
+                            <input class="form-control"
+                                   id="filter-name-input"
+                                   name="name"
+                                   th:value="${editingFilter != null ? editingFilter.name : ''}"
+                                   placeholder="Например: Диагональ экрана"
+                                   required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Тип значения</label>
+                            <select class="form-select" name="valueType" id="filter-value-type-select">
+                                <option value="LIST" th:selected="${editingFilter == null or editingFilter.valueType == 'LIST'}">Список</option>
+                                <option value="NUMBER" th:selected="${editingFilter != null and editingFilter.valueType == 'NUMBER'}">Число</option>
+                                <option value="TEXT" th:selected="${editingFilter != null and editingFilter.valueType == 'TEXT'}">Текст</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Вид вывода</label>
+                            <select class="form-select" name="viewType">
+                                <option value="CHECKBOX" th:selected="${editingFilter == null or editingFilter.viewType == 'CHECKBOX'}">Чекбоксы</option>
+                                <option value="RADIO" th:selected="${editingFilter != null and editingFilter.viewType == 'RADIO'}">Радиокнопки / автодополнение</option>
+                                <option value="SLIDER" th:selected="${editingFilter != null and editingFilter.viewType == 'SLIDER'}">Слайдер</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-check mt-2">
+                                <input type="hidden" name="multiValue" value="false">
+                                <input class="form-check-input" type="checkbox" name="multiValue" value="true"
+                                       th:checked="${editingFilter == null or T(java.lang.Boolean).TRUE.equals(editingFilter.multiValue)}">
+                                <span class="form-check-label">Разрешить множественный выбор</span>
+                            </label>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-check mt-2">
+                                <input type="hidden" name="enabled" value="false">
+                                <input class="form-check-input" type="checkbox" name="enabled" value="true"
+                                       th:checked="${editingFilter == null or T(java.lang.Boolean).TRUE.equals(editingFilter.isEnabled)}">
+                                <span class="form-check-label">Фильтр включён</span>
+                            </label>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label">Предустановленные значения</label>
+                            <textarea class="form-control"
+                                      name="predefinedValues"
+                                      rows="4"
+                                      placeholder="По одному значению на строку или через запятую&#10;Например: 13&#10;14&#10;15"> </textarea>
+                            <div class="small text-muted mt-1">
+                                Для списка с автодополнением значения можно дополнять прямо при редактировании товара.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass-card p-4 mt-3" th:if="${editingFilter != null}">
+                    <div class="fw-semibold mb-2">Текущие значения фильтра</div>
+                    <div class="small text-muted mb-2" th:if="${filterOptions == null or #lists.isEmpty(filterOptions)}">Пока нет предустановленных значений.</div>
+                    <div class="d-flex flex-wrap gap-2" th:if="${filterOptions != null and !#lists.isEmpty(filterOptions)}">
+                        <span class="badge text-bg-light border" th:each="opt : ${filterOptions}" th:text="${opt.value}"></span>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </form>
+</main>
+
+<div th:replace="~{fragments :: scripts}"></div>
+<script>
+    (function () {
+        const treeNodes = Array.from(document.querySelectorAll("#filter-category-tree .admin-tree-node[data-id]"));
+        const nodeById = new Map();
+        treeNodes.forEach((node) => {
+            const id = node.getAttribute("data-id");
+            if (id) {
+                nodeById.set(id, node);
+            }
+        });
+        const collapsedIds = new Set();
+        const hasCollapsedAncestor = (node) => {
+            let parentId = node.getAttribute("data-parent");
+            while (parentId) {
+                if (collapsedIds.has(parentId)) {
+                    return true;
+                }
+                const parentNode = nodeById.get(parentId);
+                if (!parentNode) {
+                    break;
+                }
+                parentId = parentNode.getAttribute("data-parent");
+            }
+            return false;
+        };
+        const syncTree = () => {
+            treeNodes.forEach((node) => {
+                node.classList.toggle("d-none", hasCollapsedAncestor(node));
+            });
+            document.querySelectorAll("[data-tree-toggle]").forEach((btn) => {
+                const id = btn.getAttribute("data-tree-toggle");
+                const collapsed = id != null && collapsedIds.has(id);
+                btn.classList.toggle("is-collapsed", collapsed);
+                btn.setAttribute("aria-expanded", String(!collapsed));
+            });
+        };
+        document.querySelectorAll("[data-tree-toggle]").forEach((btn) => {
+            btn.addEventListener("click", () => {
+                const id = btn.getAttribute("data-tree-toggle");
+                if (!id) {
+                    return;
+                }
+                if (collapsedIds.has(id)) {
+                    collapsedIds.delete(id);
+                } else {
+                    collapsedIds.add(id);
+                }
+                syncTree();
+            });
+        });
+        syncTree();
+
+        const filterForm = document.getElementById("filter-form");
+        const filterSubmitBtn = document.getElementById("filter-form-submit-btn");
+        if (filterForm && filterSubmitBtn) {
+            filterSubmitBtn.addEventListener("click", (event) => {
+                event.preventDefault();
+                if (typeof filterForm.requestSubmit === "function") {
+                    filterForm.requestSubmit();
+                } else {
+                    filterForm.submit();
+                }
+            });
+        }
+    })();
+</script>
+</body>
+</html>

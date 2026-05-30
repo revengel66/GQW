@@ -27,12 +27,18 @@ public class StageMetricType {
     @Column(length = 512)
     private String description;
 
+    @Column(length = 2048)
+    private String readingGuide;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)
     private MetricValueKind valueKind = MetricValueKind.NUMERIC;
 
     @Column(length = 32)
     private String unitDefault;
+
+    @Column(nullable = false)
+    private Boolean isSystem = false;
 
     @Column(nullable = false)
     private Boolean isActive = true;

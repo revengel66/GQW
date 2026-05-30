@@ -27,13 +27,13 @@ public class DemoStageTypeSource implements StageTypeSource {
         database.setDescription("Операции записи/чтения из БД");
         database.setIsActive(true);
 
-        StageType response = new StageType();
-        response.setCode("RESPONSE");
-        response.setName("Ответ");
-        response.setDescription("Подготовка и отправка ответа");
-        response.setIsActive(true);
+        StageType frontend = new StageType();
+        frontend.setCode("FRONTEND");
+        frontend.setName("Фронтенд");
+        frontend.setDescription("Клиентский рендер и браузерные метрики");
+        frontend.setIsActive(true);
 
-        return List.of(controller, service, database, response);
+        return List.of(controller, service, database, frontend);
     }
 }
 

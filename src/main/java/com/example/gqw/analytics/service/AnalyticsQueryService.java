@@ -83,6 +83,7 @@ public class AnalyticsQueryService {
             from,
             to,
             eventTypeCode,
+            null,
             status,
             PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "startedAt"))
         );

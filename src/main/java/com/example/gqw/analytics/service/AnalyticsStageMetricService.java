@@ -8,6 +8,7 @@ import com.example.gqw.analytics.repository.StageMetricTypeRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -15,27 +16,34 @@ public class AnalyticsStageMetricService {
 
     private final AnalyticsStageMetricRepository stageMetricRepository;
     private final StageMetricTypeRepository stageMetricTypeRepository;
+    private final AnalyticsCodeResolverService codeResolverService;
 
     public AnalyticsStageMetricService(
         AnalyticsStageMetricRepository stageMetricRepository,
-        StageMetricTypeRepository stageMetricTypeRepository
+        StageMetricTypeRepository stageMetricTypeRepository,
+        AnalyticsCodeResolverService codeResolverService
     ) {
         this.stageMetricRepository = stageMetricRepository;
         this.stageMetricTypeRepository = stageMetricTypeRepository;
+        this.codeResolverService = codeResolverService;
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordMetricNum(Long stageId, String metricTypeCode, BigDecimal value, String unit) {
-        StageMetricType type = stageMetricTypeRepository.findById(metricTypeCode)
+        String resolvedCode = codeResolverService.resolveMetricTypeCode(metricTypeCode);
+        StageMetricType type = stageMetricTypeRepository.findById(resolvedCode)
             .orElseThrow(() -> new IllegalArgumentException("Unknown metric type: " + metricTypeCode));
+        if (!Boolean.TRUE.equals(type.getIsActive())) {
+            throw new IllegalArgumentException("Inactive metric type: " + resolvedCode);
+        }
         if (type.getValueKind() != MetricValueKind.NUMERIC) {
-            throw new IllegalArgumentException("Metric type is not numeric: " + metricTypeCode);
+            throw new IllegalArgumentException("Metric type is not numeric: " + resolvedCode);
         }
 
-        AnalyticsStageMetric metric = stageMetricRepository.findByStageIdAndMetricTypeCode(stageId, metricTypeCode)
+        AnalyticsStageMetric metric = stageMetricRepository.findByStageIdAndMetricTypeCode(stageId, resolvedCode)
             .orElseGet(AnalyticsStageMetric::new);
         metric.setStageId(stageId);
-        metric.setMetricTypeCode(metricTypeCode);
+        metric.setMetricTypeCode(resolvedCode);
         metric.setMetricValueNum(value);
         metric.setMetricValueText(null);
         metric.setUnit(unit != null ? unit : type.getUnitDefault());
@@ -43,18 +51,22 @@ public class AnalyticsStageMetricService {
         stageMetricRepository.save(metric);
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordMetricText(Long stageId, String metricTypeCode, String value, String unit) {
-        StageMetricType type = stageMetricTypeRepository.findById(metricTypeCode)
+        String resolvedCode = codeResolverService.resolveMetricTypeCode(metricTypeCode);
+        StageMetricType type = stageMetricTypeRepository.findById(resolvedCode)
             .orElseThrow(() -> new IllegalArgumentException("Unknown metric type: " + metricTypeCode));
+        if (!Boolean.TRUE.equals(type.getIsActive())) {
+            throw new IllegalArgumentException("Inactive metric type: " + resolvedCode);
+        }
         if (type.getValueKind() != MetricValueKind.TEXT) {
-            throw new IllegalArgumentException("Metric type is not text: " + metricTypeCode);
+            throw new IllegalArgumentException("Metric type is not text: " + resolvedCode);
         }
 
-        AnalyticsStageMetric metric = stageMetricRepository.findByStageIdAndMetricTypeCode(stageId, metricTypeCode)
+        AnalyticsStageMetric metric = stageMetricRepository.findByStageIdAndMetricTypeCode(stageId, resolvedCode)
             .orElseGet(AnalyticsStageMetric::new);
         metric.setStageId(stageId);
-        metric.setMetricTypeCode(metricTypeCode);
+        metric.setMetricTypeCode(resolvedCode);
         metric.setMetricValueNum(null);
         metric.setMetricValueText(value);
         metric.setUnit(unit != null ? unit : type.getUnitDefault());

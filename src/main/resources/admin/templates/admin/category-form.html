@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head(${categoryFormMode == 'edit' ? 'Админка - Редактирование категории' : 'Админка - Новая категория'})}"></head>
+<body>
+<nav th:replace="~{fragments :: adminNavbar}"></nav>
+<main class="container container-wide py-4">
+    <nav class="admin-breadcrumb mb-3" aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a th:href="@{/admin}">Админка</a></li>
+            <li class="breadcrumb-item"><a th:href="@{/admin/categories}">Категории</a></li>
+            <li class="breadcrumb-item active"
+                aria-current="page"
+                th:text="${categoryFormMode == 'edit' ? 'Редактирование' : 'Создание'}">Создание</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <div class="h4 mb-0" th:text="${categoryFormMode == 'edit' ? 'Редактирование категории' : 'Создание категории'}">Создание категории</div>
+        <div class="d-flex align-items-center gap-2">
+            <a class="btn btn-outline-secondary btn-sm" th:href="@{/admin/categories}">
+                <i class="bi bi-arrow-left me-1"></i>
+                Назад к списку
+            </a>
+            <a class="btn btn-outline-dark btn-sm"
+               th:if="${categoryFormMode == 'edit' and editingCategory != null and editingCategory.slug != null and !#strings.isEmpty(editingCategory.slug)}"
+               th:href="@{'/category/' + ${editingCategory.slug}}"
+               target="_blank"
+               rel="noopener">
+                <i class="bi bi-box-arrow-up-right me-1"></i>
+                На сайте
+            </a>
+            <button class="btn btn-primary btn-sm" type="button"
+                    id="category-form-submit-btn"
+                    th:text="${categoryFormMode == 'edit' ? 'Сохранить изменения' : 'Создать категорию'}">Сохранить</button>
+        </div>
+    </div>
+
+    <div class="alert alert-success" th:if="${categorySuccess}" th:text="${categorySuccess}"></div>
+    <div class="alert alert-danger" th:if="${categoryError}" th:text="${categoryError}"></div>
+
+    <form id="category-form"
+          method="post"
+          enctype="multipart/form-data"
+          th:action="${categoryFormMode == 'edit'} ? @{'/admin/categories/' + ${editingCategory.id}} : @{/admin/categories}">
+        <div class="row g-4">
+            <aside class="col-12 col-xl-3">
+                <div class="glass-card p-3 admin-sticky-column">
+                    <div class="catalog-panel-title mb-3">Родительская категория</div>
+                    <div class="small text-muted mb-2">Список категорий раскрыт. Можно свернуть ветку при необходимости.</div>
+                    <div class="admin-tree-list" id="category-parent-tree">
+                        <div class="admin-tree-node admin-tree-root-note">
+                            <label class="form-check mb-0 admin-tree-choice">
+                                <input class="form-check-input" type="radio" name="parentId" value="0"
+                                       th:checked="${editingCategory == null or editingCategory.parent == null}">
+                                <span class="form-check-label admin-tree-label">Без родителя</span>
+                            </label>
+                        </div>
+                        <div class="admin-tree-node"
+                             th:each="row : ${categoryRows}"
+                             th:if="${editingCategory == null or row.category.id != editingCategory.id}"
+                             th:attr="data-id=${row.category.id},data-parent=${row.parentId != null ? row.parentId : ''}">
+                            <div class="admin-tree-node-inner" th:style="'--tree-depth:' + ${row.depth}">
+                                <button class="admin-tree-toggle"
+                                        th:if="${!row.leaf}"
+                                        type="button"
+                                        th:attr="data-tree-toggle=${row.category.id},aria-expanded=true"
+                                        title="Свернуть/развернуть">
+                                    <i class="bi bi-chevron-down"></i>
+                                </button>
+                                <span class="admin-tree-toggle-placeholder" th:if="${row.leaf}"></span>
+                                <label class="form-check mb-0 admin-tree-choice">
+                                    <input class="form-check-input" type="radio" name="parentId" th:value="${row.category.id}"
+                                           th:checked="${editingCategory != null and editingCategory.parent != null and editingCategory.parent.id == row.category.id}">
+                                    <span class="form-check-label admin-tree-label" th:text="${row.category.name}">Категория</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <section class="col-12 col-xl-9">
+                <div class="glass-card p-4">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Название</label>
+                            <input class="form-control"
+                                   id="category-name-input"
+                                   name="name"
+                                   th:value="${editingCategory != null ? editingCategory.name : ''}"
+                                   required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Slug</label>
+                            <input class="form-control"
+                                   id="category-slug-input"
+                                   name="slug"
+                                   th:value="${editingCategory != null ? editingCategory.slug : ''}"
+                                   required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Описание</label>
+                            <textarea class="form-control"
+                                      name="description"
+                                      rows="4"
+                                      th:text="${editingCategory != null ? editingCategory.description : ''}"></textarea>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-check mb-0">
+                                <input class="form-check-input" type="checkbox" name="isPublished" value="true"
+                                       th:checked="${editingCategory == null or editingCategory.isPublished}">
+                                <span class="form-check-label">Опубликована</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass-card p-4 mt-3">
+                    <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap mb-3">
+                        <div class="small text-muted">Изображение категории</div>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button class="btn btn-outline-secondary btn-sm" type="button" id="clear-category-image-btn">Очистить</button>
+                            <button class="btn btn-dark btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#categoryLibraryModal">Открыть файловый менеджер</button>
+                        </div>
+                    </div>
+                    <input class="form-control mb-2" type="file" name="image" id="category-image-input" accept=".jpg,.jpeg,.png,.webp">
+                    <input type="hidden" name="libraryImageUrl" id="category-library-image-url"
+                           th:value="${editingCategory != null ? editingCategory.imageUrl : ''}">
+                    <div class="admin-photo-preview-box mt-3" id="category-image-preview-box"
+                         th:with="previewImage=${editingCategory != null ? editingCategory.imageUrl : null}">
+                        <img id="category-image-preview" th:if="${previewImage != null}" th:src="${previewImage}" alt="">
+                        <i id="category-image-camera" th:if="${previewImage == null}" class="bi bi-camera"></i>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </form>
+
+    <div class="glass-card p-4 mt-4" th:if="${categoryFormMode == 'edit'}">
+        <div class="fw-semibold mb-2">Товары в категории</div>
+        <div class="text-muted" th:if="${categoryProducts == null or #lists.isEmpty(categoryProducts)}">
+            В этой категории пока нет товаров.
+        </div>
+        <ul class="list-group list-group-flush" th:if="${categoryProducts != null and !#lists.isEmpty(categoryProducts)}">
+            <li class="list-group-item px-0 d-flex justify-content-between align-items-center"
+                th:each="p : ${categoryProducts}">
+                <div>
+                    <div class="fw-semibold">
+                        <a th:href="@{'/admin/products/' + ${p.id} + '/edit'}" th:text="${p.name}"></a>
+                    </div>
+                    <div class="small text-muted" th:text="${p.slug}"></div>
+                </div>
+                <a class="btn btn-outline-secondary btn-sm"
+                   th:href="@{'/product/' + ${p.slug}}"
+                   target="_blank" rel="noopener">
+                    На сайте
+                </a>
+            </li>
+        </ul>
+    </div>
+</main>
+
+<div class="modal fade"
+     id="categoryLibraryModal"
+     tabindex="-1"
+     aria-hidden="true"
+     th:attr="data-selected-folder=${selectedLibraryFolder != null ? selectedLibraryFolder : 'library'}">
+    <div class="modal-dialog modal-fullscreen-xl-down modal-xl modal-dialog-scrollable modal-dialog-centered">
+        <div class="modal-content review-modal-content">
+            <div class="modal-header">
+                <div class="h6 mb-0">Файловый менеджер</div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <aside class="col-12 col-lg-3">
+                        <div class="glass-card p-3 h-100">
+                            <div class="fw-semibold mb-2">Папки</div>
+                            <div id="category-library-folders" class="admin-file-folders">
+                                <button type="button"
+                                        class="admin-file-folder-btn"
+                                        th:classappend="${folder.key == selectedLibraryFolder} ? ' is-active'"
+                                        th:each="folder : ${fileFolders}"
+                                        th:attr="data-folder-key=${folder.key},data-folder-depth=${folder.depth}">
+                                    <span th:text="${folder.label}">Папка</span>
+                                    <span class="small text-muted ms-auto" th:text="${folder.filesCount}">0</span>
+                                </button>
+                            </div>
+                        </div>
+                    </aside>
+                    <section class="col-12 col-lg-5">
+                        <div class="glass-card p-3 h-100">
+                            <div class="row g-2 align-items-end mb-3">
+                                <div class="col-12">
+                                    <label class="form-label mb-1">Загрузить изображения в текущую папку</label>
+                                    <input class="form-control" type="file" id="category-library-upload-input" accept=".jpg,.jpeg,.png,.webp" multiple>
+                                </div>
+                                <div class="col-12 d-grid">
+                                    <button class="btn btn-dark btn-sm" type="button" id="category-library-upload-btn">Загрузить</button>
+                                </div>
+                            </div>
+                            <div class="alert alert-danger d-none" id="category-library-error"></div>
+                            <div id="category-library-grid" class="admin-file-grid">
+                                <button type="button"
+                                        class="admin-file-tile js-category-library-select"
+                                        th:each="f : ${libraryFiles}"
+                                        th:attr="data-url=${f.url},data-name=${f.name},data-size=${f.size},data-width=${f.width},data-height=${f.height},data-folder=${f.folderKey}">
+                                    <img th:src="${f.url}" alt="">
+                                    <span class="admin-file-tile-name" th:text="${f.name}">file.webp</span>
+                                    <button class="btn btn-danger btn-sm admin-file-delete js-category-library-delete"
+                                            type="button"
+                                            th:attr="data-url=${f.url}"
+                                            title="Удалить файл">
+                                        <i class="bi bi-trash3"></i>
+                                    </button>
+                                </button>
+                            </div>
+                        </div>
+                    </section>
+                    <aside class="col-12 col-lg-4">
+                        <div class="glass-card p-3 h-100">
+                            <div class="fw-semibold mb-2">Информация о файле</div>
+                            <div id="category-library-details-empty" class="text-muted small">Выберите изображение для просмотра.</div>
+                            <div id="category-library-details" class="d-none">
+                                <img id="category-library-preview-img" class="img-fluid rounded-3 border mb-2" alt="">
+                                <div class="small"><span class="text-muted">Имя:</span> <span id="category-library-preview-name"></span></div>
+                                <div class="small"><span class="text-muted">Размер:</span> <span id="category-library-preview-size"></span></div>
+                                <div class="small"><span class="text-muted">Разрешение:</span> <span id="category-library-preview-dimensions"></span></div>
+                                <div class="small"><span class="text-muted">Папка:</span> <span id="category-library-preview-folder"></span></div>
+                            </div>
+                        </div>
+                    </aside>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-dismiss="modal">Отмена</button>
+                <button class="btn btn-primary btn-sm" type="button" id="category-library-apply-btn">Выбрать</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="admin-category-save-error-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Ошибка сохранения</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-0" id="admin-category-save-error-text">Не удалось сохранить данные.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary btn-sm" data-bs-dismiss="modal">Понятно</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div th:replace="~{fragments :: scripts}"></div>
+<script>
+    (function () {
+        const csrfToken = document.querySelector("meta[name='_csrf']")?.getAttribute("content");
+        const csrfHeader = document.querySelector("meta[name='_csrf_header']")?.getAttribute("content");
+        const form = document.getElementById("category-form");
+        const saveErrorModalEl = document.getElementById("admin-category-save-error-modal");
+        const saveErrorTextEl = document.getElementById("admin-category-save-error-text");
+
+        const nameInput = document.getElementById("category-name-input");
+        const slugInput = document.getElementById("category-slug-input");
+        const imageInput = document.getElementById("category-image-input");
+        const clearBtn = document.getElementById("clear-category-image-btn");
+        const libraryInput = document.getElementById("category-library-image-url");
+        const previewBox = document.getElementById("category-image-preview-box");
+        const explicitSubmitButton = document.getElementById("category-form-submit-btn");
+        const defaultSaveErrorText = "Не удалось сохранить данные.";
+        let isCategoryFormSubmitting = false;
+
+        const showCategorySaveError = (message) => {
+            const resolvedMessage = (message || "").trim() || defaultSaveErrorText;
+            if (saveErrorTextEl) {
+                saveErrorTextEl.textContent = resolvedMessage;
+            }
+            if (saveErrorModalEl && window.bootstrap && window.bootstrap.Modal) {
+                window.bootstrap.Modal.getOrCreateInstance(saveErrorModalEl).show();
+                return;
+            }
+            window.alert(resolvedMessage);
+        };
+
+        const submitCategoryFormAsync = async () => {
+            if (!form || isCategoryFormSubmitting) {
+                return;
+            }
+            isCategoryFormSubmitting = true;
+            if (explicitSubmitButton) {
+                explicitSubmitButton.disabled = true;
+            }
+            try {
+                const action = form.getAttribute("action") || window.location.href;
+                const method = (form.getAttribute("method") || "post").toUpperCase();
+                const headers = {"X-Requested-With": "XMLHttpRequest"};
+                if (csrfToken && csrfHeader) {
+                    headers[csrfHeader] = csrfToken;
+                }
+                const response = await fetch(action, {
+                    method,
+                    body: new FormData(form),
+                    headers,
+                    redirect: "follow"
+                });
+                if (!response.ok) {
+                    const errorText = (await response.text()).trim();
+                    showCategorySaveError(errorText);
+                    return;
+                }
+                window.location.href = response.url || window.location.href;
+            } catch (error) {
+                const message = error instanceof Error ? error.message : defaultSaveErrorText;
+                showCategorySaveError(message);
+            } finally {
+                if (explicitSubmitButton) {
+                    explicitSubmitButton.disabled = false;
+                }
+                isCategoryFormSubmitting = false;
+            }
+        };
+
+        if (form) {
+            form.dataset.ajaxMode = "off";
+            form.addEventListener("submit", (event) => {
+                event.preventDefault();
+                submitCategoryFormAsync();
+            });
+        }
+
+        if (form && explicitSubmitButton) {
+            explicitSubmitButton.addEventListener("click", (event) => {
+                event.preventDefault();
+                submitCategoryFormAsync();
+            });
+        }
+
+        const setPreview = (url) => {
+            if (!previewBox) {
+                return;
+            }
+            let img = previewBox.querySelector("img");
+            let icon = previewBox.querySelector("i");
+            if (url) {
+                if (!img) {
+                    img = document.createElement("img");
+                    previewBox.appendChild(img);
+                }
+                img.src = url;
+                if (icon) {
+                    icon.remove();
+                }
+            } else {
+                if (img) {
+                    img.remove();
+                }
+                if (!icon) {
+                    icon = document.createElement("i");
+                    icon.className = "bi bi-camera";
+                    previewBox.appendChild(icon);
+                }
+            }
+        };
+
+        if (nameInput && slugInput) {
+            const translitMap = {
+                "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e", "ё": "e", "ж": "zh", "з": "z", "и": "i",
+                "й": "y", "к": "k", "л": "l", "м": "m", "н": "n", "о": "o", "п": "p", "р": "r", "с": "s", "т": "t",
+                "у": "u", "ф": "f", "х": "h", "ц": "c", "ч": "ch", "ш": "sh", "щ": "sch", "ъ": "", "ы": "y", "ь": "",
+                "э": "e", "ю": "yu", "я": "ya"
+            };
+            const normalize = (value) => {
+                const lower = String(value || "").trim().toLowerCase();
+                let out = "";
+                for (const ch of lower) {
+                    out += Object.prototype.hasOwnProperty.call(translitMap, ch) ? translitMap[ch] : ch;
+                }
+                return out.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").replace(/-{2,}/g, "-");
+            };
+            let slugTouched = slugInput.value.trim().length > 0;
+            slugInput.addEventListener("input", () => {
+                slugTouched = slugInput.value.trim().length > 0;
+            });
+            nameInput.addEventListener("input", () => {
+                if (!slugTouched) {
+                    slugInput.value = normalize(nameInput.value);
+                }
+            });
+            if (!slugInput.value.trim()) {
+                slugInput.value = normalize(nameInput.value);
+            }
+        }
+
+        if (imageInput) {
+            imageInput.addEventListener("change", () => {
+                const file = imageInput.files && imageInput.files[0];
+                if (!file) {
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    if (event && event.target && typeof event.target.result === "string") {
+                        setPreview(event.target.result);
+                        if (libraryInput) {
+                            libraryInput.value = "";
+                        }
+                    }
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        if (clearBtn) {
+            clearBtn.addEventListener("click", () => {
+                if (imageInput) {
+                    imageInput.value = "";
+                }
+                if (libraryInput) {
+                    libraryInput.value = "";
+                }
+                setPreview("");
+            });
+        }
+
+        const treeNodes = Array.from(document.querySelectorAll("#category-parent-tree .admin-tree-node[data-id]"));
+        const treeNodeById = new Map();
+        treeNodes.forEach((node) => {
+            const id = node.getAttribute("data-id");
+            if (id) {
+                treeNodeById.set(id, node);
+            }
+        });
+        const collapsedTreeIds = new Set();
+        const hasCollapsedAncestor = (node) => {
+            let parentId = node.getAttribute("data-parent");
+            while (parentId) {
+                if (collapsedTreeIds.has(parentId)) {
+                    return true;
+                }
+                const parentNode = treeNodeById.get(parentId);
+                if (!parentNode) {
+                    break;
+                }
+                parentId = parentNode.getAttribute("data-parent");
+            }
+            return false;
+        };
+        const syncTree = () => {
+            treeNodes.forEach((node) => {
+                node.classList.toggle("d-none", hasCollapsedAncestor(node));
+            });
+            document.querySelectorAll("[data-tree-toggle]").forEach((btn) => {
+                const id = btn.getAttribute("data-tree-toggle");
+                const isCollapsed = id != null && collapsedTreeIds.has(id);
+                btn.classList.toggle("is-collapsed", isCollapsed);
+                btn.setAttribute("aria-expanded", String(!isCollapsed));
+            });
+        };
+        document.querySelectorAll("[data-tree-toggle]").forEach((btn) => {
+            btn.addEventListener("click", () => {
+                const id = btn.getAttribute("data-tree-toggle");
+                if (!id) {
+                    return;
+                }
+                if (collapsedTreeIds.has(id)) {
+                    collapsedTreeIds.delete(id);
+                } else {
+                    collapsedTreeIds.add(id);
+                }
+                syncTree();
+            });
+        });
+        syncTree();
+
+        const modalError = document.getElementById("category-library-error");
+        const foldersWrap = document.getElementById("category-library-folders");
+        const filesGrid = document.getElementById("category-library-grid");
+        const uploadInput = document.getElementById("category-library-upload-input");
+        const uploadBtn = document.getElementById("category-library-upload-btn");
+        const applyBtn = document.getElementById("category-library-apply-btn");
+        const modalEl = document.getElementById("categoryLibraryModal");
+
+        const detailsWrap = document.getElementById("category-library-details");
+        const detailsEmpty = document.getElementById("category-library-details-empty");
+        const detailsImg = document.getElementById("category-library-preview-img");
+        const detailsName = document.getElementById("category-library-preview-name");
+        const detailsSize = document.getElementById("category-library-preview-size");
+        const detailsDimensions = document.getElementById("category-library-preview-dimensions");
+        const detailsFolder = document.getElementById("category-library-preview-folder");
+
+        let selectedUrl = libraryInput && libraryInput.value ? libraryInput.value : "";
+        let currentFolder = (modalEl && modalEl.dataset && modalEl.dataset.selectedFolder)
+            ? modalEl.dataset.selectedFolder
+            : "library";
+
+        const showError = (message) => {
+            if (!modalError) {
+                return;
+            }
+            if (!message) {
+                modalError.classList.add("d-none");
+                modalError.textContent = "";
+                return;
+            }
+            modalError.classList.remove("d-none");
+            modalError.textContent = message;
+        };
+
+        const formatBytes = (value) => {
+            const bytes = Number(value || 0);
+            if (bytes <= 0) {
+                return "0 Б";
+            }
+            if (bytes < 1024) {
+                return bytes + " Б";
+            }
+            if (bytes < 1024 * 1024) {
+                return (bytes / 1024).toFixed(1) + " КБ";
+            }
+            return (bytes / (1024 * 1024)).toFixed(2) + " МБ";
+        };
+
+        const showDetails = (tile) => {
+            if (!tile || !detailsWrap || !detailsEmpty || !detailsImg || !detailsName || !detailsSize || !detailsDimensions || !detailsFolder) {
+                return;
+            }
+            detailsImg.src = tile.getAttribute("data-url") || "";
+            detailsName.textContent = tile.getAttribute("data-name") || "";
+            detailsSize.textContent = formatBytes(tile.getAttribute("data-size"));
+            const width = tile.getAttribute("data-width");
+            const height = tile.getAttribute("data-height");
+            detailsDimensions.textContent = width && height ? (width + " × " + height) : "—";
+            detailsFolder.textContent = tile.getAttribute("data-folder") || currentFolder;
+            detailsWrap.classList.remove("d-none");
+            detailsEmpty.classList.add("d-none");
+        };
+
+        const hideDetails = () => {
+            if (detailsWrap) {
+                detailsWrap.classList.add("d-none");
+            }
+            if (detailsEmpty) {
+                detailsEmpty.classList.remove("d-none");
+            }
+        };
+
+        const setFolders = (folders, selectedFolder) => {
+            if (!foldersWrap) {
+                return;
+            }
+            foldersWrap.innerHTML = "";
+            (folders || []).forEach((folder) => {
+                if (!folder || !folder.key) {
+                    return;
+                }
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.className = "admin-file-folder-btn";
+                btn.dataset.folderKey = folder.key;
+                btn.dataset.folderDepth = String(folder.depth || 0);
+                if (folder.key === selectedFolder) {
+                    btn.classList.add("is-active");
+                }
+                const label = document.createElement("span");
+                label.textContent = folder.label || folder.key;
+                const count = document.createElement("span");
+                count.className = "small text-muted ms-auto";
+                count.textContent = String(folder.filesCount || 0);
+                btn.appendChild(label);
+                btn.appendChild(count);
+                foldersWrap.appendChild(btn);
+            });
+        };
+
+        const setFiles = (files) => {
+            if (!filesGrid) {
+                return;
+            }
+            filesGrid.innerHTML = "";
+            (files || []).forEach((f) => {
+                if (!f || !f.url) {
+                    return;
+                }
+                const tile = document.createElement("button");
+                tile.type = "button";
+                tile.className = "admin-file-tile js-category-library-select";
+                tile.dataset.url = f.url;
+                tile.dataset.name = f.name || "";
+                tile.dataset.size = String(f.size || 0);
+                tile.dataset.width = f.width != null ? String(f.width) : "";
+                tile.dataset.height = f.height != null ? String(f.height) : "";
+                tile.dataset.folder = f.folderKey || currentFolder;
+                if (selectedUrl && selectedUrl === f.url) {
+                    tile.classList.add("is-selected");
+                }
+
+                const img = document.createElement("img");
+                img.src = f.url;
+                img.alt = "";
+                const name = document.createElement("span");
+                name.className = "admin-file-tile-name";
+                name.textContent = f.name || f.url;
+
+                const del = document.createElement("button");
+                del.type = "button";
+                del.className = "btn btn-danger btn-sm admin-file-delete js-category-library-delete";
+                del.dataset.url = f.url;
+                del.title = "Удалить файл";
+                del.innerHTML = "<i class='bi bi-trash3'></i>";
+
+                tile.appendChild(img);
+                tile.appendChild(name);
+                tile.appendChild(del);
+                filesGrid.appendChild(tile);
+            });
+            hideDetails();
+        };
+
+        const reloadManager = async (folder) => {
+            const response = await fetch("/admin/files/list?folder=" + encodeURIComponent(folder), {
+                headers: {"Accept": "application/json"}
+            });
+            const payload = await response.json();
+            if (!response.ok || payload.ok === false) {
+                throw new Error(payload.message || "Не удалось загрузить файловый менеджер");
+            }
+            currentFolder = payload.selectedFolder || "library";
+            setFolders(payload.folders || [], currentFolder);
+            setFiles(payload.files || []);
+        };
+
+        if (modalEl) {
+            modalEl.addEventListener("show.bs.modal", async () => {
+                showError("");
+                try {
+                    await reloadManager(currentFolder);
+                } catch (error) {
+                    showError(error instanceof Error ? error.message : "Не удалось загрузить файлы.");
+                }
+            });
+        }
+
+        if (foldersWrap) {
+            foldersWrap.addEventListener("click", async (event) => {
+                const target = event.target instanceof HTMLElement ? event.target.closest(".admin-file-folder-btn") : null;
+                if (!(target instanceof HTMLElement)) {
+                    return;
+                }
+                const folderKey = target.dataset.folderKey;
+                if (!folderKey) {
+                    return;
+                }
+                showError("");
+                try {
+                    await reloadManager(folderKey);
+                } catch (error) {
+                    showError(error instanceof Error ? error.message : "Не удалось открыть папку.");
+                }
+            });
+        }
+
+        if (filesGrid) {
+            filesGrid.addEventListener("click", async (event) => {
+                const deleteBtn = event.target instanceof HTMLElement ? event.target.closest(".js-category-library-delete") : null;
+                if (deleteBtn instanceof HTMLElement) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const url = deleteBtn.dataset.url;
+                    if (!url) {
+                        return;
+                    }
+                    showError("");
+                    const body = new URLSearchParams();
+                    body.set("url", url);
+                    body.set("folder", currentFolder);
+                    try {
+                        const response = await fetch("/admin/files/delete-json", {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/x-www-form-urlencoded",
+                                ...(csrfToken && csrfHeader ? {[csrfHeader]: csrfToken} : {})
+                            },
+                            body: body.toString()
+                        });
+                        const payload = await response.json();
+                        if (!response.ok || payload.ok === false) {
+                            throw new Error(payload.message || "Не удалось удалить файл");
+                        }
+                        if (selectedUrl === url) {
+                            selectedUrl = "";
+                            if (libraryInput) {
+                                libraryInput.value = "";
+                            }
+                            setPreview("");
+                        }
+                        currentFolder = payload.selectedFolder || currentFolder;
+                        setFolders(payload.folders || [], currentFolder);
+                        setFiles(payload.files || []);
+                    } catch (error) {
+                        showError(error instanceof Error ? error.message : "Ошибка удаления файла.");
+                    }
+                    return;
+                }
+
+                const tile = event.target instanceof HTMLElement ? event.target.closest(".js-category-library-select") : null;
+                if (!(tile instanceof HTMLElement)) {
+                    return;
+                }
+                const url = tile.dataset.url;
+                if (!url) {
+                    return;
+                }
+                selectedUrl = url;
+                filesGrid.querySelectorAll(".js-category-library-select").forEach((item) => item.classList.remove("is-selected"));
+                tile.classList.add("is-selected");
+                showDetails(tile);
+            });
+        }
+
+        if (uploadBtn && uploadInput) {
+            uploadBtn.addEventListener("click", async () => {
+                showError("");
+                const files = Array.from(uploadInput.files || []);
+                if (!files.length) {
+                    showError("Выберите файлы для загрузки.");
+                    return;
+                }
+                const formData = new FormData();
+                files.forEach((file) => formData.append("files", file));
+                formData.append("folder", currentFolder);
+                try {
+                    const response = await fetch("/admin/files/upload-json", {
+                        method: "POST",
+                        headers: csrfToken && csrfHeader ? {[csrfHeader]: csrfToken} : {},
+                        body: formData
+                    });
+                    const payload = await response.json();
+                    if (!response.ok || payload.ok === false) {
+                        throw new Error(payload.message || "Не удалось загрузить файлы.");
+                    }
+                    uploadInput.value = "";
+                    currentFolder = payload.selectedFolder || currentFolder;
+                    setFolders(payload.folders || [], currentFolder);
+                    setFiles(payload.files || []);
+                } catch (error) {
+                    showError(error instanceof Error ? error.message : "Ошибка загрузки файлов.");
+                }
+            });
+        }
+
+        if (applyBtn) {
+            applyBtn.addEventListener("click", () => {
+                if (!selectedUrl) {
+                    showError("Выберите изображение.");
+                    return;
+                }
+                if (libraryInput) {
+                    libraryInput.value = selectedUrl;
+                }
+                if (imageInput) {
+                    imageInput.value = "";
+                }
+                setPreview(selectedUrl);
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) {
+                    modal.hide();
+                }
+            });
+        }
+    })();
+</script>
+</body>
+</html>

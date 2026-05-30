@@ -1,5 +1,6 @@
 package com.example.gqw.shop.repository;
 
+import com.example.gqw.shop.entity.ShopOrder;
 import com.example.gqw.shop.entity.ShopUser;
 import com.example.gqw.shop.entity.SupportRequest;
 import java.util.List;
@@ -10,5 +11,7 @@ public interface SupportRequestRepository extends JpaRepository<SupportRequest, 
     List<SupportRequest> findByProcessedFalseOrderByCreatedAtDesc();
 
     List<SupportRequest> findByUserOrderByCreatedAtDesc(ShopUser user);
+
+    List<SupportRequest> findByOrder(ShopOrder order);
 }
 

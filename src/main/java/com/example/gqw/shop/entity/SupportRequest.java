@@ -49,6 +49,9 @@ public class SupportRequest {
     @Column(nullable = false, length = 2048)
     private String message;
 
+    @Column(length = 2048)
+    private String adminReply;
+
     @Column(nullable = false)
     private Boolean processed = false;
 

@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Админка - Файловый менеджер')}"></head>
+<body>
+<nav th:replace="~{fragments :: adminNavbar}"></nav>
+<main class="container container-wide py-4">
+    <nav class="admin-breadcrumb mb-3" aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a th:href="@{/admin}">Админка</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Файловый менеджер</li>
+        </ol>
+    </nav>
+
+    <h1 class="h4 mb-3">Файловый менеджер</h1>
+    <div class="alert alert-success" th:if="${filesSuccess}" th:text="${filesSuccess}"></div>
+    <div class="alert alert-danger" th:if="${filesError}" th:text="${filesError}"></div>
+    <div class="alert alert-danger d-none" id="filesPageError"></div>
+
+    <div class="row g-3">
+        <aside class="col-12 col-lg-3">
+            <div class="glass-card p-3 admin-sticky-column">
+                <div class="fw-semibold mb-2">Папки</div>
+                <div id="files-page-folders" class="admin-file-folders">
+                    <button type="button"
+                            class="admin-file-folder-btn"
+                            th:each="folder : ${fileFolders}"
+                            th:classappend="${folder.key == selectedFolder} ? ' is-active'"
+                            th:attr="data-folder-key=${folder.key},data-folder-depth=${folder.depth}">
+                        <span th:text="${folder.label}">Папка</span>
+                        <span class="small text-muted ms-auto" th:text="${folder.filesCount}">0</span>
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <section class="col-12 col-lg-6">
+            <div class="glass-card p-3">
+                <div class="row g-2 align-items-end mb-3">
+                    <div class="col-12">
+                        <label class="form-label mb-1">Текущая папка</label>
+                        <input class="form-control form-control-sm" id="filesPageCurrentFolderLabel" th:value="${selectedFolder}" readonly>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label mb-1">Загрузить изображения в текущую папку</label>
+                        <input class="form-control" type="file" id="filesPageUploadInput" accept=".jpg,.jpeg,.png,.webp" multiple>
+                    </div>
+                    <div class="col-12 d-grid">
+                        <button class="btn btn-dark btn-sm" type="button" id="filesPageUploadBtn">Загрузить</button>
+                    </div>
+                </div>
+
+                <div id="filesPageGrid" class="admin-file-grid">
+                    <button type="button"
+                            class="admin-file-tile js-files-page-tile"
+                            th:each="f : ${libraryFiles}"
+                            th:attr="data-url=${f.url},data-name=${f.name},data-size=${f.size},data-width=${f.width},data-height=${f.height},data-folder=${f.folderKey}">
+                        <img th:src="${f.url}" alt="">
+                        <span class="admin-file-tile-name" th:text="${f.name}">file.webp</span>
+                        <button class="btn btn-danger btn-sm admin-file-delete js-files-page-delete"
+                                type="button"
+                                th:attr="data-url=${f.url}"
+                                title="Удалить файл">
+                            <i class="bi bi-trash3"></i>
+                        </button>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <aside class="col-12 col-lg-3">
+            <div class="glass-card p-3 h-100 d-none" id="filesPageDetailsCard">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <div class="fw-semibold">Информация о файле</div>
+                    <button class="btn btn-outline-secondary btn-sm admin-mini-icon-btn" type="button" id="filesPageDetailsClose" title="Закрыть">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+                <img id="filesPageDetailsImage" class="img-fluid rounded-3 border mb-2" alt="">
+                <div class="small"><span class="text-muted">Имя:</span> <span id="filesPageDetailsName"></span></div>
+                <div class="small"><span class="text-muted">Размер:</span> <span id="filesPageDetailsSize"></span></div>
+                <div class="small"><span class="text-muted">Разрешение:</span> <span id="filesPageDetailsDimensions"></span></div>
+                <div class="small"><span class="text-muted">Папка:</span> <span id="filesPageDetailsFolder"></span></div>
+            </div>
+        </aside>
+    </div>
+</main>
+<div th:replace="~{fragments :: scripts}"></div>
+<script>
+    (function () {
+        const csrfToken = document.querySelector("meta[name='_csrf']")?.getAttribute("content");
+        const csrfHeader = document.querySelector("meta[name='_csrf_header']")?.getAttribute("content");
+
+        const foldersWrap = document.getElementById("files-page-folders");
+        const uploadInput = document.getElementById("filesPageUploadInput");
+        const uploadBtn = document.getElementById("filesPageUploadBtn");
+        const grid = document.getElementById("filesPageGrid");
+        const errorBox = document.getElementById("filesPageError");
+        const currentFolderLabel = document.getElementById("filesPageCurrentFolderLabel");
+
+        const detailsCard = document.getElementById("filesPageDetailsCard");
+        const detailsClose = document.getElementById("filesPageDetailsClose");
+        const detailsImage = document.getElementById("filesPageDetailsImage");
+        const detailsName = document.getElementById("filesPageDetailsName");
+        const detailsSize = document.getElementById("filesPageDetailsSize");
+        const detailsDimensions = document.getElementById("filesPageDetailsDimensions");
+        const detailsFolder = document.getElementById("filesPageDetailsFolder");
+
+        let currentFolder = currentFolderLabel ? currentFolderLabel.value : "library";
+
+        const showError = (message) => {
+            if (!errorBox) {
+                return;
+            }
+            if (!message) {
+                errorBox.classList.add("d-none");
+                errorBox.textContent = "";
+                return;
+            }
+            errorBox.classList.remove("d-none");
+            errorBox.textContent = message;
+        };
+
+        const formatBytes = (value) => {
+            const bytes = Number(value || 0);
+            if (bytes <= 0) {
+                return "0 Б";
+            }
+            if (bytes < 1024) {
+                return bytes + " Б";
+            }
+            if (bytes < 1024 * 1024) {
+                return (bytes / 1024).toFixed(1) + " КБ";
+            }
+            return (bytes / (1024 * 1024)).toFixed(2) + " МБ";
+        };
+
+        const hideDetails = () => {
+            if (detailsCard) {
+                detailsCard.classList.add("d-none");
+            }
+        };
+
+        const showDetails = (tile) => {
+            if (!tile || !detailsCard || !detailsImage || !detailsName || !detailsSize || !detailsDimensions || !detailsFolder) {
+                return;
+            }
+            detailsImage.src = tile.getAttribute("data-url") || "";
+            detailsName.textContent = tile.getAttribute("data-name") || "";
+            detailsSize.textContent = formatBytes(tile.getAttribute("data-size"));
+            const width = tile.getAttribute("data-width");
+            const height = tile.getAttribute("data-height");
+            detailsDimensions.textContent = width && height ? (width + " × " + height) : "—";
+            detailsFolder.textContent = tile.getAttribute("data-folder") || currentFolder;
+            detailsCard.classList.remove("d-none");
+        };
+
+        const renderFolders = (folders) => {
+            if (!foldersWrap) {
+                return;
+            }
+            foldersWrap.innerHTML = "";
+            (folders || []).forEach((folder) => {
+                if (!folder || !folder.key) {
+                    return;
+                }
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.className = "admin-file-folder-btn";
+                btn.dataset.folderKey = folder.key;
+                btn.dataset.folderDepth = String(folder.depth || 0);
+                if (folder.key === currentFolder) {
+                    btn.classList.add("is-active");
+                }
+                const label = document.createElement("span");
+                label.textContent = folder.label || folder.key;
+                const count = document.createElement("span");
+                count.className = "small text-muted ms-auto";
+                count.textContent = String(folder.filesCount || 0);
+                btn.appendChild(label);
+                btn.appendChild(count);
+                foldersWrap.appendChild(btn);
+            });
+        };
+
+        const renderFiles = (files) => {
+            if (!grid) {
+                return;
+            }
+            grid.innerHTML = "";
+            (files || []).forEach((f) => {
+                if (!f || !f.url) {
+                    return;
+                }
+                const tile = document.createElement("button");
+                tile.type = "button";
+                tile.className = "admin-file-tile js-files-page-tile";
+                tile.dataset.url = f.url;
+                tile.dataset.name = f.name || "";
+                tile.dataset.size = String(f.size || 0);
+                tile.dataset.width = f.width != null ? String(f.width) : "";
+                tile.dataset.height = f.height != null ? String(f.height) : "";
+                tile.dataset.folder = f.folderKey || currentFolder;
+
+                const img = document.createElement("img");
+                img.src = f.url;
+                img.alt = "";
+                const name = document.createElement("span");
+                name.className = "admin-file-tile-name";
+                name.textContent = f.name || f.url;
+                const del = document.createElement("button");
+                del.type = "button";
+                del.className = "btn btn-danger btn-sm admin-file-delete js-files-page-delete";
+                del.dataset.url = f.url;
+                del.innerHTML = "<i class='bi bi-trash3'></i>";
+                del.title = "Удалить файл";
+
+                tile.appendChild(img);
+                tile.appendChild(name);
+                tile.appendChild(del);
+                grid.appendChild(tile);
+            });
+            hideDetails();
+        };
+
+        const fetchData = async (folder) => {
+            const response = await fetch("/admin/files/list?folder=" + encodeURIComponent(folder), {
+                headers: {"Accept": "application/json"}
+            });
+            const payload = await response.json();
+            if (!response.ok || payload.ok === false) {
+                throw new Error(payload.message || "Не удалось загрузить файлы");
+            }
+            currentFolder = payload.selectedFolder || "library";
+            if (currentFolderLabel) {
+                currentFolderLabel.value = currentFolder;
+            }
+            renderFolders(payload.folders || []);
+            renderFiles(payload.files || []);
+        };
+
+        if (foldersWrap) {
+            foldersWrap.addEventListener("click", async (event) => {
+                const target = event.target instanceof HTMLElement ? event.target.closest(".admin-file-folder-btn") : null;
+                if (!(target instanceof HTMLElement)) {
+                    return;
+                }
+                const folderKey = target.dataset.folderKey;
+                if (!folderKey) {
+                    return;
+                }
+                showError("");
+                try {
+                    await fetchData(folderKey);
+                } catch (error) {
+                    showError(error instanceof Error ? error.message : "Не удалось открыть папку.");
+                }
+            });
+        }
+
+        if (uploadBtn && uploadInput) {
+            uploadBtn.addEventListener("click", async () => {
+                showError("");
+                const files = Array.from(uploadInput.files || []);
+                if (!files.length) {
+                    showError("Выберите файлы для загрузки.");
+                    return;
+                }
+                const formData = new FormData();
+                files.forEach((file) => formData.append("files", file));
+                formData.append("folder", currentFolder);
+                try {
+                    const response = await fetch("/admin/files/upload-json", {
+                        method: "POST",
+                        headers: csrfToken && csrfHeader ? {[csrfHeader]: csrfToken} : {},
+                        body: formData
+                    });
+                    const payload = await response.json();
+                    if (!response.ok || payload.ok === false) {
+                        throw new Error(payload.message || "Не удалось загрузить файлы.");
+                    }
+                    uploadInput.value = "";
+                    currentFolder = payload.selectedFolder || currentFolder;
+                    if (currentFolderLabel) {
+                        currentFolderLabel.value = currentFolder;
+                    }
+                    renderFolders(payload.folders || []);
+                    renderFiles(payload.files || []);
+                } catch (error) {
+                    showError(error instanceof Error ? error.message : "Ошибка загрузки файлов.");
+                }
+            });
+        }
+
+        if (grid) {
+            grid.addEventListener("click", async (event) => {
+                const deleteBtn = event.target instanceof HTMLElement ? event.target.closest(".js-files-page-delete") : null;
+                if (deleteBtn instanceof HTMLElement) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const url = deleteBtn.dataset.url;
+                    if (!url) {
+                        return;
+                    }
+                    showError("");
+                    const body = new URLSearchParams();
+                    body.set("url", url);
+                    body.set("folder", currentFolder);
+                    try {
+                        const response = await fetch("/admin/files/delete-json", {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/x-www-form-urlencoded",
+                                ...(csrfToken && csrfHeader ? {[csrfHeader]: csrfToken} : {})
+                            },
+                            body: body.toString()
+                        });
+                        const payload = await response.json();
+                        if (!response.ok || payload.ok === false) {
+                            throw new Error(payload.message || "Не удалось удалить файл.");
+                        }
+                        currentFolder = payload.selectedFolder || currentFolder;
+                        if (currentFolderLabel) {
+                            currentFolderLabel.value = currentFolder;
+                        }
+                        renderFolders(payload.folders || []);
+                        renderFiles(payload.files || []);
+                    } catch (error) {
+                        showError(error instanceof Error ? error.message : "Ошибка удаления файла.");
+                    }
+                    return;
+                }
+
+                const tile = event.target instanceof HTMLElement ? event.target.closest(".js-files-page-tile") : null;
+                if (!(tile instanceof HTMLElement)) {
+                    return;
+                }
+                showDetails(tile);
+            });
+        }
+
+        if (detailsClose) {
+            detailsClose.addEventListener("click", hideDetails);
+        }
+    })();
+</script>
+</body>
+</html>
