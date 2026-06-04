@@ -16,28 +16,28 @@ public class DefaultAnalyticsOperationDescriptionResolver implements AnalyticsOp
     private static String genericOperationDescription(String methodName, String layer) {
         String lower = methodName.toLowerCase();
         if (lower.startsWith("add") || lower.startsWith("create") || lower.startsWith("save")) {
-            return "создание/добавление данных";
+            return "create or add data";
         }
         if (lower.startsWith("update") || lower.startsWith("edit")) {
-            return "обновление данных";
+            return "update data";
         }
         if (lower.startsWith("remove") || lower.startsWith("delete")) {
-            return "удаление данных";
+            return "delete data";
         }
         if (lower.startsWith("find") || lower.startsWith("get") || lower.startsWith("list") || lower.startsWith("items")) {
-            return "получение данных";
+            return "read data";
         }
         if (lower.startsWith("count")) {
-            return "подсчёт данных";
+            return "count data";
         }
         if (lower.startsWith("merge")) {
-            return "объединение данных";
+            return "merge data";
         }
         return switch (layer) {
-            case "CONTROLLER" -> "обработка входящего запроса";
-            case "SERVICE" -> "выполнение бизнес-операции";
-            case "REPOSITORY" -> "выполнение операции доступа к данным";
-            default -> "выполнение прикладной операции";
+            case "CONTROLLER" -> "handle incoming request";
+            case "SERVICE" -> "execute business operation";
+            case "REPOSITORY" -> "execute data access operation";
+            default -> "execute application operation";
         };
     }
 }

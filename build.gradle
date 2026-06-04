@@ -10,6 +10,10 @@ group = 'com.example'
 version = '0.0.1-SNAPSHOT'
 description = 'gqw'
 
+// Keep Gradle outputs in an ASCII-only path to avoid Windows/JVM argfile
+// classpath decoding issues for projects located in Cyrillic directories.
+layout.buildDirectory.set(file("${System.getProperty('user.home')}/.gqw-build/${rootProject.name}"))
+
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)
@@ -41,9 +45,9 @@ dependencies {
     testImplementation 'org.springframework.security:spring-security-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
-    testImplementation 'org.junit.platform:junit-platform-suite'
+    testImplementation 'org.junit.platform:junit-platform-suite-api'
+    testRuntimeOnly 'org.junit.platform:junit-platform-suite-engine'
     testRuntimeOnly 'com.h2database:h2'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 configurations.configureEach {
@@ -55,4 +59,36 @@ configurations.configureEach {
 
 tasks.named('test') {
     useJUnitPlatform()
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+tasks.withType(JavaExec).configureEach {
+    jvmArgs += [
+        '-Dfile.encoding=UTF-8',
+        '-Dstdout.encoding=UTF-8',
+        '-Dstderr.encoding=UTF-8',
+        '-Dsun.stdout.encoding=UTF-8',
+        '-Dsun.stderr.encoding=UTF-8'
+    ]
+}
+
+tasks.register('freePort8080', Exec) {
+    onlyIf { org.gradle.internal.os.OperatingSystem.current().isWindows() }
+    commandLine 'powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', '''
+        $conn = Get-NetTCPConnection -LocalPort 8080 -State Listen -ErrorAction SilentlyContinue
+        if ($null -eq $conn) { Write-Host "Port 8080 is already free."; exit 0 }
+        $pids = $conn | Select-Object -ExpandProperty OwningProcess -Unique
+        foreach ($pid in $pids) {
+            taskkill /PID $pid /F | Out-Null
+        }
+        Start-Sleep -Seconds 1
+        Write-Host "Port 8080 listener processes terminated: $($pids -join ',')"
+    '''
+}
+
+tasks.named('bootRun') {
+    dependsOn tasks.named('freePort8080')
 }

@@ -5,6 +5,7 @@ import com.example.gqw.analytics.entity.AnalyticsEventAttribute;
 import com.example.gqw.analytics.entity.AnalyticsStage;
 import com.example.gqw.analytics.entity.AnalyticsStageMetric;
 import com.example.gqw.analytics.entity.EventType;
+import com.example.gqw.analytics.entity.MetricValueKind;
 import com.example.gqw.analytics.repository.AnalyticsEventAttributeRepository;
 import com.example.gqw.analytics.repository.AnalyticsEventRepository;
 import com.example.gqw.analytics.repository.AnalyticsStageMetricRepository;
@@ -56,12 +57,15 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional(readOnly = true)
 public class AnalyticsInsightsService {
+    private static final Logger log = LoggerFactory.getLogger(AnalyticsInsightsService.class);
     private static final int DEFAULT_EVENT_PAGE_SIZE = 20;
     private static final int MAX_EVENT_PAGE_SIZE = 100;
     private static final int IN_CLAUSE_BATCH_SIZE = 2000;
@@ -77,6 +81,8 @@ public class AnalyticsInsightsService {
     private final EventAttributeTypeRepository eventAttributeTypeRepository;
     private final AnalyticsLogViewService analyticsLogViewService;
     private final AnalyticsFilterRollupService filterRollupService;
+    private final AnalyticsTimeRollupService timeRollupService;
+    private final AnalyticsStageMetricRollupService stageMetricRollupService;
 
     public AnalyticsInsightsService(
         AnalyticsEventRepository eventRepository,
@@ -89,7 +95,9 @@ public class AnalyticsInsightsService {
         StageMetricTypeRepository stageMetricTypeRepository,
         EventAttributeTypeRepository eventAttributeTypeRepository,
         AnalyticsLogViewService analyticsLogViewService,
-        AnalyticsFilterRollupService filterRollupService
+        AnalyticsFilterRollupService filterRollupService,
+        AnalyticsTimeRollupService timeRollupService,
+        AnalyticsStageMetricRollupService stageMetricRollupService
     ) {
         this.eventRepository = eventRepository;
         this.stageRepository = stageRepository;
@@ -102,6 +110,8 @@ public class AnalyticsInsightsService {
         this.eventAttributeTypeRepository = eventAttributeTypeRepository;
         this.analyticsLogViewService = analyticsLogViewService;
         this.filterRollupService = filterRollupService;
+        this.timeRollupService = timeRollupService;
+        this.stageMetricRollupService = stageMetricRollupService;
     }
 
     public DictionariesResponse dictionaries(String moduleCode) {
@@ -138,6 +148,7 @@ public class AnalyticsInsightsService {
         String requestPath,
         String attributeCode
     ) {
+        long serviceStarted = System.nanoTime();
         String normalizedModuleCode = normalizeModuleFilterCode(moduleCode);
         String normalizedEventType = normalizeCode(eventTypeCode);
         String normalizedRequestPath = normalizeText(requestPath);
@@ -236,14 +247,60 @@ public class AnalyticsInsightsService {
         String normalizedModuleCode = normalizeModuleFilterCode(moduleCode);
         String normalizedEventType = normalizeCode(eventTypeCode);
         String normalizedRequestPath = normalizeText(requestPath);
+        int resolvedBucket = resolveBucketMinutes(from, to, bucketMinutes);
+
+        if (canUseTimeRollup(
+            normalizedRequestPath,
+            filterMetricTypeCode,
+            filterMetricValue,
+            filterMetricMinValue,
+            filterMetricMaxValue,
+            filterAttributeCode,
+            filterAttributeValue,
+            filterAttributeMinValue,
+            filterAttributeMaxValue
+        )) {
+            Set<String> eventTypeFilter = normalizedEventType == null ? Set.of() : Set.of(normalizedEventType);
+            List<AnalyticsTimeRollupService.AggregatePoint> points = timeRollupService.loadEventAggregatePoints(
+                from,
+                to,
+                normalizedModuleCode,
+                eventTypeFilter,
+                resolvedBucket
+            );
+            AnalyticsTimeRollupService.AnalyticsAccumulator totalsAcc = timeRollupService.accumulateAll(points);
+            Map<String, AnalyticsTimeRollupService.AnalyticsAccumulator> byType = timeRollupService.accumulateByCode(points);
+            Map<String, String> eventTypeNames = eventTypeNameMap();
+
+            List<EventKpiDto> breakdown = byType.entrySet().stream()
+                .map(entry -> {
+                    String code = entry.getKey();
+                    AnalyticsTimeRollupService.AnalyticsAccumulator stat = entry.getValue();
+                    return new EventKpiDto(
+                        code,
+                        eventTypeNames.getOrDefault(code, code),
+                        stat.sampleCount(),
+                        stat.errorRate(),
+                        stat.avgMs(),
+                        stat.p95Ms(),
+                        stat.p99Ms(),
+                        stat.maxMs()
+                    );
+                })
+                .sorted(Comparator.comparing(EventKpiDto::count).reversed().thenComparing(EventKpiDto::eventTypeCode))
+                .toList();
+
+            List<TimeSeriesPointDto> series = timeRollupService.seriesFromPoints(from, to, resolvedBucket, points);
+            KpiSnapshot totals = snapshotFromAccumulator(totalsAcc);
+            return new OverviewResponse(from, to, resolvedBucket, totals, breakdown, series);
+        }
+
         List<AnalyticsEvent> events = filterEventsByRequestPath(
             eventRepository.findAllByRangeOrdered(from, to, normalizedEventType, normalizedModuleCode),
             normalizedRequestPath
         );
         events = filterEventsByMetric(events, filterMetricTypeCode, filterMetricValue, filterMetricMinValue, filterMetricMaxValue);
         events = filterEventsByAttribute(events, filterAttributeCode, filterAttributeValue, filterAttributeMinValue, filterAttributeMaxValue);
-
-        int resolvedBucket = resolveBucketMinutes(from, to, bucketMinutes);
         KpiSnapshot totals = snapshotFromEvents(events);
 
         Map<String, String> eventTypeNames = eventTypeNameMap();
@@ -299,6 +356,74 @@ public class AnalyticsInsightsService {
         String normalizedModuleCode = normalizeModuleFilterCode(moduleCode);
         String normalizedEventType = normalizeCode(eventTypeCode);
         String normalizedRequestPath = normalizeText(requestPath);
+        int resolvedBucket = resolveBucketMinutes(from, to, bucketMinutes);
+
+        if (canUseTimeRollup(
+            normalizedRequestPath,
+            filterMetricTypeCode,
+            filterMetricValue,
+            filterMetricMinValue,
+            filterMetricMaxValue,
+            filterAttributeCode,
+            filterAttributeValue,
+            filterAttributeMinValue,
+            filterAttributeMaxValue
+        )) {
+            Set<String> eventTypeFilter = normalizedEventType == null ? Set.of() : Set.of(normalizedEventType);
+            List<AnalyticsTimeRollupService.AggregatePoint> points = timeRollupService.loadStageAggregatePoints(
+                from,
+                to,
+                normalizedModuleCode,
+                eventTypeFilter,
+                Set.of(),
+                resolvedBucket
+            );
+            if (points.isEmpty()) {
+                return new StageBreakdownResponse(from, to, resolvedBucket, List.of(), List.of());
+            }
+
+            Map<String, String> stageTypeNames = stageTypeNameMap();
+            Map<String, AnalyticsTimeRollupService.AnalyticsAccumulator> byStage = timeRollupService.accumulateByCode(points);
+            List<StageKpiDto> kpi = byStage.entrySet().stream()
+                .map(entry -> {
+                    String code = entry.getKey();
+                    AnalyticsTimeRollupService.AnalyticsAccumulator stat = entry.getValue();
+                    return new StageKpiDto(
+                        code,
+                        stageTypeNames.getOrDefault(code, code),
+                        stat.sampleCount(),
+                        stat.errorRate(),
+                        stat.avgMs(),
+                        stat.p95Ms(),
+                        stat.p99Ms(),
+                        stat.maxMs()
+                    );
+                })
+                .sorted(Comparator.comparing(StageKpiDto::count).reversed().thenComparing(StageKpiDto::stageTypeCode))
+                .toList();
+
+            Set<String> topStageCodes = kpi.stream()
+                .limit(6)
+                .map(StageKpiDto::stageTypeCode)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+
+            List<StageSeriesDto> stageSeries = topStageCodes.stream()
+                .map(code -> new StageSeriesDto(
+                    code,
+                    stageTypeNames.getOrDefault(code, code),
+                    timeRollupService.seriesFromPoints(
+                        from,
+                        to,
+                        resolvedBucket,
+                        timeRollupService.pointsForCode(points, code)
+                    )
+                ))
+                .sorted(Comparator.comparing(StageSeriesDto::stageTypeCode))
+                .toList();
+
+            return new StageBreakdownResponse(from, to, resolvedBucket, kpi, stageSeries);
+        }
+
         List<AnalyticsEvent> events = filterEventsByRequestPath(
             eventRepository.findAllByRangeOrdered(from, to, normalizedEventType, normalizedModuleCode),
             normalizedRequestPath
@@ -306,12 +431,11 @@ public class AnalyticsInsightsService {
         events = filterEventsByMetric(events, filterMetricTypeCode, filterMetricValue, filterMetricMinValue, filterMetricMaxValue);
         events = filterEventsByAttribute(events, filterAttributeCode, filterAttributeValue, filterAttributeMinValue, filterAttributeMaxValue);
         if (events.isEmpty()) {
-            return new StageBreakdownResponse(from, to, resolveBucketMinutes(from, to, bucketMinutes), List.of(), List.of());
+            return new StageBreakdownResponse(from, to, resolvedBucket, List.of(), List.of());
         }
 
         Map<String, String> stageTypeNames = stageTypeNameMap();
         List<AnalyticsStage> stages = findStagesByEventIds(ids(events));
-        int resolvedBucket = resolveBucketMinutes(from, to, bucketMinutes);
 
         List<StageKpiDto> kpi = stages.stream()
             .collect(Collectors.groupingBy(AnalyticsStage::getStageTypeCode))
@@ -380,8 +504,11 @@ public class AnalyticsInsightsService {
         BigDecimal filterAttributeMinValue,
         BigDecimal filterAttributeMaxValue,
         Integer bucketMinutes,
-        boolean includeSummaries
+        boolean includeSummaries,
+        boolean includeTopValues,
+        boolean includeSeries
     ) {
+        long serviceStarted = System.nanoTime();
         String normalizedModuleCode = normalizeModuleFilterCode(moduleCode);
         String normalizedEventType = normalizeCode(eventTypeCode);
         String normalizedRequestPath = normalizeText(requestPath);
@@ -398,11 +525,308 @@ public class AnalyticsInsightsService {
             || filterAttributeMinValue != null
             || filterAttributeMaxValue != null;
 
+        boolean canUseStageMetricRollup = stageMetricRollupService.isEnabled()
+            && normalizedRequestPath == null
+            && !hasAdditionalEventFilters;
+        if (canUseStageMetricRollup) {
+            if (!includeSummaries && normalizedMetricType != null) {
+                long buildStarted = System.nanoTime();
+                Map<String, String> metricTypeNames = stageMetricTypeNameMap();
+                MetricValueKind valueKind = stageMetricTypeValueKindMap()
+                    .getOrDefault(normalizedMetricType, MetricValueKind.NUMERIC);
+                boolean numeric = valueKind == MetricValueKind.NUMERIC && !shouldTreatMetricAsText(normalizedMetricType);
+                long buildMs = elapsedMs(buildStarted);
+
+                long seriesStarted = System.nanoTime();
+                List<TimeSeriesPointDto> numericSeries = numeric && includeSeries
+                    ? stageMetricRollupService.loadNumericSeries(
+                        from,
+                        to,
+                        normalizedModuleCode,
+                        normalizedEventType,
+                        normalizedStageType,
+                        normalizedMetricType,
+                        resolvedBucket
+                    )
+                    : List.of();
+                long seriesMs = elapsedMs(seriesStarted);
+
+                long topValuesStarted = System.nanoTime();
+                List<TopValueDto> selectedTopValues = includeTopValues
+                    ? stageMetricRollupService.loadTopValues(
+                        from,
+                        to,
+                        normalizedModuleCode,
+                        normalizedEventType,
+                        normalizedStageType,
+                        normalizedMetricType,
+                        8
+                    )
+                    : List.of();
+                long topValuesMs = elapsedMs(topValuesStarted);
+
+                StageMetricResponse response = new StageMetricResponse(
+                    from,
+                    to,
+                    resolvedBucket,
+                    normalizedMetricType,
+                    metricTypeNames.getOrDefault(normalizedMetricType, normalizedMetricType),
+                    null,
+                    numeric,
+                    List.of(),
+                    numericSeries,
+                    selectedTopValues
+                );
+                logStageMetricsServicePerf(
+                    serviceStarted,
+                    "rollup",
+                    from,
+                    to,
+                    normalizedModuleCode,
+                    normalizedEventType,
+                    normalizedStageType,
+                    normalizedMetricType,
+                    resolvedBucket,
+                    includeSummaries,
+                    includeTopValues,
+                    0,
+                    0,
+                    0,
+                    buildMs,
+                    seriesMs,
+                    topValuesMs,
+                    response.summaries().size(),
+                    response.numericSeries().size(),
+                    response.selectedTopValues().size()
+                );
+                return response;
+            }
+
+            long rollupStarted = System.nanoTime();
+            List<AnalyticsStageMetricRollupService.MetricSummaryPoint> summaryPoints =
+                stageMetricRollupService.loadMetricSummaries(
+                    from,
+                    to,
+                    normalizedModuleCode,
+                    normalizedEventType,
+                    normalizedStageType
+                );
+            long rollupMs = elapsedMs(rollupStarted);
+            if (summaryPoints.isEmpty()) {
+                logStageMetricsServicePerf(
+                    serviceStarted,
+                    "rollup",
+                    from,
+                    to,
+                    normalizedModuleCode,
+                    normalizedEventType,
+                    normalizedStageType,
+                    normalizedMetricType,
+                    resolvedBucket,
+                    includeSummaries,
+                    includeTopValues,
+                    rollupMs,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
+                );
+                return new StageMetricResponse(from, to, resolvedBucket, null, null, null, false, List.of(), List.of(), List.of());
+            }
+
+            long buildStarted = System.nanoTime();
+            Map<String, String> metricTypeNames = stageMetricTypeNameMap();
+            Map<String, String> metricTypeDescriptions = stageMetricTypeDescriptionMap();
+            Map<String, String> metricTypeReadingGuides = stageMetricTypeReadingGuideMap();
+
+            List<StageMetricSummaryDto> summaries = summaryPoints.stream()
+                .map(point -> {
+                    boolean numeric = point.numeric() && !shouldTreatMetricAsText(point.metricTypeCode());
+                    return new StageMetricSummaryDto(
+                        point.metricTypeCode(),
+                        metricTypeNames.getOrDefault(point.metricTypeCode(), point.metricTypeCode()),
+                        metricTypeDescriptions.getOrDefault(point.metricTypeCode(), null),
+                        metricTypeReadingGuides.getOrDefault(point.metricTypeCode(), null),
+                        point.unit(),
+                        numeric,
+                        point.sampleCount(),
+                        numeric ? point.avgValue() : BigDecimal.ZERO,
+                        numeric ? point.p95Value() : BigDecimal.ZERO,
+                        numeric ? Objects.requireNonNullElse(point.minValue(), BigDecimal.ZERO) : BigDecimal.ZERO,
+                        numeric ? Objects.requireNonNullElse(point.maxValue(), BigDecimal.ZERO) : BigDecimal.ZERO,
+                        List.of()
+                    );
+                })
+                .sorted(Comparator.comparing(StageMetricSummaryDto::sampleCount).reversed().thenComparing(StageMetricSummaryDto::metricTypeCode))
+                .toList();
+            long buildMs = elapsedMs(buildStarted);
+            if (summaries.isEmpty()) {
+                return new StageMetricResponse(from, to, resolvedBucket, null, null, null, false, List.of(), List.of(), List.of());
+            }
+
+            if (!includeSummaries) {
+                StageMetricSummaryDto selected = null;
+                if (normalizedMetricType != null) {
+                    selected = summaries.stream()
+                        .filter(summary -> Objects.equals(summary.metricTypeCode(), normalizedMetricType))
+                        .findFirst()
+                        .orElse(null);
+                    if (selected == null) {
+                        return new StageMetricResponse(from, to, resolvedBucket, null, null, null, false, List.of(), List.of(), List.of());
+                    }
+                } else {
+                    selected = summaries.stream()
+                        .filter(StageMetricSummaryDto::numeric)
+                        .findFirst()
+                        .orElse(summaries.getFirst());
+                }
+
+                long seriesStarted = System.nanoTime();
+                List<TimeSeriesPointDto> numericSeries = selected.numeric() && includeSeries
+                    ? stageMetricRollupService.loadNumericSeries(
+                        from,
+                        to,
+                        normalizedModuleCode,
+                        normalizedEventType,
+                        normalizedStageType,
+                        selected.metricTypeCode(),
+                        resolvedBucket
+                    )
+                    : List.of();
+                long seriesMs = elapsedMs(seriesStarted);
+                long topValuesStarted = System.nanoTime();
+                List<TopValueDto> selectedTopValues = includeTopValues
+                    ? stageMetricRollupService.loadTopValues(
+                        from,
+                        to,
+                        normalizedModuleCode,
+                        normalizedEventType,
+                        normalizedStageType,
+                        selected.metricTypeCode(),
+                        8
+                    )
+                    : List.of();
+                long topValuesMs = elapsedMs(topValuesStarted);
+
+                StageMetricResponse response = new StageMetricResponse(
+                    from,
+                    to,
+                    resolvedBucket,
+                    selected.metricTypeCode(),
+                    selected.metricTypeName(),
+                    selected.unit(),
+                    selected.numeric(),
+                    List.of(),
+                    numericSeries,
+                    selectedTopValues
+                );
+                logStageMetricsServicePerf(
+                    serviceStarted,
+                    "rollup",
+                    from,
+                    to,
+                    normalizedModuleCode,
+                    normalizedEventType,
+                    normalizedStageType,
+                    selected.metricTypeCode(),
+                    resolvedBucket,
+                    includeSummaries,
+                    includeTopValues,
+                    rollupMs,
+                    0,
+                    0,
+                    buildMs,
+                    seriesMs,
+                    topValuesMs,
+                    response.summaries().size(),
+                    response.numericSeries().size(),
+                    response.selectedTopValues().size()
+                );
+                return response;
+            }
+
+            StageMetricSummaryDto selected = summaries.stream()
+                .filter(summary -> Objects.equals(summary.metricTypeCode(), normalizedMetricType))
+                .findFirst()
+                .orElseGet(() -> summaries.stream()
+                .filter(StageMetricSummaryDto::numeric)
+                .findFirst()
+                .orElse(summaries.getFirst()));
+
+            long seriesStarted = System.nanoTime();
+            List<TimeSeriesPointDto> numericSeries = selected.numeric() && includeSeries
+                ? stageMetricRollupService.loadNumericSeries(
+                    from,
+                    to,
+                    normalizedModuleCode,
+                    normalizedEventType,
+                    normalizedStageType,
+                    selected.metricTypeCode(),
+                    resolvedBucket
+                )
+                : List.of();
+            long seriesMs = elapsedMs(seriesStarted);
+            long topValuesStarted = System.nanoTime();
+            List<TopValueDto> selectedTopValues = includeTopValues
+                ? stageMetricRollupService.loadTopValues(
+                    from,
+                    to,
+                    normalizedModuleCode,
+                    normalizedEventType,
+                    normalizedStageType,
+                    selected.metricTypeCode(),
+                    8
+                )
+                : List.of();
+            long topValuesMs = elapsedMs(topValuesStarted);
+
+            StageMetricResponse response = new StageMetricResponse(
+                from,
+                to,
+                resolvedBucket,
+                selected.metricTypeCode(),
+                selected.metricTypeName(),
+                selected.unit(),
+                selected.numeric(),
+                summaries,
+                numericSeries,
+                selectedTopValues
+            );
+            logStageMetricsServicePerf(
+                serviceStarted,
+                "rollup",
+                from,
+                to,
+                normalizedModuleCode,
+                normalizedEventType,
+                normalizedStageType,
+                selected.metricTypeCode(),
+                resolvedBucket,
+                includeSummaries,
+                includeTopValues,
+                rollupMs,
+                0,
+                0,
+                buildMs,
+                seriesMs,
+                topValuesMs,
+                response.summaries().size(),
+                response.numericSeries().size(),
+                response.selectedTopValues().size()
+            );
+            return response;
+        }
+
         // Fast path for large periods: direct DB join for a concrete metric type, without loading all events/stages into memory.
         if (!includeSummaries
             && normalizedMetricType != null
             && normalizedRequestPath == null
             && !hasAdditionalEventFilters) {
+            long directQueryStarted = System.nanoTime();
             List<AnalyticsStageMetric> scopedMetrics = stageMetricRepository.findByScope(
                 from,
                 to,
@@ -411,22 +835,46 @@ public class AnalyticsInsightsService {
                 normalizedStageType,
                 normalizedMetricType
             );
+            long directQueryMs = elapsedMs(directQueryStarted);
             if (scopedMetrics.isEmpty()) {
+                logStageMetricsServicePerf(
+                    serviceStarted,
+                    "direct_metric_scope",
+                    from,
+                    to,
+                    normalizedModuleCode,
+                    normalizedEventType,
+                    normalizedStageType,
+                    normalizedMetricType,
+                    resolvedBucket,
+                    includeSummaries,
+                    includeTopValues,
+                    0,
+                    directQueryMs,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
+                );
                 return new StageMetricResponse(from, to, resolvedBucket, null, null, null, false, List.of(), List.of(), List.of());
             }
 
+            long buildStarted = System.nanoTime();
             Map<String, String> metricTypeNames = stageMetricTypeNameMap();
             List<BigDecimal> numericValues = scopedMetrics.stream()
                 .map(AnalyticsStageMetric::getMetricValueNum)
                 .filter(Objects::nonNull)
                 .toList();
-            boolean numeric = !numericValues.isEmpty();
+            boolean numeric = !shouldTreatMetricAsText(normalizedMetricType) && !numericValues.isEmpty();
             String unit = scopedMetrics.stream()
                 .map(AnalyticsStageMetric::getUnit)
                 .filter(unitValue -> unitValue != null && !unitValue.isBlank())
                 .findFirst()
                 .orElse(null);
-            List<TimeSeriesPointDto> numericSeries = numeric
+            List<TimeSeriesPointDto> numericSeries = numeric && includeSeries
                 ? buildSeries(
                     from,
                     to,
@@ -440,9 +888,10 @@ public class AnalyticsInsightsService {
                     point -> false
                 )
                 : List.of();
-            List<TopValueDto> selectedTopValues = topValuesForMetrics(scopedMetrics);
+            List<TopValueDto> selectedTopValues = includeTopValues ? topValuesForMetrics(scopedMetrics) : List.of();
+            long buildMs = elapsedMs(buildStarted);
 
-            return new StageMetricResponse(
+            StageMetricResponse response = new StageMetricResponse(
                 from,
                 to,
                 resolvedBucket,
@@ -454,21 +903,91 @@ public class AnalyticsInsightsService {
                 numericSeries,
                 selectedTopValues
             );
+            logStageMetricsServicePerf(
+                serviceStarted,
+                "direct_metric_scope",
+                from,
+                to,
+                normalizedModuleCode,
+                normalizedEventType,
+                normalizedStageType,
+                normalizedMetricType,
+                resolvedBucket,
+                includeSummaries,
+                includeTopValues,
+                0,
+                directQueryMs,
+                0,
+                buildMs,
+                0,
+                0,
+                response.summaries().size(),
+                response.numericSeries().size(),
+                response.selectedTopValues().size()
+            );
+            return response;
         }
 
+        long rawQueryStarted = System.nanoTime();
         List<AnalyticsEvent> events = filterEventsByRequestPath(
             eventRepository.findAllByRangeOrdered(from, to, normalizedEventType, normalizedModuleCode),
             normalizedRequestPath
         );
         events = filterEventsByMetric(events, filterMetricTypeCode, filterMetricValue, filterMetricMinValue, filterMetricMaxValue);
         events = filterEventsByAttribute(events, filterAttributeCode, filterAttributeValue, filterAttributeMinValue, filterAttributeMaxValue);
+        long rawQueryMs = elapsedMs(rawQueryStarted);
         if (events.isEmpty()) {
+            logStageMetricsServicePerf(
+                serviceStarted,
+                "raw",
+                from,
+                to,
+                normalizedModuleCode,
+                normalizedEventType,
+                normalizedStageType,
+                normalizedMetricType,
+                resolvedBucket,
+                includeSummaries,
+                includeTopValues,
+                0,
+                rawQueryMs,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+            );
             return new StageMetricResponse(from, to, resolvedBucket, null, null, null, false, List.of(), List.of(), List.of());
         }
 
+        long groupingStarted = System.nanoTime();
         List<Long> eventIds = ids(events);
         List<AnalyticsStage> stages = findStagesByEventIds(eventIds, normalizedStageType);
         if (stages.isEmpty()) {
+            logStageMetricsServicePerf(
+                serviceStarted,
+                "raw",
+                from,
+                to,
+                normalizedModuleCode,
+                normalizedEventType,
+                normalizedStageType,
+                normalizedMetricType,
+                resolvedBucket,
+                includeSummaries,
+                includeTopValues,
+                0,
+                rawQueryMs,
+                elapsedMs(groupingStarted),
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+            );
             return new StageMetricResponse(from, to, resolvedBucket, null, null, null, false, List.of(), List.of(), List.of());
         }
 
@@ -477,9 +996,33 @@ public class AnalyticsInsightsService {
             includeSummaries ? null : normalizedMetricType
         );
         if (metrics.isEmpty()) {
+            logStageMetricsServicePerf(
+                serviceStarted,
+                "raw",
+                from,
+                to,
+                normalizedModuleCode,
+                normalizedEventType,
+                normalizedStageType,
+                normalizedMetricType,
+                resolvedBucket,
+                includeSummaries,
+                includeTopValues,
+                0,
+                rawQueryMs,
+                elapsedMs(groupingStarted),
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+            );
             return new StageMetricResponse(from, to, resolvedBucket, null, null, null, false, List.of(), List.of(), List.of());
         }
+        long groupingMs = elapsedMs(groupingStarted);
 
+        long buildStarted = System.nanoTime();
         Map<String, String> metricTypeNames = stageMetricTypeNameMap();
         Map<String, String> metricTypeDescriptions = stageMetricTypeDescriptionMap();
         Map<String, String> metricTypeReadingGuides = stageMetricTypeReadingGuideMap();
@@ -507,13 +1050,13 @@ public class AnalyticsInsightsService {
                 .map(AnalyticsStageMetric::getMetricValueNum)
                 .filter(Objects::nonNull)
                 .toList();
-            boolean numeric = !numericValues.isEmpty();
+            boolean numeric = !shouldTreatMetricAsText(selectedCode) && !numericValues.isEmpty();
             String unit = selectedMetrics.stream()
                 .map(AnalyticsStageMetric::getUnit)
                 .filter(unitValue -> unitValue != null && !unitValue.isBlank())
                 .findFirst()
                 .orElse(null);
-            List<TimeSeriesPointDto> numericSeries = numeric
+            List<TimeSeriesPointDto> numericSeries = numeric && includeSeries
                 ? buildSeries(
                     from,
                     to,
@@ -528,8 +1071,8 @@ public class AnalyticsInsightsService {
                 )
                 : List.of();
 
-            List<TopValueDto> selectedTopValues = topValuesForMetrics(selectedMetrics);
-            return new StageMetricResponse(
+            List<TopValueDto> selectedTopValues = includeTopValues ? topValuesForMetrics(selectedMetrics) : List.of();
+            StageMetricResponse response = new StageMetricResponse(
                 from,
                 to,
                 resolvedBucket,
@@ -541,6 +1084,29 @@ public class AnalyticsInsightsService {
                 numericSeries,
                 selectedTopValues
             );
+            logStageMetricsServicePerf(
+                serviceStarted,
+                "raw",
+                from,
+                to,
+                normalizedModuleCode,
+                normalizedEventType,
+                normalizedStageType,
+                selectedCode,
+                resolvedBucket,
+                includeSummaries,
+                includeTopValues,
+                0,
+                rawQueryMs,
+                groupingMs,
+                elapsedMs(buildStarted),
+                0,
+                0,
+                response.summaries().size(),
+                response.numericSeries().size(),
+                response.selectedTopValues().size()
+            );
+            return response;
         }
 
         Map<String, List<AnalyticsStageMetric>> byMetricType = metrics.stream()
@@ -554,7 +1120,7 @@ public class AnalyticsInsightsService {
                     .map(AnalyticsStageMetric::getMetricValueNum)
                     .filter(Objects::nonNull)
                     .toList();
-                boolean numeric = !numericValues.isEmpty();
+                boolean numeric = !shouldTreatMetricAsText(code) && !numericValues.isEmpty();
                 BigDecimal avg = numeric ? avgDecimal(numericValues) : BigDecimal.ZERO;
                 BigDecimal p95 = numeric ? percentileBigDecimal(numericValues, 0.95) : BigDecimal.ZERO;
                 BigDecimal min = numeric ? numericValues.stream().min(Comparator.naturalOrder()).orElse(BigDecimal.ZERO) : BigDecimal.ZERO;
@@ -596,7 +1162,7 @@ public class AnalyticsInsightsService {
                 .orElse(summaries.getFirst()));
 
         List<AnalyticsStageMetric> selectedMetrics = byMetricType.getOrDefault(selected.metricTypeCode(), List.of());
-        List<TimeSeriesPointDto> numericSeries = selected.numeric()
+        List<TimeSeriesPointDto> numericSeries = selected.numeric() && includeSeries
             ? buildSeries(
                 from,
                 to,
@@ -611,9 +1177,9 @@ public class AnalyticsInsightsService {
             )
             : List.of();
 
-        List<TopValueDto> selectedTopValues = selected.topValues();
+        List<TopValueDto> selectedTopValues = includeTopValues ? selected.topValues() : List.of();
 
-        return new StageMetricResponse(
+        StageMetricResponse response = new StageMetricResponse(
             from,
             to,
             resolvedBucket,
@@ -625,6 +1191,29 @@ public class AnalyticsInsightsService {
             numericSeries,
             selectedTopValues
         );
+        logStageMetricsServicePerf(
+            serviceStarted,
+            "raw",
+            from,
+            to,
+            normalizedModuleCode,
+            normalizedEventType,
+            normalizedStageType,
+            selected.metricTypeCode(),
+            resolvedBucket,
+            includeSummaries,
+            includeTopValues,
+            0,
+            rawQueryMs,
+            groupingMs,
+            elapsedMs(buildStarted),
+            0,
+            0,
+            response.summaries().size(),
+            response.numericSeries().size(),
+            response.selectedTopValues().size()
+        );
+        return response;
     }
 
     public UniversalResponse universal(
@@ -644,8 +1233,10 @@ public class AnalyticsInsightsService {
         BigDecimal filterAttributeMinValue,
         BigDecimal filterAttributeMaxValue,
         String stageTypeCode,
-        Integer bucketMinutes
+        Integer bucketMinutes,
+        boolean includeEventStageBreakdown
     ) {
+        long serviceStarted = System.nanoTime();
         String normalizedModuleCode = normalizeModuleFilterCode(moduleCode);
         Set<String> normalizedEventTypes = normalizeCodes(eventTypeCode);
         String normalizedRequestPath = normalizeText(requestPath);
@@ -653,7 +1244,195 @@ public class AnalyticsInsightsService {
         String normalizedAttributeValue = normalizeText(attributeValue);
         String normalizedStageType = normalizeCode(stageTypeCode);
         int resolvedBucket = resolveBucketMinutes(from, to, bucketMinutes);
+        boolean canUseRollup = canUseTimeRollup(
+            normalizedRequestPath,
+            filterMetricTypeCode,
+            filterMetricValue,
+            filterMetricMinValue,
+            filterMetricMaxValue,
+            filterAttributeCode,
+            filterAttributeValue,
+            filterAttributeMinValue,
+            filterAttributeMaxValue
+        ) && normalizedAttributeCode == null && normalizedAttributeValue == null;
 
+        if (canUseRollup) {
+            Set<String> stageTypeFilter = normalizedStageType == null ? Set.of() : Set.of(normalizedStageType);
+
+            long eventRollupStarted = System.nanoTime();
+            List<AnalyticsTimeRollupService.AggregatePoint> eventPoints = normalizedStageType == null
+                ? timeRollupService.loadEventAggregatePoints(
+                    from,
+                    to,
+                    normalizedModuleCode,
+                    normalizedEventTypes,
+                    resolvedBucket
+                )
+                : timeRollupService.loadStageAggregatePointsByEvent(
+                    from,
+                    to,
+                    normalizedModuleCode,
+                    normalizedEventTypes,
+                    stageTypeFilter,
+                    resolvedBucket
+                );
+            long eventRollupMs = elapsedMs(eventRollupStarted);
+            long stageRollupStarted = System.nanoTime();
+            List<AnalyticsTimeRollupService.AggregatePoint> stagePoints = timeRollupService.loadStageAggregatePoints(
+                from,
+                to,
+                normalizedModuleCode,
+                normalizedEventTypes,
+                stageTypeFilter,
+                resolvedBucket
+            );
+            long stageRollupMs = elapsedMs(stageRollupStarted);
+
+            long responseBuildStarted = System.nanoTime();
+            Map<String, String> eventTypeNames = eventTypeNameMap();
+            Map<String, String> stageTypeNames = stageTypeNameMap();
+            AnalyticsTimeRollupService.AnalyticsAccumulator totalsAcc = timeRollupService.accumulateAll(eventPoints);
+            KpiSnapshot totals = snapshotFromAccumulator(totalsAcc);
+
+            Map<String, AnalyticsTimeRollupService.AnalyticsAccumulator> eventByCode = timeRollupService.accumulateByCode(eventPoints);
+            List<EventKpiDto> eventBreakdown = eventByCode.entrySet().stream()
+                .map(entry -> {
+                    String code = entry.getKey();
+                    AnalyticsTimeRollupService.AnalyticsAccumulator stat = entry.getValue();
+                    return new EventKpiDto(
+                        code,
+                        eventTypeNames.getOrDefault(code, code),
+                        stat.sampleCount(),
+                        stat.errorRate(),
+                        stat.avgMs(),
+                        stat.p95Ms(),
+                        stat.p99Ms(),
+                        stat.maxMs()
+                    );
+                })
+                .sorted(Comparator.comparing(EventKpiDto::count).reversed().thenComparing(EventKpiDto::eventTypeCode))
+                .toList();
+
+            Map<String, AnalyticsTimeRollupService.AnalyticsAccumulator> stageByCode = timeRollupService.accumulateByCode(stagePoints);
+            List<StageKpiDto> stageRows = stageByCode.entrySet().stream()
+                .map(entry -> {
+                    String code = entry.getKey();
+                    AnalyticsTimeRollupService.AnalyticsAccumulator stat = entry.getValue();
+                    return new StageKpiDto(
+                        code,
+                        stageTypeNames.getOrDefault(code, code),
+                        stat.sampleCount(),
+                        stat.errorRate(),
+                        stat.avgMs(),
+                        stat.p95Ms(),
+                        stat.p99Ms(),
+                        stat.maxMs()
+                    );
+                })
+                .sorted(Comparator.comparing(StageKpiDto::count).reversed().thenComparing(StageKpiDto::stageTypeCode))
+                .toList();
+
+            List<TimeSeriesPointDto> series = timeRollupService.seriesFromPoints(from, to, resolvedBucket, eventPoints);
+            List<UniversalEventSeriesDto> eventSeries = eventBreakdown.stream()
+                .map(row -> new UniversalEventSeriesDto(
+                    row.eventTypeCode(),
+                    row.eventTypeName(),
+                    timeRollupService.seriesFromPoints(
+                        from,
+                        to,
+                        resolvedBucket,
+                        timeRollupService.pointsForCode(eventPoints, row.eventTypeCode())
+                    )
+                ))
+                .toList();
+
+            long eventStageBreakdownStarted = System.nanoTime();
+            List<UniversalEventStageBreakdownDto> eventStageBreakdown = includeEventStageBreakdown
+                ? eventBreakdown.stream()
+                    .limit(10)
+                    .map(row -> {
+                        List<AnalyticsTimeRollupService.AggregatePoint> scopedStagePoints = timeRollupService.loadStageAggregatePoints(
+                            from,
+                            to,
+                            normalizedModuleCode,
+                            Set.of(row.eventTypeCode()),
+                            stageTypeFilter,
+                            resolvedBucket
+                        );
+                        Map<String, AnalyticsTimeRollupService.AnalyticsAccumulator> scopedStages = timeRollupService.accumulateByCode(scopedStagePoints);
+                        List<StageKpiDto> stageKpis = scopedStages.entrySet().stream()
+                            .map(entry -> {
+                                String stageCode = entry.getKey();
+                                AnalyticsTimeRollupService.AnalyticsAccumulator stat = entry.getValue();
+                                return new StageKpiDto(
+                                    stageCode,
+                                    stageTypeNames.getOrDefault(stageCode, stageCode),
+                                    stat.sampleCount(),
+                                    stat.errorRate(),
+                                    stat.avgMs(),
+                                    stat.p95Ms(),
+                                    stat.p99Ms(),
+                                    stat.maxMs()
+                                );
+                            })
+                            .sorted(Comparator.comparing(StageKpiDto::count).reversed().thenComparing(StageKpiDto::stageTypeCode))
+                            .toList();
+                        return new UniversalEventStageBreakdownDto(
+                            row.eventTypeCode(),
+                            row.eventTypeName(),
+                            stageKpis
+                        );
+                    })
+                    .toList()
+                : List.of();
+            long eventStageBreakdownMs = includeEventStageBreakdown ? elapsedMs(eventStageBreakdownStarted) : 0L;
+
+            Map<String, String> attributeTypeNames = eventAttributeTypeNameMap();
+            long attributesStarted = System.nanoTime();
+            List<OptionDto> availableAttributeTypes = availableAttributeTypesForRollup(
+                from,
+                to,
+                normalizedModuleCode,
+                normalizedEventTypes,
+                attributeTypeNames
+            );
+            long attributesMs = elapsedMs(attributesStarted);
+            long responseBuildMs = elapsedMs(responseBuildStarted);
+
+            UniversalResponse response = new UniversalResponse(
+                from,
+                to,
+                resolvedBucket,
+                totals,
+                series,
+                stageRows,
+                eventBreakdown,
+                eventSeries,
+                eventStageBreakdown,
+                availableAttributeTypes
+            );
+            log.info(
+                "[UNIVERSAL_PERF] service path=aggregate totalMs={} eventRollupMs={} stageRollupMs={} eventStageBreakdownMs={} attributesMs={} responseBuildMs={} includeEventStageBreakdown={} counts eventPoints={} stagePoints={} series={} stages={} events={} eventSeries={} eventStageBreakdown={} attrs={}",
+                elapsedMs(serviceStarted),
+                eventRollupMs,
+                stageRollupMs,
+                eventStageBreakdownMs,
+                attributesMs,
+                responseBuildMs,
+                includeEventStageBreakdown,
+                eventPoints.size(),
+                stagePoints.size(),
+                series.size(),
+                stageRows.size(),
+                eventBreakdown.size(),
+                eventSeries.size(),
+                eventStageBreakdown.size(),
+                availableAttributeTypes.size()
+            );
+            return response;
+        }
+
+        long rawQueryStarted = System.nanoTime();
         List<AnalyticsEvent> events = normalizedAttributeCode == null
             ? eventRepository.findAllByRangeOrdered(from, to, null, normalizedModuleCode)
             : eventRepository.findAllByRangeOrderedWithAttribute(
@@ -664,6 +1443,8 @@ public class AnalyticsInsightsService {
                 normalizedAttributeCode,
                 normalizedAttributeValue
             );
+        long rawQueryMs = elapsedMs(rawQueryStarted);
+        long javaFilterStarted = System.nanoTime();
         if (!normalizedEventTypes.isEmpty()) {
             events = events.stream()
                 .filter(event -> normalizedEventTypes.contains(normalizeCode(event.getEventTypeCode())))
@@ -672,11 +1453,22 @@ public class AnalyticsInsightsService {
         events = filterEventsByRequestPath(events, normalizedRequestPath);
         events = filterEventsByMetric(events, filterMetricTypeCode, filterMetricValue, filterMetricMinValue, filterMetricMaxValue);
         events = filterEventsByAttribute(events, filterAttributeCode, filterAttributeValue, filterAttributeMinValue, filterAttributeMaxValue);
+        long javaFilterMs = elapsedMs(javaFilterStarted);
         if (events.isEmpty()) {
-            return new UniversalResponse(from, to, resolvedBucket, snapshotFromEvents(List.of()), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+            UniversalResponse empty = new UniversalResponse(from, to, resolvedBucket, snapshotFromEvents(List.of()), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+            log.info(
+                "[UNIVERSAL_PERF] service path=raw totalMs={} rawQueryMs={} javaFilterMs={} stageBatchLoadMs=0 javaGroupingMs=0 attributesMs=0 responseBuildMs=0 includeEventStageBreakdown={} counts events=0 stages=0 eventStageBreakdown=0 attrs=0",
+                elapsedMs(serviceStarted),
+                rawQueryMs,
+                javaFilterMs,
+                includeEventStageBreakdown
+            );
+            return empty;
         }
 
+        long stageBatchStarted = System.nanoTime();
         List<AnalyticsStage> stages = findStagesByEventIds(ids(events));
+        long stageBatchLoadMs = elapsedMs(stageBatchStarted);
         if (normalizedStageType != null) {
             Set<Long> matchedEventIds = stages.stream()
                 .filter(stage -> normalizedStageType.equals(stage.getStageTypeCode()))
@@ -691,9 +1483,20 @@ public class AnalyticsInsightsService {
         }
 
         if (events.isEmpty()) {
-            return new UniversalResponse(from, to, resolvedBucket, snapshotFromEvents(List.of()), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+            UniversalResponse empty = new UniversalResponse(from, to, resolvedBucket, snapshotFromEvents(List.of()), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+            log.info(
+                "[UNIVERSAL_PERF] service path=raw totalMs={} rawQueryMs={} javaFilterMs={} stageBatchLoadMs={} javaGroupingMs=0 attributesMs=0 responseBuildMs=0 includeEventStageBreakdown={} counts events=0 stages={} eventStageBreakdown=0 attrs=0",
+                elapsedMs(serviceStarted),
+                rawQueryMs,
+                javaFilterMs,
+                stageBatchLoadMs,
+                includeEventStageBreakdown,
+                stages.size()
+            );
+            return empty;
         }
 
+        long javaGroupingStarted = System.nanoTime();
         Map<String, String> stageTypeNames = stageTypeNameMap();
         List<StageKpiDto> stageRows = stages.stream()
             .collect(Collectors.groupingBy(AnalyticsStage::getStageTypeCode))
@@ -716,95 +1519,157 @@ public class AnalyticsInsightsService {
             .sorted(Comparator.comparing(StageKpiDto::count).reversed().thenComparing(StageKpiDto::stageTypeCode))
             .toList();
 
-        KpiSnapshot totals = snapshotFromEvents(events);
         Map<String, String> eventTypeNames = eventTypeNameMap();
-        List<EventKpiDto> eventBreakdown = events.stream()
-            .collect(Collectors.groupingBy(AnalyticsEvent::getEventTypeCode))
-            .entrySet()
-            .stream()
-            .map(entry -> {
-                String code = entry.getKey();
-                KpiSnapshot stat = snapshotFromEvents(entry.getValue());
-                return new EventKpiDto(
-                    code,
-                    eventTypeNames.getOrDefault(code, code),
-                    stat.count(),
-                    stat.errorRate(),
-                    stat.avgMs(),
-                    stat.p95Ms(),
-                    stat.p99Ms(),
-                    stat.maxMs()
-                );
-            })
-            .sorted(Comparator.comparing(EventKpiDto::count).reversed().thenComparing(EventKpiDto::eventTypeCode))
-            .toList();
-        List<TimeSeriesPointDto> series = buildSeries(
-            from,
-            to,
-            resolvedBucket,
-            events,
-            AnalyticsEvent::getStartedAt,
-            AnalyticsEvent::getDurationMs,
-            event -> Boolean.TRUE.equals(event.getIsError())
-        );
-        List<UniversalEventSeriesDto> eventSeries = events.stream()
-            .collect(Collectors.groupingBy(AnalyticsEvent::getEventTypeCode))
-            .entrySet()
-            .stream()
-            .map(entry -> new UniversalEventSeriesDto(
-                entry.getKey(),
-                eventTypeNames.getOrDefault(entry.getKey(), entry.getKey()),
-                buildSeries(
-                    from,
-                    to,
-                    resolvedBucket,
-                    entry.getValue(),
-                    AnalyticsEvent::getStartedAt,
-                    AnalyticsEvent::getDurationMs,
-                    event -> Boolean.TRUE.equals(event.getIsError())
-                )
-            ))
-            .sorted(Comparator.comparing(UniversalEventSeriesDto::eventTypeCode))
-            .toList();
-
         Map<Long, String> eventTypeByEventId = events.stream()
             .collect(Collectors.toMap(AnalyticsEvent::getId, AnalyticsEvent::getEventTypeCode, (first, second) -> first));
+        KpiSnapshot totals;
+        List<EventKpiDto> eventBreakdown;
+        List<TimeSeriesPointDto> series;
+        List<UniversalEventSeriesDto> eventSeries;
+        if (normalizedStageType != null) {
+            List<AnalyticsStage> stagesWithEventType = stages.stream()
+                .filter(stage -> stage.getEventId() != null && eventTypeByEventId.containsKey(stage.getEventId()))
+                .toList();
+            totals = snapshotFromStages(stagesWithEventType);
+            eventBreakdown = stagesWithEventType.stream()
+                .collect(Collectors.groupingBy(stage -> eventTypeByEventId.get(stage.getEventId())))
+                .entrySet()
+                .stream()
+                .map(entry -> {
+                    String code = entry.getKey();
+                    KpiSnapshot stat = snapshotFromStages(entry.getValue());
+                    return new EventKpiDto(
+                        code,
+                        eventTypeNames.getOrDefault(code, code),
+                        stat.count(),
+                        stat.errorRate(),
+                        stat.avgMs(),
+                        stat.p95Ms(),
+                        stat.p99Ms(),
+                        stat.maxMs()
+                    );
+                })
+                .sorted(Comparator.comparing(EventKpiDto::count).reversed().thenComparing(EventKpiDto::eventTypeCode))
+                .toList();
+            series = buildSeries(
+                from,
+                to,
+                resolvedBucket,
+                stagesWithEventType,
+                AnalyticsStage::getStartedAt,
+                AnalyticsStage::getDurationMs,
+                stage -> Boolean.TRUE.equals(stage.getIsError())
+            );
+            eventSeries = stagesWithEventType.stream()
+                .collect(Collectors.groupingBy(stage -> eventTypeByEventId.get(stage.getEventId())))
+                .entrySet()
+                .stream()
+                .map(entry -> new UniversalEventSeriesDto(
+                    entry.getKey(),
+                    eventTypeNames.getOrDefault(entry.getKey(), entry.getKey()),
+                    buildSeries(
+                        from,
+                        to,
+                        resolvedBucket,
+                        entry.getValue(),
+                        AnalyticsStage::getStartedAt,
+                        AnalyticsStage::getDurationMs,
+                        stage -> Boolean.TRUE.equals(stage.getIsError())
+                    )
+                ))
+                .sorted(Comparator.comparing(UniversalEventSeriesDto::eventTypeCode))
+                .toList();
+        } else {
+            totals = snapshotFromEvents(events);
+            eventBreakdown = events.stream()
+                .collect(Collectors.groupingBy(AnalyticsEvent::getEventTypeCode))
+                .entrySet()
+                .stream()
+                .map(entry -> {
+                    String code = entry.getKey();
+                    KpiSnapshot stat = snapshotFromEvents(entry.getValue());
+                    return new EventKpiDto(
+                        code,
+                        eventTypeNames.getOrDefault(code, code),
+                        stat.count(),
+                        stat.errorRate(),
+                        stat.avgMs(),
+                        stat.p95Ms(),
+                        stat.p99Ms(),
+                        stat.maxMs()
+                    );
+                })
+                .sorted(Comparator.comparing(EventKpiDto::count).reversed().thenComparing(EventKpiDto::eventTypeCode))
+                .toList();
+            series = buildSeries(
+                from,
+                to,
+                resolvedBucket,
+                events,
+                AnalyticsEvent::getStartedAt,
+                AnalyticsEvent::getDurationMs,
+                event -> Boolean.TRUE.equals(event.getIsError())
+            );
+            eventSeries = events.stream()
+                .collect(Collectors.groupingBy(AnalyticsEvent::getEventTypeCode))
+                .entrySet()
+                .stream()
+                .map(entry -> new UniversalEventSeriesDto(
+                    entry.getKey(),
+                    eventTypeNames.getOrDefault(entry.getKey(), entry.getKey()),
+                    buildSeries(
+                        from,
+                        to,
+                        resolvedBucket,
+                        entry.getValue(),
+                        AnalyticsEvent::getStartedAt,
+                        AnalyticsEvent::getDurationMs,
+                        event -> Boolean.TRUE.equals(event.getIsError())
+                    )
+                ))
+                .sorted(Comparator.comparing(UniversalEventSeriesDto::eventTypeCode))
+                .toList();
+        }
         Map<String, List<AnalyticsStage>> stagesByEventType = stages.stream()
             .filter(stage -> stage.getEventId() != null && eventTypeByEventId.containsKey(stage.getEventId()))
             .collect(Collectors.groupingBy(stage -> eventTypeByEventId.get(stage.getEventId())));
-        List<UniversalEventStageBreakdownDto> eventStageBreakdown = stagesByEventType.entrySet().stream()
-            .map(entry -> {
-                String eventCode = entry.getKey();
-                List<StageKpiDto> stageKpis = entry.getValue().stream()
-                    .collect(Collectors.groupingBy(AnalyticsStage::getStageTypeCode))
-                    .entrySet()
-                    .stream()
-                    .map(stageEntry -> {
-                        KpiSnapshot stat = snapshotFromStages(stageEntry.getValue());
-                        String stageCode = stageEntry.getKey();
-                        return new StageKpiDto(
-                            stageCode,
-                            stageTypeNames.getOrDefault(stageCode, stageCode),
-                            stat.count(),
-                            stat.errorRate(),
-                            stat.avgMs(),
-                            stat.p95Ms(),
-                            stat.p99Ms(),
-                            stat.maxMs()
-                        );
-                    })
-                    .sorted(Comparator.comparing(StageKpiDto::count).reversed().thenComparing(StageKpiDto::stageTypeCode))
-                    .toList();
-                return new UniversalEventStageBreakdownDto(
-                    eventCode,
-                    eventTypeNames.getOrDefault(eventCode, eventCode),
-                    stageKpis
-                );
-            })
-            .sorted(Comparator.comparing(UniversalEventStageBreakdownDto::eventTypeCode))
-            .toList();
+        List<UniversalEventStageBreakdownDto> eventStageBreakdown = includeEventStageBreakdown
+            ? stagesByEventType.entrySet().stream()
+                .map(entry -> {
+                    String eventCode = entry.getKey();
+                    List<StageKpiDto> stageKpis = entry.getValue().stream()
+                        .collect(Collectors.groupingBy(AnalyticsStage::getStageTypeCode))
+                        .entrySet()
+                        .stream()
+                        .map(stageEntry -> {
+                            KpiSnapshot stat = snapshotFromStages(stageEntry.getValue());
+                            String stageCode = stageEntry.getKey();
+                            return new StageKpiDto(
+                                stageCode,
+                                stageTypeNames.getOrDefault(stageCode, stageCode),
+                                stat.count(),
+                                stat.errorRate(),
+                                stat.avgMs(),
+                                stat.p95Ms(),
+                                stat.p99Ms(),
+                                stat.maxMs()
+                            );
+                        })
+                        .sorted(Comparator.comparing(StageKpiDto::count).reversed().thenComparing(StageKpiDto::stageTypeCode))
+                        .toList();
+                    return new UniversalEventStageBreakdownDto(
+                        eventCode,
+                        eventTypeNames.getOrDefault(eventCode, eventCode),
+                        stageKpis
+                    );
+                })
+                .sorted(Comparator.comparing(UniversalEventStageBreakdownDto::eventTypeCode))
+                .toList()
+            : List.of();
+        long javaGroupingMs = elapsedMs(javaGroupingStarted);
 
         Map<String, String> attributeTypeNames = eventAttributeTypeNameMap();
+        long attributesStarted = System.nanoTime();
         List<OptionDto> availableAttributeTypes = findAttributesByEventIds(ids(events)).stream()
             .map(AnalyticsEventAttribute::getAttributeTypeCode)
             .filter(Objects::nonNull)
@@ -814,8 +1679,10 @@ public class AnalyticsInsightsService {
             .map(code -> new OptionDto(code, attributeTypeNames.getOrDefault(code, code)))
             .sorted(Comparator.comparing(OptionDto::name))
             .toList();
+        long attributesMs = elapsedMs(attributesStarted);
 
-        return new UniversalResponse(
+        long responseBuildStarted = System.nanoTime();
+        UniversalResponse response = new UniversalResponse(
             from,
             to,
             resolvedBucket,
@@ -827,6 +1694,27 @@ public class AnalyticsInsightsService {
             eventStageBreakdown,
             availableAttributeTypes
         );
+        long responseBuildMs = elapsedMs(responseBuildStarted);
+        log.info(
+            "[UNIVERSAL_PERF] service path=raw totalMs={} rawQueryMs={} javaFilterMs={} stageBatchLoadMs={} javaGroupingMs={} attributesMs={} responseBuildMs={} includeEventStageBreakdown={} counts events={} stages={} series={} stageRows={} eventBreakdown={} eventSeries={} eventStageBreakdown={} attrs={}",
+            elapsedMs(serviceStarted),
+            rawQueryMs,
+            javaFilterMs,
+            stageBatchLoadMs,
+            javaGroupingMs,
+            attributesMs,
+            responseBuildMs,
+            includeEventStageBreakdown,
+            events.size(),
+            stages.size(),
+            series.size(),
+            stageRows.size(),
+            eventBreakdown.size(),
+            eventSeries.size(),
+            eventStageBreakdown.size(),
+            availableAttributeTypes.size()
+        );
+        return response;
     }
 
     public EventListResponse events(
@@ -1242,13 +2130,14 @@ public class AnalyticsInsightsService {
         Map<String, String> stageTypeNames = stageTypeNameMap();
         Map<String, String> metricTypeNames = stageMetricTypeNameMap();
         Map<String, String> attributeTypeNames = eventAttributeTypeNameMap();
-        List<EventLogEntryDto> traceLogs = analyticsLogViewService.loadTraceLogs(
+        AnalyticsLogViewService.TraceLogLookupResult traceLogLookup = analyticsLogViewService.loadTraceLogs(
             event.getTraceId(),
             event.getEventUid() == null ? null : event.getEventUid().toString(),
             event.getModuleCode(),
             event.getStartedAt(),
             event.getEndedAt()
         );
+        List<EventLogEntryDto> traceLogs = traceLogLookup.rows();
 
         Map<Long, List<EventStageMetricDto>> metricsByStage = metrics.stream()
             .collect(Collectors.groupingBy(
@@ -1311,6 +2200,7 @@ public class AnalyticsInsightsService {
             event.getErrorMessage(),
             attributeDtos,
             stageDtos,
+            traceLogLookup.status(),
             traceLogs
         );
     }
@@ -1430,6 +2320,33 @@ public class AnalyticsInsightsService {
         return snapshot(total, errors, durations);
     }
 
+    private KpiSnapshot snapshotFromAccumulator(AnalyticsTimeRollupService.AnalyticsAccumulator accumulator) {
+        if (accumulator == null) {
+            return new KpiSnapshot(
+                0,
+                0,
+                0,
+                BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP),
+                BigDecimal.ZERO.setScale(3, RoundingMode.HALF_UP),
+                BigDecimal.ZERO.setScale(3, RoundingMode.HALF_UP),
+                BigDecimal.ZERO.setScale(3, RoundingMode.HALF_UP),
+                BigDecimal.ZERO.setScale(3, RoundingMode.HALF_UP)
+            );
+        }
+        long count = accumulator.sampleCount();
+        long errors = Math.max(0L, accumulator.errorCount());
+        return new KpiSnapshot(
+            count,
+            errors,
+            Math.max(0L, count - errors),
+            accumulator.errorRate(),
+            accumulator.avgMs(),
+            accumulator.p95Ms(),
+            accumulator.p99Ms(),
+            accumulator.maxMs()
+        );
+    }
+
     private KpiSnapshot snapshot(long total, long errors, List<Integer> sortedDurations) {
         BigDecimal avg = sortedDurations.isEmpty()
             ? BigDecimal.ZERO
@@ -1477,7 +2394,14 @@ public class AnalyticsInsightsService {
             BigDecimal p95 = percentileInt(sortedDurations, 0.95);
             BigDecimal p99 = percentileInt(sortedDurations, 0.99);
             BigDecimal errorRate = ratio(errors, count);
-            result.add(new TimeSeriesPointDto(bucket, count, avg, p95, p99, errorRate));
+            result.add(new TimeSeriesPointDto(
+                AnalyticsSeriesTime.displayTimeForBucket(bucket, to, stepSeconds),
+                count,
+                avg,
+                p95,
+                p99,
+                errorRate
+            ));
         }
         return result;
     }
@@ -1537,6 +2461,33 @@ public class AnalyticsInsightsService {
             .divide(safeBaseline, 2, RoundingMode.HALF_UP);
     }
 
+    private boolean canUseTimeRollup(
+        String normalizedRequestPath,
+        String filterMetricTypeCode,
+        String filterMetricValue,
+        BigDecimal filterMetricMinValue,
+        BigDecimal filterMetricMaxValue,
+        String filterAttributeCode,
+        String filterAttributeValue,
+        BigDecimal filterAttributeMinValue,
+        BigDecimal filterAttributeMaxValue
+    ) {
+        if (!timeRollupService.isEnabled()) {
+            return false;
+        }
+        if (normalizedRequestPath != null) {
+            return false;
+        }
+        return normalizeCode(filterMetricTypeCode) == null
+            && normalizeText(filterMetricValue) == null
+            && filterMetricMinValue == null
+            && filterMetricMaxValue == null
+            && normalizeCode(filterAttributeCode) == null
+            && normalizeText(filterAttributeValue) == null
+            && filterAttributeMinValue == null
+            && filterAttributeMaxValue == null;
+    }
+
     private Instant floorToBucket(Instant value, long stepSeconds) {
         long epochSecond = value.getEpochSecond();
         long normalized = Math.floorDiv(epochSecond, stepSeconds) * stepSeconds;
@@ -1574,6 +2525,14 @@ public class AnalyticsInsightsService {
         return value.isBlank() ? null : value.toUpperCase(Locale.ROOT);
     }
 
+    private boolean shouldTreatMetricAsText(String metricTypeCode) {
+        String normalized = normalizeCode(metricTypeCode);
+        if (normalized == null) {
+            return false;
+        }
+        return normalized.contains("HTTP_STATUS");
+    }
+
     private Set<String> normalizeCodes(List<String> codes) {
         if (codes == null || codes.isEmpty()) {
             return Set.of();
@@ -1598,6 +2557,49 @@ public class AnalyticsInsightsService {
         }
         String normalized = value.trim();
         return normalized.isBlank() ? null : normalized;
+    }
+
+    private List<OptionDto> availableAttributeTypesForRollup(
+        Instant from,
+        Instant to,
+        String normalizedModuleCode,
+        Set<String> normalizedEventTypes,
+        Map<String, String> attributeTypeNames
+    ) {
+        Set<String> codes = new LinkedHashSet<>();
+        if (normalizedEventTypes == null || normalizedEventTypes.isEmpty()) {
+            codes.addAll(eventAttributeRepository.findDistinctAttributeTypeCodesByScopeNoPath(
+                from,
+                to,
+                normalizedModuleCode,
+                null
+            ));
+        } else if (normalizedEventTypes.size() == 1) {
+            String eventType = normalizedEventTypes.iterator().next();
+            codes.addAll(eventAttributeRepository.findDistinctAttributeTypeCodesByScopeNoPath(
+                from,
+                to,
+                normalizedModuleCode,
+                eventType
+            ));
+        } else {
+            for (String eventType : normalizedEventTypes) {
+                codes.addAll(eventAttributeRepository.findDistinctAttributeTypeCodesByScopeNoPath(
+                    from,
+                    to,
+                    normalizedModuleCode,
+                    eventType
+                ));
+            }
+        }
+
+        return codes.stream()
+            .filter(Objects::nonNull)
+            .map(String::trim)
+            .filter(code -> !code.isBlank())
+            .map(code -> new OptionDto(code, attributeTypeNames.getOrDefault(code, code)))
+            .sorted(Comparator.comparing(OptionDto::name))
+            .toList();
     }
 
     private boolean containsIgnoreCase(String source, String target) {
@@ -1696,6 +2698,16 @@ public class AnalyticsInsightsService {
             ));
     }
 
+    private Map<String, MetricValueKind> stageMetricTypeValueKindMap() {
+        return stageMetricTypeRepository.findByIsActiveTrueOrderByNameAsc().stream()
+            .collect(Collectors.toMap(
+                type -> type.getCode(),
+                type -> Objects.requireNonNullElse(type.getValueKind(), MetricValueKind.NUMERIC),
+                (a, b) -> a,
+                LinkedHashMap::new
+            ));
+    }
+
     private Map<String, String> eventAttributeTypeNameMap() {
         return eventAttributeTypeRepository.findByIsActiveTrueOrderByNameAsc().stream()
             .collect(Collectors.toMap(type -> type.getCode(), type -> type.getName(), (a, b) -> a, LinkedHashMap::new));
@@ -1784,6 +2796,57 @@ public class AnalyticsInsightsService {
 
     private List<AnalyticsEventAttribute> findAttributesByEventIds(List<Long> eventIds) {
         return loadInBatches(eventIds, eventAttributeRepository::findByEventIdIn);
+    }
+
+    private static long elapsedMs(long started) {
+        return (System.nanoTime() - started) / 1_000_000L;
+    }
+
+    private void logStageMetricsServicePerf(
+        long serviceStarted,
+        String path,
+        Instant from,
+        Instant to,
+        String moduleCode,
+        String eventTypeCode,
+        String stageTypeCode,
+        String metricTypeCode,
+        int bucketMinutes,
+        boolean includeSummaries,
+        boolean includeTopValues,
+        long rollupQueryMs,
+        long rawQueryMs,
+        long groupingMs,
+        long buildMs,
+        long seriesMs,
+        long topValuesMs,
+        int summariesCount,
+        int numericSeriesCount,
+        int topValuesCount
+    ) {
+        log.info(
+            "[STAGE_METRICS_PERF] service path={} totalMs={} from={} to={} module={} eventType={} stage={} metric={} bucket={} includeSummaries={} includeTopValues={} rollupQueryMs={} rawQueryMs={} groupingMs={} buildMs={} seriesMs={} topValuesMs={} counts summaries={} series={} topValues={}",
+            path,
+            elapsedMs(serviceStarted),
+            from,
+            to,
+            moduleCode,
+            eventTypeCode,
+            stageTypeCode,
+            metricTypeCode,
+            bucketMinutes,
+            includeSummaries,
+            includeTopValues,
+            rollupQueryMs,
+            rawQueryMs,
+            groupingMs,
+            buildMs,
+            seriesMs,
+            topValuesMs,
+            summariesCount,
+            numericSeriesCount,
+            topValuesCount
+        );
     }
 
     private <ID, ENTITY> List<ENTITY> loadInBatches(

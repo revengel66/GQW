@@ -83,7 +83,7 @@ public class AnalyticsMethodLoggingAspect {
         Instant logWindowStartedAt = Instant.now();
         if (log.isTraceEnabled()) {
             log.trace(
-                "Детализация вызова {}.{}: слой={}, traceId='{}', eventUid='{}', аргументы={}",
+                "Method call details {}.{}: layer={}, traceId='{}', eventUid='{}', args={}",
                 className,
                 methodName,
                 layer,
@@ -94,7 +94,7 @@ public class AnalyticsMethodLoggingAspect {
         }
         if (log.isDebugEnabled()) {
             log.debug(
-                "Начато выполнение метода {}.{} (операция='{}', слой={}, traceId='{}', eventUid='{}').",
+                "Method started {}.{} (operation='{}', layer={}, traceId='{}', eventUid='{}').",
                 className,
                 methodName,
                 operation,
@@ -114,7 +114,7 @@ public class AnalyticsMethodLoggingAspect {
 
             if (isHttpError) {
                 log.warn(
-                    "HTTP-ошибка в {}.{}: операция='{}', слой={}, статус={}, длительность={} мс, traceId='{}', eventUid='{}', ответ='{}'.",
+                    "HTTP error in {}.{}: operation='{}', layer={}, status={}, duration={} ms, traceId='{}', eventUid='{}', response='{}'.",
                     className,
                     methodName,
                     operation,
@@ -127,7 +127,7 @@ public class AnalyticsMethodLoggingAspect {
                 );
             } else {
                 log.info(
-                    "Метод {}.{} выполнен успешно: операция='{}', слой={}, длительность={} мс, traceId='{}', eventUid='{}'.",
+                    "Method finished successfully {}.{}: operation='{}', layer={}, duration={} ms, traceId='{}', eventUid='{}'.",
                     className,
                     methodName,
                     operation,
@@ -139,7 +139,7 @@ public class AnalyticsMethodLoggingAspect {
             }
             if (log.isDebugEnabled()) {
                 log.debug(
-                    "Результат метода {}.{}: {}",
+                    "Method result {}.{}: {}",
                     className,
                     methodName,
                     resultSummary
@@ -147,7 +147,7 @@ public class AnalyticsMethodLoggingAspect {
             }
             if (durationMs >= warnThresholdForLayer(layer)) {
                 log.warn(
-                    "Замедленное выполнение {}.{}: операция='{}', слой={}, длительность={} мс, traceId='{}', eventUid='{}'.",
+                    "Slow execution {}.{}: operation='{}', layer={}, duration={} ms, traceId='{}', eventUid='{}'.",
                     className,
                     methodName,
                     operation,
@@ -164,7 +164,7 @@ public class AnalyticsMethodLoggingAspect {
             Instant endedAt = Instant.now();
             long durationMs = Duration.between(startedAt, endedAt).toMillis();
             log.warn(
-                "Бизнес-ошибка в {}.{}: операция='{}', слой={}, длительность={} мс, traceId='{}', eventUid='{}', ошибка='{}', причина='{}', аргументы={}",
+                "Business error in {}.{}: operation='{}', layer={}, duration={} ms, traceId='{}', eventUid='{}', error='{}', cause='{}', args={}",
                 className,
                 methodName,
                 operation,
@@ -183,7 +183,7 @@ public class AnalyticsMethodLoggingAspect {
             Instant endedAt = Instant.now();
             long durationMs = Duration.between(startedAt, endedAt).toMillis();
             log.error(
-                "Техническая ошибка в {}.{}: операция='{}', слой={}, длительность={} мс, traceId='{}', eventUid='{}', ошибка='{}', причина='{}', аргументы={}",
+                "Technical error in {}.{}: operation='{}', layer={}, duration={} ms, traceId='{}', eventUid='{}', error='{}', cause='{}', args={}",
                 className,
                 methodName,
                 operation,

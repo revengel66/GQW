@@ -4,7 +4,6 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
 
@@ -13,7 +12,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 public class ProductSchemaPatchConfig {
 
     @Bean
-    @Order(Ordered.LOWEST_PRECEDENCE)
+    @Order(50)
     CommandLineRunner patchProductSchema(JdbcTemplate jdbcTemplate) {
         return args -> {
             if (!tableExists(jdbcTemplate, "shop.product")) {

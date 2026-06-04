@@ -46,7 +46,7 @@ public class AnalyticsEvent {
     @Column(nullable = false, length = 64)
     private String eventTypeCode;
 
-    @Column(nullable = false, length = 64)
+    @Column(length = 64)
     private String moduleCode = EventType.DEFAULT_MODULE_CODE;
 
     @Column(length = 1024)

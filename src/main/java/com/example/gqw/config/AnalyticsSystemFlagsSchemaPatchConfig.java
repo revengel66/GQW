@@ -5,6 +5,7 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 @Configuration
@@ -71,6 +72,7 @@ public class AnalyticsSystemFlagsSchemaPatchConfig {
     );
 
     @Bean
+    @Order(90)
     CommandLineRunner patchAnalyticsSystemFlagsSchema(JdbcTemplate jdbcTemplate) {
         return args -> {
             if (!schemaExists(jdbcTemplate, "analytics")) {

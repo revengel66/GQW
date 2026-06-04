@@ -24,6 +24,7 @@ import java.util.Set;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.Hibernate;
 
 @Getter
 @Setter
@@ -69,7 +70,7 @@ public class Product {
     @Column(nullable = false)
     private Boolean isDiscount = false;
 
-    @Column(nullable = false)
+    @Column
     private Boolean isPublished = true;
 
     @Column(nullable = false)
@@ -117,7 +118,7 @@ public class Product {
 
     @Transient
     public String getPrimaryImageUrl() {
-        if (images != null && !images.isEmpty()) {
+        if (images != null && Hibernate.isInitialized(images) && !images.isEmpty()) {
             ProductImage first = images.getFirst();
             if (first != null && first.getImageUrl() != null && !first.getImageUrl().isBlank()) {
                 return first.getImageUrl();

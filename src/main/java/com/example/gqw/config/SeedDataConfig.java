@@ -49,6 +49,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -58,6 +59,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class SeedDataConfig {
 
     @Bean
+    @Order(600)
     CommandLineRunner sanitizeProductTextsOnStartup(
         ProductRepository productRepository,
         CategoryRepository categoryRepository,
@@ -71,6 +73,7 @@ public class SeedDataConfig {
     }
 
     @Bean
+    @Order(700)
     @ConditionalOnProperty(value = "app.seed.enabled", havingValue = "true", matchIfMissing = true)
     CommandLineRunner seedData(
         ShopUserRepository userRepository,

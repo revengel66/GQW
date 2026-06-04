@@ -32,8 +32,10 @@ if "%DIRNAME%"=="" set DIRNAME=.
 set APP_BASE_NAME=%~n0
 set APP_HOME=%DIRNAME%
 
-@rem Resolve any "." and ".." in APP_HOME to make it shorter.
-for %%i in ("%APP_HOME%") do set APP_HOME=%%~fi
+@rem Resolve any "." and ".." in APP_HOME.
+@rem On Windows with non-ASCII paths, Test worker classpath can break (ClassNotFound)
+@rem if APP_HOME is kept in a localized long form. Prefer ASCII short path when available.
+for %%i in ("%APP_HOME%") do set APP_HOME=%%~fsi
 
 @rem Add default JVM options here. You can also use JAVA_OPTS and GRADLE_OPTS to pass JVM options to this script.
 set DEFAULT_JVM_OPTS="-Xmx64m" "-Xms64m"

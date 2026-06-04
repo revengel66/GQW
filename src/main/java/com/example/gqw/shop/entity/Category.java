@@ -39,7 +39,7 @@ public class Category {
     @Column(length = 1024)
     private String imageUrl;
 
-    @Column(nullable = false)
+    @Column
     private Boolean isPublished = true;
 
     @ManyToOne(fetch = FetchType.LAZY)

@@ -75,6 +75,12 @@ public final class AnalyticsApiDto {
     ) {
     }
 
+    public record OverviewCompareResponse(
+        OverviewResponse before,
+        OverviewResponse after
+    ) {
+    }
+
     public record FilterOptionsResponse(
         List<OptionDto> eventTypes,
         List<OptionDto> attributeTypes,
@@ -107,6 +113,12 @@ public final class AnalyticsApiDto {
         int bucketMinutes,
         List<StageKpiDto> stages,
         List<StageSeriesDto> series
+    ) {
+    }
+
+    public record StageBreakdownCompareResponse(
+        StageBreakdownResponse before,
+        StageBreakdownResponse after
     ) {
     }
 
@@ -143,6 +155,12 @@ public final class AnalyticsApiDto {
         List<StageMetricSummaryDto> summaries,
         List<TimeSeriesPointDto> numericSeries,
         List<TopValueDto> selectedTopValues
+    ) {
+    }
+
+    public record StageMetricCompareResponse(
+        StageMetricResponse before,
+        StageMetricResponse after
     ) {
     }
 
@@ -209,6 +227,33 @@ public final class AnalyticsApiDto {
     ) {
     }
 
+    public record EventLogExcerptDto(
+        Instant timestamp,
+        String level,
+        String source,
+        String messageShort,
+        String excerpt,
+        Long lineNumber
+    ) {
+    }
+
+    public record EventTraceLogStatusDto(
+        String status,
+        String message,
+        String moduleCode,
+        String fileName,
+        String filePath,
+        Instant fromTs,
+        Instant toTs,
+        Long lineCount,
+        Long errorCount,
+        Long warnCount,
+        boolean archiveReadable,
+        String summary,
+        List<EventLogExcerptDto> excerpts
+    ) {
+    }
+
     public record EventStageDetailsDto(
         String stageTypeCode,
         String stageTypeName,
@@ -251,6 +296,7 @@ public final class AnalyticsApiDto {
         String errorMessage,
         List<EventAttributeDto> attributes,
         List<EventStageDetailsDto> stages,
+        EventTraceLogStatusDto traceLogStatus,
         List<EventLogEntryDto> traceLogs
     ) {
     }
@@ -285,6 +331,12 @@ public final class AnalyticsApiDto {
         List<UniversalEventSeriesDto> eventSeries,
         List<UniversalEventStageBreakdownDto> eventStageBreakdown,
         List<OptionDto> availableAttributeTypes
+    ) {
+    }
+
+    public record UniversalCompareResponse(
+        UniversalResponse before,
+        UniversalResponse after
     ) {
     }
 

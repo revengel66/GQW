@@ -68,7 +68,7 @@ public class AnalyticsRepositoryStageAspect {
         );
         if (log.isTraceEnabled()) {
             log.trace(
-                "Начато выполнение DB-вызова {}.{}: слой=DATABASE, stageId={}, traceId='{}', eventUid='{}'.",
+                "Database call started {}.{}: layer=DATABASE, stageId={}, traceId='{}', eventUid='{}'.",
                 className,
                 methodName,
                 stageId,
@@ -101,7 +101,7 @@ public class AnalyticsRepositoryStageAspect {
             }
             long durationMs = Duration.between(stageLogStartedAt, Instant.now()).toMillis();
             log.info(
-                "DB-вызов {}.{} выполнен успешно: слой=DATABASE, stageId={}, длительность={} мс, traceId='{}', eventUid='{}'.",
+                "Database call completed successfully {}.{}: layer=DATABASE, stageId={}, durationMs={}, traceId='{}', eventUid='{}'.",
                 className,
                 methodName,
                 stageId,
@@ -139,7 +139,7 @@ public class AnalyticsRepositoryStageAspect {
             }
             long durationMs = Duration.between(stageLogStartedAt, Instant.now()).toMillis();
             log.error(
-                "DB-вызов {}.{} завершился ошибкой: слой=DATABASE, stageId={}, длительность={} мс, traceId='{}', eventUid='{}'.",
+                "Database call failed {}.{}: layer=DATABASE, stageId={}, durationMs={}, traceId='{}', eventUid='{}'.",
                 className,
                 methodName,
                 stageId,

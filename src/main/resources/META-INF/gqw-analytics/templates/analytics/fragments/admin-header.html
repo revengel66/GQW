@@ -1,0 +1,65 @@
+﻿<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<body>
+<nav th:fragment="adminHeader(activeTab, showSettingsButton, authenticated)"
+     class="navbar navbar-expand-lg bg-white navbar-shadow sticky-top">
+    <div class="container container-wide py-1">
+        <a class="navbar-brand fw-semibold" th:href="@{/analytics-admin/dashboard}">Analytics Admin</a>
+        <div class="navbar-nav ms-3">
+            <a class="nav-link"
+               th:href="@{/analytics-admin/dashboard}"
+               data-analytics-top-tab="overview"
+               th:classappend="${activeTab == 'overview'} ? ' active' : ''">Дашборд</a>
+            <a class="nav-link"
+               th:href="@{/analytics-admin/dashboard(tab='universal')}"
+               data-analytics-top-tab="universal"
+               th:classappend="${activeTab == 'universal'} ? ' active' : ''">Универсальный анализ</a>
+            <a class="nav-link"
+               th:href="@{/analytics-admin/dashboard(tab='raw')}"
+               data-analytics-top-tab="raw"
+               th:classappend="${activeTab == 'raw'} ? ' active' : ''">Raw события</a>
+            <a class="nav-link"
+               th:href="@{/analytics-admin/dashboard(tab='metrics')}"
+               data-analytics-top-tab="metrics"
+               th:classappend="${activeTab == 'metrics'} ? ' active' : ''">Метрики</a>
+            <a class="nav-link"
+               th:href="@{/analytics-admin/dashboard(tab='compare')}"
+               data-analytics-top-tab="compare"
+               th:classappend="${activeTab == 'compare'} ? ' active' : ''">Сравнение</a>
+        </div>
+        <div class="ms-auto d-flex align-items-center gap-3 analytics-admin-header-actions">
+            <a class="analytics-admin-header-link"
+               th:classappend="${activeTab == 'dictionaries'} ? ' active' : ''"
+               th:href="@{/analytics-admin/dictionaries}">
+                Справочники
+            </a>
+
+            <th:block th:if="${authenticated}">
+                <div class="d-flex align-items-center gap-2">
+                    <button th:if="${showSettingsButton}"
+                            class="btn btn-outline-secondary btn-sm analytics-runtime-settings-trigger"
+                            type="button"
+                            id="analytics-runtime-settings-open"
+                            title="Настройки аналитики"
+                            aria-label="Настройки аналитики">
+                        <i class="bi bi-gear"></i>
+                    </button>
+                    <form method="post" th:action="@{/analytics-admin/logout}" class="m-0">
+                        <input th:if="${_csrf != null}" type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                        <button class="btn btn-outline-danger btn-sm" type="submit">
+                            <i class="bi bi-box-arrow-right"></i>
+                            Выйти
+                        </button>
+                    </form>
+                </div>
+            </th:block>
+
+            <th:block th:unless="${authenticated}">
+                <a class="btn btn-outline-dark btn-sm" th:href="@{/analytics-admin/login}">Вход</a>
+            </th:block>
+        </div>
+    </div>
+</nav>
+</body>
+</html>
+

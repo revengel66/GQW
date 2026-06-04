@@ -1,11 +1,15 @@
 package com.example.gqw.analytics.controller;
 
 import com.example.gqw.analytics.service.AnalyticsInsightsService;
+import com.example.gqw.analytics.web.dto.AnalyticsApiDto.StageBreakdownCompareResponse;
 import com.example.gqw.analytics.web.dto.AnalyticsApiDto.StageBreakdownResponse;
+import com.example.gqw.analytics.web.dto.AnalyticsApiDto.StageMetricCompareResponse;
 import com.example.gqw.analytics.web.dto.AnalyticsApiDto.StageMetricResponse;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -15,6 +19,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping({"/analytics/api", "/analytics-admin/api"})
 public class AnalyticsStageController {
+
+    private static final Logger log = LoggerFactory.getLogger(AnalyticsStageController.class);
 
     private final AnalyticsInsightsService analyticsInsightsService;
 
@@ -37,8 +43,7 @@ public class AnalyticsStageController {
         @RequestParam(required = false) String filterAttributeValue,
         @RequestParam(required = false) BigDecimal filterAttributeMinValue,
         @RequestParam(required = false) BigDecimal filterAttributeMaxValue,
-        @RequestParam(required = false) Integer bucketMinutes,
-        @RequestParam(defaultValue = "true") boolean includeSummaries
+        @RequestParam(required = false) Integer bucketMinutes
     ) {
         AnalyticsTimeRangeResolver.TimeRange range = AnalyticsTimeRangeResolver.resolveRange(from, to, Duration.ofHours(24));
         return analyticsInsightsService.stageBreakdown(
@@ -59,6 +64,63 @@ public class AnalyticsStageController {
         );
     }
 
+    @GetMapping("/stages/compare")
+    public StageBreakdownCompareResponse stagesCompare(
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant beforeFrom,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant beforeTo,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant afterFrom,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant afterTo,
+        @RequestParam(required = false) String moduleCode,
+        @RequestParam(required = false) String eventTypeCode,
+        @RequestParam(required = false) String requestPath,
+        @RequestParam(required = false) String filterMetricTypeCode,
+        @RequestParam(required = false) String filterMetricValue,
+        @RequestParam(required = false) BigDecimal filterMetricMinValue,
+        @RequestParam(required = false) BigDecimal filterMetricMaxValue,
+        @RequestParam(required = false) String filterAttributeCode,
+        @RequestParam(required = false) String filterAttributeValue,
+        @RequestParam(required = false) BigDecimal filterAttributeMinValue,
+        @RequestParam(required = false) BigDecimal filterAttributeMaxValue,
+        @RequestParam(required = false) Integer bucketMinutes
+    ) {
+        AnalyticsTimeRangeResolver.TimeRange afterRange = AnalyticsTimeRangeResolver.resolveRange(afterFrom, afterTo, Duration.ofHours(24));
+        AnalyticsTimeRangeResolver.TimeRange beforeRange = resolveBeforeRange(beforeFrom, beforeTo, afterRange);
+
+        StageBreakdownResponse before = analyticsInsightsService.stageBreakdown(
+            beforeRange.from(),
+            beforeRange.to(),
+            moduleCode,
+            eventTypeCode,
+            requestPath,
+            filterMetricTypeCode,
+            filterMetricValue,
+            filterMetricMinValue,
+            filterMetricMaxValue,
+            filterAttributeCode,
+            filterAttributeValue,
+            filterAttributeMinValue,
+            filterAttributeMaxValue,
+            bucketMinutes
+        );
+        StageBreakdownResponse after = analyticsInsightsService.stageBreakdown(
+            afterRange.from(),
+            afterRange.to(),
+            moduleCode,
+            eventTypeCode,
+            requestPath,
+            filterMetricTypeCode,
+            filterMetricValue,
+            filterMetricMinValue,
+            filterMetricMaxValue,
+            filterAttributeCode,
+            filterAttributeValue,
+            filterAttributeMinValue,
+            filterAttributeMaxValue,
+            bucketMinutes
+        );
+        return new StageBreakdownCompareResponse(before, after);
+    }
+
     @GetMapping("/stage-metrics")
     public StageMetricResponse stageMetrics(
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
@@ -77,10 +139,13 @@ public class AnalyticsStageController {
         @RequestParam(required = false) BigDecimal filterAttributeMinValue,
         @RequestParam(required = false) BigDecimal filterAttributeMaxValue,
         @RequestParam(required = false) Integer bucketMinutes,
-        @RequestParam(defaultValue = "true") boolean includeSummaries
+        @RequestParam(defaultValue = "true") boolean includeSummaries,
+        @RequestParam(defaultValue = "true") boolean includeTopValues,
+        @RequestParam(defaultValue = "true") boolean includeSeries
     ) {
+        long started = System.nanoTime();
         AnalyticsTimeRangeResolver.TimeRange range = AnalyticsTimeRangeResolver.resolveRange(from, to, Duration.ofHours(24));
-        return analyticsInsightsService.stageMetrics(
+        StageMetricResponse response = analyticsInsightsService.stageMetrics(
             range.from(),
             range.to(),
             moduleCode,
@@ -97,7 +162,138 @@ public class AnalyticsStageController {
             filterAttributeMinValue,
             filterAttributeMaxValue,
             bucketMinutes,
-            includeSummaries
+            includeSummaries,
+            includeTopValues,
+            includeSeries
         );
+        log.info(
+            "[STAGE_METRICS_PERF] controller endpoint=/api/stage-metrics totalMs={} from={} to={} module={} eventType={} stage={} metric={} bucket={} includeSummaries={} includeTopValues={} counts summaries={} series={} topValues={}",
+            elapsedMs(started),
+            range.from(),
+            range.to(),
+            moduleCode,
+            eventTypeCode,
+            stageTypeCode,
+            metricTypeCode,
+            bucketMinutes,
+            includeSummaries,
+            includeTopValues,
+            response.summaries() == null ? 0 : response.summaries().size(),
+            response.numericSeries() == null ? 0 : response.numericSeries().size(),
+            response.selectedTopValues() == null ? 0 : response.selectedTopValues().size()
+        );
+        return response;
+    }
+
+    @GetMapping("/stage-metrics/compare")
+    public StageMetricCompareResponse stageMetricsCompare(
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant beforeFrom,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant beforeTo,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant afterFrom,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant afterTo,
+        @RequestParam(required = false) String moduleCode,
+        @RequestParam(required = false) String eventTypeCode,
+        @RequestParam(required = false) String requestPath,
+        @RequestParam(required = false) String stageTypeCode,
+        @RequestParam(required = false) String metricTypeCode,
+        @RequestParam(required = false) String filterMetricTypeCode,
+        @RequestParam(required = false) String filterMetricValue,
+        @RequestParam(required = false) BigDecimal filterMetricMinValue,
+        @RequestParam(required = false) BigDecimal filterMetricMaxValue,
+        @RequestParam(required = false) String filterAttributeCode,
+        @RequestParam(required = false) String filterAttributeValue,
+        @RequestParam(required = false) BigDecimal filterAttributeMinValue,
+        @RequestParam(required = false) BigDecimal filterAttributeMaxValue,
+        @RequestParam(required = false) Integer bucketMinutes,
+        @RequestParam(defaultValue = "false") boolean includeSummaries,
+        @RequestParam(defaultValue = "false") boolean includeTopValues,
+        @RequestParam(defaultValue = "true") boolean includeSeries
+    ) {
+        long started = System.nanoTime();
+        AnalyticsTimeRangeResolver.TimeRange afterRange = AnalyticsTimeRangeResolver.resolveRange(afterFrom, afterTo, Duration.ofHours(24));
+        AnalyticsTimeRangeResolver.TimeRange beforeRange = resolveBeforeRange(beforeFrom, beforeTo, afterRange);
+
+        StageMetricResponse before = analyticsInsightsService.stageMetrics(
+            beforeRange.from(),
+            beforeRange.to(),
+            moduleCode,
+            eventTypeCode,
+            requestPath,
+            stageTypeCode,
+            metricTypeCode,
+            filterMetricTypeCode,
+            filterMetricValue,
+            filterMetricMinValue,
+            filterMetricMaxValue,
+            filterAttributeCode,
+            filterAttributeValue,
+            filterAttributeMinValue,
+            filterAttributeMaxValue,
+            bucketMinutes,
+            includeSummaries,
+            includeTopValues,
+            includeSeries
+        );
+        StageMetricResponse after = analyticsInsightsService.stageMetrics(
+            afterRange.from(),
+            afterRange.to(),
+            moduleCode,
+            eventTypeCode,
+            requestPath,
+            stageTypeCode,
+            metricTypeCode,
+            filterMetricTypeCode,
+            filterMetricValue,
+            filterMetricMinValue,
+            filterMetricMaxValue,
+            filterAttributeCode,
+            filterAttributeValue,
+            filterAttributeMinValue,
+            filterAttributeMaxValue,
+            bucketMinutes,
+            includeSummaries,
+            includeTopValues,
+            includeSeries
+        );
+        StageMetricCompareResponse response = new StageMetricCompareResponse(before, after);
+        log.info(
+            "[STAGE_METRICS_PERF] controller endpoint=/api/stage-metrics/compare totalMs={} beforeFrom={} beforeTo={} afterFrom={} afterTo={} module={} eventType={} stage={} metric={} bucket={} includeSummaries={} includeTopValues={}",
+            elapsedMs(started),
+            beforeRange.from(),
+            beforeRange.to(),
+            afterRange.from(),
+            afterRange.to(),
+            moduleCode,
+            eventTypeCode,
+            stageTypeCode,
+            metricTypeCode,
+            bucketMinutes,
+            includeSummaries,
+            includeTopValues
+        );
+        return response;
+    }
+
+    private static long elapsedMs(long started) {
+        return (System.nanoTime() - started) / 1_000_000L;
+    }
+
+    private static AnalyticsTimeRangeResolver.TimeRange resolveBeforeRange(
+        Instant beforeFrom,
+        Instant beforeTo,
+        AnalyticsTimeRangeResolver.TimeRange afterRange
+    ) {
+        if (beforeFrom != null && beforeTo != null && beforeFrom.isBefore(beforeTo)) {
+            return new AnalyticsTimeRangeResolver.TimeRange(beforeFrom, beforeTo);
+        }
+        Instant safeAfterFrom = afterRange.from();
+        Instant safeAfterTo = afterRange.to();
+        Duration duration = Duration.between(safeAfterFrom, safeAfterTo);
+        if (duration.isZero() || duration.isNegative()) {
+            duration = Duration.ofHours(24);
+        }
+        Instant resolvedBeforeTo = safeAfterFrom;
+        Instant resolvedBeforeFrom = resolvedBeforeTo.minus(duration);
+        return new AnalyticsTimeRangeResolver.TimeRange(resolvedBeforeFrom, resolvedBeforeTo);
     }
 }

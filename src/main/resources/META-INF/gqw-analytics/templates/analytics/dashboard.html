@@ -52,6 +52,7 @@
                     <div class="analytics-filter-field">
                         <label class="form-label mb-1">Быстрые пресеты</label>
                         <select class="form-select analytics-quick-preset-select" id="analytics-quick-preset-select">
+                            <option value="">—</option>
                             <option value="15m">15 минут</option>
                             <option value="30m">30 минут</option>
                             <option value="1h">1 час</option>
@@ -100,51 +101,24 @@
             </section>
             <section class="analytics-filter-block">
                 <div class="analytics-filter-block-title">Сравнение</div>
-                <div class="analytics-filter-row analytics-filter-row-2">
-                    <div class="analytics-filter-field">
-                        <label class="form-label mb-1">До/после</label>
-                        <div class="form-check mt-1">
-                            <input class="form-check-input" type="checkbox" id="analytics-global-compare-enabled">
-                            <label class="form-check-label" for="analytics-global-compare-enabled">Включить для всех графиков</label>
-                        </div>
-                    </div>
-                    <div class="analytics-filter-field">
-                        <label class="form-label mb-1">Разрез сравнения</label>
-                        <select class="form-select" id="analytics-global-compare-preset">
-                            <option value="">По текущему периоду</option>
-                            <option value="15m">15 минут</option>
-                            <option value="30m">30 минут</option>
-                            <option value="1h">1 час</option>
-                            <option value="3h">3 часа</option>
-                            <option value="6h">6 часов</option>
-                            <option value="12h">12 часов</option>
-                            <option value="24h">24 часа</option>
-                            <option value="1w">1 неделя</option>
-                            <option value="1mo">1 месяц</option>
-                            <option value="3mo">3 месяца</option>
-                            <option value="6mo">6 месяцев</option>
-                            <option value="1y">1 год</option>
-                            <option value="all">Все время</option>
-                        </select>
-                    </div>
-                </div>
                 <div class="analytics-filter-row analytics-filter-row-1">
                     <div class="analytics-filter-field">
-                        <label class="form-label mb-1">Наложение</label>
-                        <div class="form-check mt-1">
-                            <input class="form-check-input" type="checkbox" id="analytics-global-compare-ghost" checked>
-                            <label class="form-check-label" for="analytics-global-compare-ghost">Пунктиры/бледные столбцы «До» на графике «После»</label>
+                        <label class="form-label mb-1">Режим сравнения</label>
+                        <div class="analytics-compare-mode-radios mt-1">
+                            <label class="form-check mb-0">
+                                <input class="form-check-input" type="radio" name="analytics-global-compare-mode" id="analytics-global-compare-mode-off" value="off" checked>
+                                <span class="form-check-label">Выключено</span>
+                            </label>
+                            <label class="form-check mb-0">
+                                <input class="form-check-input" type="radio" name="analytics-global-compare-mode" id="analytics-global-compare-mode-split" value="split">
+                                <span class="form-check-label">Раздельно</span>
+                            </label>
+                            <label class="form-check mb-0">
+                                <input class="form-check-input" type="radio" name="analytics-global-compare-mode" id="analytics-global-compare-mode-overlay" value="overlay">
+                                <span class="form-check-label">Наложением</span>
+                            </label>
                         </div>
-                    </div>
-                </div>
-                <div class="analytics-filter-row analytics-filter-row-2 d-none" id="analytics-global-before-row">
-                    <div class="analytics-filter-field">
-                        <label class="form-label mb-1">Период до: с</label>
-                        <input class="form-control" type="datetime-local" id="analytics-global-before-from">
-                    </div>
-                    <div class="analytics-filter-field">
-                        <label class="form-label mb-1">По</label>
-                        <input class="form-control" type="datetime-local" id="analytics-global-before-to">
+                        <div class="small text-muted mt-2 d-none" id="analytics-global-before-summary"></div>
                     </div>
                 </div>
             </section>
@@ -277,14 +251,9 @@
                 </div>
             </div>
             <div class="analytics-universal-range-row mt-2">
-                <div class="analytics-universal-field d-none" id="universal-before-wrap">
-                    <label class="form-label mb-1">До: с</label>
-                    <input class="form-control" type="datetime-local" id="universal-before-from">
-                </div>
-                <div class="analytics-universal-field d-none" id="universal-before-wrap-to">
-                    <label class="form-label mb-1">До: по</label>
-                    <input class="form-control" type="datetime-local" id="universal-before-to">
-                </div>
+                <input type="hidden" id="universal-before-from" value="">
+                <input type="hidden" id="universal-before-to" value="">
+                <div class="small text-muted d-none" id="universal-before-summary"></div>
                 <div class="analytics-universal-field">
                     <label class="form-label mb-1">После: с</label>
                     <input class="form-control" type="datetime-local" id="universal-from">
@@ -311,6 +280,7 @@
                 <div class="analytics-universal-field analytics-universal-field-preset">
                     <label class="form-label mb-1">Пресет</label>
                     <select class="form-select" id="universal-quick-preset">
+                        <option value="">—</option>
                         <option value="15m">15 минут</option>
                         <option value="30m">30 минут</option>
                         <option value="1h">1 час</option>
@@ -489,6 +459,7 @@
                 <div class="analytics-stage-metric-field analytics-stage-metric-quick-range-wrap">
                     <label class="form-label mb-1">Быстрый период</label>
                     <select class="form-select" id="stage-metric-quick-range">
+                        <option value="">—</option>
                         <option value="15m">15 минут</option>
                         <option value="30m">30 минут</option>
                         <option value="1h">1 час</option>
@@ -504,26 +475,22 @@
                         <option value="all">Все время</option>
                     </select>
                 </div>
-                <div class="analytics-stage-metric-period-row">
-                    <div class="analytics-stage-metric-range-col analytics-stage-metric-range-col-before">
-                        <div class="analytics-stage-metric-range-title">До</div>
-                        <div class="analytics-stage-metric-range-row">
-                            <input class="form-control" type="datetime-local" id="stage-metric-from-a">
-                            <input class="form-control" type="datetime-local" id="stage-metric-to-a">
-                        </div>
-                    </div>
-                    <div class="analytics-stage-metric-range-col analytics-stage-metric-range-col-after" id="stage-metric-compare-controls-wrap">
-                        <div class="analytics-stage-metric-range-title">После</div>
-                        <div class="analytics-stage-metric-range-row">
-                            <input class="form-control" type="datetime-local" id="stage-metric-from-b">
-                            <input class="form-control" type="datetime-local" id="stage-metric-to-b">
-                        </div>
-                    </div>
+                <div class="analytics-stage-metric-field analytics-stage-metric-field-date">
+                    <label class="form-label mb-1" for="stage-metric-from-a">Период с</label>
+                    <input class="form-control" type="datetime-local" id="stage-metric-from-a">
+                </div>
+                <div class="analytics-stage-metric-field analytics-stage-metric-field-date">
+                    <label class="form-label mb-1" for="stage-metric-to-a">Период по</label>
+                    <input class="form-control" type="datetime-local" id="stage-metric-to-a">
                 </div>
                 <div class="analytics-stage-metric-compare-toggle-wrap">
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="stage-metric-compare-enabled">
-                        <label class="form-check-label" for="stage-metric-compare-enabled">До/после</label>
+                    <div class="analytics-stage-metric-field">
+                        <label class="form-label mb-1" for="stage-metric-compare-mode">Режим сравнения</label>
+                        <select class="form-select" id="stage-metric-compare-mode">
+                            <option value="off" selected>Выключено</option>
+                            <option value="split">Раздельно</option>
+                            <option value="overlay">Наложением</option>
+                        </select>
                     </div>
                 </div>
                 <div class="analytics-stage-metric-action">
@@ -532,6 +499,7 @@
                     </button>
                 </div>
             </div>
+            <div class="analytics-stage-metric-hint-row small text-muted d-none" id="stage-metric-compare-summary"></div>
         </form>
         <div class="analytics-stage-metric-split">
             <section class="analytics-stage-metric-block">
@@ -539,13 +507,13 @@
                 <div class="analytics-stage-metric-charts-wrap" id="analytics-stage-metric-charts-wrap">
                     <div class="analytics-grid analytics-grid-2 analytics-stage-metric-charts" id="analytics-stage-metric-charts">
                         <div class="analytics-stage-metric-series-col">
-                            <div class="small text-muted mb-1">До</div>
+                            <div class="small text-muted mb-1" data-stage-metric-compare-label>До</div>
                             <div class="analytics-chart-wrap">
                                 <canvas id="chart-stage-metric-series" height="130"></canvas>
                             </div>
                         </div>
                         <div class="analytics-stage-metric-series-col" id="analytics-stage-metric-compare-col">
-                            <div class="small text-muted mb-1">После</div>
+                            <div class="small text-muted mb-1" data-stage-metric-compare-label>После</div>
                             <div class="analytics-chart-wrap">
                                 <canvas id="chart-stage-metric-series-compare" height="130"></canvas>
                             </div>
@@ -581,6 +549,7 @@
                         <div class="analytics-stage-metric-field analytics-stage-metric-quick-range-wrap">
                             <label class="form-label mb-1">Быстрый период</label>
                             <select class="form-select" id="stage-text-quick-range">
+                                <option value="">—</option>
                                 <option value="15m">15 минут</option>
                                 <option value="30m">30 минут</option>
                                 <option value="1h">1 час</option>
@@ -596,30 +565,26 @@
                                 <option value="all">Все время</option>
                             </select>
                         </div>
-                        <div class="analytics-stage-metric-period-row">
-                            <div class="analytics-stage-metric-range-col analytics-stage-metric-range-col-before">
-                                <div class="analytics-stage-metric-range-title">До</div>
-                                <div class="analytics-stage-metric-range-row">
-                                    <input class="form-control" type="datetime-local" id="stage-text-from-a">
-                                    <input class="form-control" type="datetime-local" id="stage-text-to-a">
-                                </div>
-                            </div>
-                            <div class="analytics-stage-metric-range-col analytics-stage-metric-range-col-after" id="stage-text-compare-controls-wrap">
-                                <div class="analytics-stage-metric-range-title">После</div>
-                                <div class="analytics-stage-metric-range-row">
-                                    <input class="form-control" type="datetime-local" id="stage-text-from-b">
-                                    <input class="form-control" type="datetime-local" id="stage-text-to-b">
-                                </div>
-                            </div>
+                        <div class="analytics-stage-metric-field analytics-stage-metric-field-date">
+                            <label class="form-label mb-1" for="stage-text-from-a">Период с</label>
+                            <input class="form-control" type="datetime-local" id="stage-text-from-a">
+                        </div>
+                        <div class="analytics-stage-metric-field analytics-stage-metric-field-date">
+                            <label class="form-label mb-1" for="stage-text-to-a">Период по</label>
+                            <input class="form-control" type="datetime-local" id="stage-text-to-a">
                         </div>
                         <div class="analytics-stage-metric-field">
                             <label class="form-label mb-1">Текстовая метрика</label>
                             <select class="form-select" id="stage-text-metric-type"></select>
                         </div>
                         <div class="analytics-stage-metric-compare-toggle-wrap">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="stage-text-compare-enabled">
-                                <label class="form-check-label" for="stage-text-compare-enabled">До/после</label>
+                            <div class="analytics-stage-metric-field">
+                                <label class="form-label mb-1" for="stage-text-compare-mode">Режим сравнения</label>
+                                <select class="form-select" id="stage-text-compare-mode">
+                                    <option value="off" selected>Выключено</option>
+                                    <option value="split">Раздельно</option>
+                                    <option value="overlay">Наложением</option>
+                                </select>
                             </div>
                         </div>
                         <div class="analytics-stage-metric-action">
@@ -628,16 +593,17 @@
                             </button>
                         </div>
                     </div>
+                    <div class="analytics-stage-metric-hint-row small text-muted d-none" id="stage-text-compare-summary"></div>
                 </form>
-                <div class="analytics-grid analytics-grid-2 analytics-stage-metric-charts">
+                <div class="analytics-grid analytics-grid-2 analytics-stage-metric-charts" id="analytics-stage-metric-text-charts">
                     <div class="analytics-stage-metric-top-col">
-                        <div class="small text-muted mb-1">До</div>
+                        <div class="small text-muted mb-1" data-stage-metric-compare-label>До</div>
                         <div class="analytics-chart-wrap">
                             <canvas id="chart-stage-metric-text" height="130"></canvas>
                         </div>
                     </div>
                     <div class="analytics-stage-metric-top-col" id="analytics-stage-metric-text-compare-col">
-                        <div class="small text-muted mb-1">После</div>
+                        <div class="small text-muted mb-1" data-stage-metric-compare-label>После</div>
                         <div class="analytics-chart-wrap">
                             <canvas id="chart-stage-metric-text-compare" height="130"></canvas>
                         </div>
@@ -892,6 +858,6 @@
 <script th:inline="javascript">
     window.analyticsApiBase = [[${analyticsApiBase}]];
 </script>
-<script th:src="@{/analytics/js/analytics-dashboard.js(v='20260519-11')}"></script>
+<script th:src="@{/analytics/js/analytics-dashboard.js(v='20260604-09')}"></script>
 </body>
 </html>

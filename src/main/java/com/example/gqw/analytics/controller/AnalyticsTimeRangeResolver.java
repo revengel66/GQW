@@ -20,6 +20,9 @@ final class AnalyticsTimeRangeResolver {
         } else if (resolvedTo == null) {
             resolvedTo = now;
         }
+        if (resolvedFrom != null && resolvedTo != null && resolvedFrom.isAfter(resolvedTo)) {
+            resolvedFrom = resolvedTo.minus(fallbackDuration);
+        }
         return new TimeRange(resolvedFrom, resolvedTo);
     }
 

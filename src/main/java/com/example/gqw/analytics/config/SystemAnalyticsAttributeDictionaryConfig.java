@@ -8,6 +8,7 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 
 @Configuration
 @ConditionalOnProperty(
@@ -19,6 +20,7 @@ import org.springframework.context.annotation.Configuration;
 public class SystemAnalyticsAttributeDictionaryConfig {
 
     @Bean
+    @Order(400)
     CommandLineRunner seedSystemAnalyticsAttributes(EventAttributeTypeRepository repository) {
         return args -> {
             List<AttrSeed> system = List.of(

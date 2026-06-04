@@ -1,6 +1,7 @@
 package com.example.gqw.analytics.service;
 
 import com.example.gqw.analytics.web.dto.AnalyticsApiDto.EventLogEntryDto;
+import com.example.gqw.analytics.web.dto.AnalyticsApiDto.EventTraceLogStatusDto;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -37,23 +38,23 @@ public class AnalyticsLogViewService {
     );
 
     private static final Pattern METHOD_START_PATTERN = Pattern.compile(
-        "^Начато выполнение метода (?<class>[A-Za-z0-9_$]+)\\.(?<method>[A-Za-z0-9_$]+) "
-            + "\\(операция='(?<op>[^']*)', слой=(?<layer>[A-Z_]+),.*$"
+        "^Method started (?<class>[A-Za-z0-9_$]+)\\.(?<method>[A-Za-z0-9_$]+) "
+            + "\\(operation='(?<op>[^']*)', layer=(?<layer>[A-Z_]+),.*$"
     );
     private static final Pattern METHOD_OK_PATTERN = Pattern.compile(
-        "^Метод (?<class>[A-Za-z0-9_$]+)\\.(?<method>[A-Za-z0-9_$]+) выполнен успешно: "
-            + "операция='(?<op>[^']*)', слой=(?<layer>[A-Z_]+), длительность=(?<dur>\\d+) мс.*$"
+        "^Method finished successfully (?<class>[A-Za-z0-9_$]+)\\.(?<method>[A-Za-z0-9_$]+): "
+            + "operation='(?<op>[^']*)', layer=(?<layer>[A-Z_]+), duration=(?<dur>\\d+) ms.*$"
     );
     private static final Pattern BUSINESS_ERROR_PATTERN = Pattern.compile(
-        "^Бизнес-ошибка в (?<class>[A-Za-z0-9_$]+)\\.(?<method>[A-Za-z0-9_$]+): "
-            + "операция='(?<op>[^']*)', слой=(?<layer>[A-Z_]+), длительность=(?<dur>\\d+) мс.*$"
+        "^Business error in (?<class>[A-Za-z0-9_$]+)\\.(?<method>[A-Za-z0-9_$]+): "
+            + "operation='(?<op>[^']*)', layer=(?<layer>[A-Z_]+), duration=(?<dur>\\d+) ms.*$"
     );
     private static final Pattern TECH_ERROR_PATTERN = Pattern.compile(
-        "^Техническая ошибка в (?<class>[A-Za-z0-9_$]+)\\.(?<method>[A-Za-z0-9_$]+): "
-            + "операция='(?<op>[^']*)', слой=(?<layer>[A-Z_]+), длительность=(?<dur>\\d+) мс.*$"
+        "^Technical error in (?<class>[A-Za-z0-9_$]+)\\.(?<method>[A-Za-z0-9_$]+): "
+            + "operation='(?<op>[^']*)', layer=(?<layer>[A-Z_]+), duration=(?<dur>\\d+) ms.*$"
     );
     private static final Pattern DETAILS_PATTERN = Pattern.compile(
-        "^Детализация вызова (?<class>[A-Za-z0-9_$]+)\\.(?<method>[A-Za-z0-9_$]+): слой=(?<layer>[A-Z_]+),.*$"
+        "^Method call details (?<class>[A-Za-z0-9_$]+)\\.(?<method>[A-Za-z0-9_$]+): layer=(?<layer>[A-Z_]+),.*$"
     );
     private static final Pattern DB_STAGE_START_PATTERN = Pattern.compile(
         "^DB_STAGE_START stageId=(?<stageId>\\d+) method=(?<class>[A-Za-z0-9_$]+)\\.(?<method>[A-Za-z0-9_$]+).*"
@@ -65,10 +66,10 @@ public class AnalyticsLogViewService {
         "^DB_STAGE_ERROR stageId=(?<stageId>\\d+) method=(?<class>[A-Za-z0-9_$]+)\\.(?<method>[A-Za-z0-9_$]+) durationMs=(?<dur>\\d+).*"
     );
     private static final Pattern DB_CALL_OK_PATTERN = Pattern.compile(
-        "^DB-вызов (?<class>[A-Za-z0-9_$]+)\\.(?<method>[A-Za-z0-9_$]+) выполнен успешно: .*длительность=(?<dur>\\d+) мс.*$"
+        "^DB call (?<class>[A-Za-z0-9_$]+)\\.(?<method>[A-Za-z0-9_$]+) finished successfully: .*duration=(?<dur>\\d+) ms.*$"
     );
     private static final Pattern DB_CALL_ERROR_PATTERN = Pattern.compile(
-        "^DB-вызов (?<class>[A-Za-z0-9_$]+)\\.(?<method>[A-Za-z0-9_$]+) завершился ошибкой: .*длительность=(?<dur>\\d+) мс.*$"
+        "^DB call (?<class>[A-Za-z0-9_$]+)\\.(?<method>[A-Za-z0-9_$]+) failed: .*duration=(?<dur>\\d+) ms.*$"
     );
     private static final Pattern HTTP_PATTERN = Pattern.compile("^HTTP (?<method>[A-Z]+) (?<path>\\S+) -> (?<code>\\d+) \\((?<dur>\\d+) ms\\)$");
     private static final Pattern SLOW_HTTP_PATTERN = Pattern.compile("^SLOW HTTP (?<method>[A-Z]+) (?<path>\\S+) -> (?<code>\\d+) \\((?<dur>\\d+) ms\\)$");
@@ -79,7 +80,13 @@ public class AnalyticsLogViewService {
     @Value("${LOG_MODULE_DIR:logs/analytics/modules}")
     private String moduleLogDir;
 
-    public List<EventLogEntryDto> loadTraceLogs(
+    private final AnalyticsLogArchiveIndexService logArchiveIndexService;
+
+    public AnalyticsLogViewService(AnalyticsLogArchiveIndexService logArchiveIndexService) {
+        this.logArchiveIndexService = logArchiveIndexService;
+    }
+
+    public TraceLogLookupResult loadTraceLogs(
         String traceId,
         String eventUid,
         String moduleCode,
@@ -87,7 +94,7 @@ public class AnalyticsLogViewService {
         Instant eventEndedAt
     ) {
         if (traceId == null || traceId.isBlank()) {
-            return List.of();
+            return TraceLogLookupResult.notFound("Trace ID is empty.");
         }
         Instant from = eventStartedAt == null ? null : eventStartedAt.minusSeconds(180);
         Instant to = eventEndedAt == null ? null : eventEndedAt.plusSeconds(240);
@@ -103,7 +110,91 @@ public class AnalyticsLogViewService {
                 parsed.addAll(readTraceLinesFromFile(path, traceId, null, traceToken, from, to));
             }
         }
-        if (parsed.isEmpty()) {
+        List<EventLogEntryDto> currentRows = normalizeRows(parsed);
+        if (!currentRows.isEmpty()) {
+            return new TraceLogLookupResult(
+                currentRows,
+                new EventTraceLogStatusDto(
+                    "CURRENT_FOUND",
+                    "Логи найдены в текущем .log файле.",
+                    moduleCode,
+                    null,
+                    null,
+                    null,
+                    null,
+                    (long) currentRows.size(),
+                    currentRows.stream().filter(row -> "ERROR".equalsIgnoreCase(row.status())).count(),
+                    currentRows.stream().filter(row -> "WARN".equalsIgnoreCase(row.status())).count(),
+                    false,
+                    "current log rows=" + currentRows.size(),
+                    List.of()
+                )
+            );
+        }
+
+        AnalyticsLogArchiveIndexService.IndexedTraceLookup indexed = logArchiveIndexService.findIndexedTrace(traceId, eventUid, moduleCode);
+        if (!"NOT_FOUND".equals(indexed.status())) {
+            List<EventLogEntryDto> archiveRows = "ARCHIVE_AVAILABLE".equals(indexed.status())
+                ? logArchiveIndexService.loadTraceLinesFromArchive(indexed, traceId, eventUid)
+                : List.of();
+            boolean archiveReadable = "ARCHIVE_AVAILABLE".equals(indexed.status()) && !archiveRows.isEmpty();
+            String status = archiveReadable ? "ARCHIVE_AVAILABLE" : indexed.status();
+            String message = switch (status) {
+                case "ARCHIVE_AVAILABLE" -> "Логи trace найдены в архиве и загружены из .log.gz.";
+                case "ARCHIVE_INDEX_ONLY" -> "Полный архив недоступен, показана сохранённая диагностическая сводка.";
+                default -> "Trace найден в индексе архивов.";
+            };
+            if ("ARCHIVE_AVAILABLE".equals(indexed.status()) && archiveRows.isEmpty()) {
+                message = "Логи trace находятся в архиве " + indexed.fileName() + ", но строки не загружены. Проверьте настройку чтения архивов и доступность файла.";
+                status = "ARCHIVE_INDEX_ONLY";
+            }
+            return new TraceLogLookupResult(
+                archiveRows,
+                new EventTraceLogStatusDto(
+                    status,
+                    message,
+                    indexed.moduleCode(),
+                    indexed.fileName(),
+                    indexed.filePath(),
+                    indexed.fromTs(),
+                    indexed.toTs(),
+                    indexed.lineCount(),
+                    indexed.errorCount(),
+                    indexed.warnCount(),
+                    archiveReadable,
+                    indexed.summary(),
+                    indexed.excerpts()
+                )
+            );
+        }
+        List<String> archiveCandidates = logArchiveIndexService.findArchiveCandidatesForDate(moduleCode, eventStartedAt, 8);
+        if (!archiveCandidates.isEmpty()) {
+            return new TraceLogLookupResult(
+                List.of(),
+                new EventTraceLogStatusDto(
+                    "ARCHIVE_PENDING_INDEX",
+                    "За дату события найдены архивные файлы логов, но они ещё не проиндексированы. Запустите индексацию логов в конфигурации аналитики и обновите вкладку.",
+                    moduleCode,
+                    String.join(", ", archiveCandidates),
+                    null,
+                    eventStartedAt,
+                    eventEndedAt,
+                    0L,
+                    0L,
+                    0L,
+                    false,
+                    "archive candidates: " + String.join(", ", archiveCandidates),
+                    List.of()
+                )
+            );
+        }
+        return TraceLogLookupResult.notFound(
+            "Логи по этому trace не найдены ни в текущих файлах, ни в архивном индексе."
+        );
+    }
+
+    private List<EventLogEntryDto> normalizeRows(List<ParsedLogLine> parsed) {
+        if (parsed == null || parsed.isEmpty()) {
             return List.of();
         }
         parsed.sort(Comparator
@@ -240,7 +331,7 @@ public class AnalyticsLogViewService {
                 matcher.group("class") + "." + matcher.group("method"),
                 matcher.group("op"),
                 null,
-                "Старт метода " + matcher.group("class") + "." + matcher.group("method")
+                "Method start " + matcher.group("class") + "." + matcher.group("method")
             );
         }
         matcher = METHOD_OK_PATTERN.matcher(safeMessage);
@@ -251,7 +342,7 @@ public class AnalyticsLogViewService {
                 matcher.group("class") + "." + matcher.group("method"),
                 matcher.group("op"),
                 parseInt(matcher.group("dur")),
-                "Метод выполнен успешно"
+                "Method finished successfully"
             );
         }
         matcher = BUSINESS_ERROR_PATTERN.matcher(safeMessage);
@@ -262,7 +353,7 @@ public class AnalyticsLogViewService {
                 matcher.group("class") + "." + matcher.group("method"),
                 matcher.group("op"),
                 parseInt(matcher.group("dur")),
-                "Бизнес-ошибка метода"
+                "Business method error"
             );
         }
         matcher = TECH_ERROR_PATTERN.matcher(safeMessage);
@@ -273,7 +364,7 @@ public class AnalyticsLogViewService {
                 matcher.group("class") + "." + matcher.group("method"),
                 matcher.group("op"),
                 parseInt(matcher.group("dur")),
-                "Техническая ошибка метода"
+                "Technical method error"
             );
         }
         matcher = DETAILS_PATTERN.matcher(safeMessage);
@@ -284,7 +375,7 @@ public class AnalyticsLogViewService {
                 matcher.group("class") + "." + matcher.group("method"),
                 null,
                 null,
-                "Детализация вызова"
+                "Method call details"
             );
         }
         matcher = DB_STAGE_START_PATTERN.matcher(safeMessage);
@@ -293,9 +384,9 @@ public class AnalyticsLogViewService {
                 "START",
                 "DATABASE",
                 matcher.group("class") + "." + matcher.group("method"),
-                "операция доступа к данным",
+                "data access operation",
                 null,
-                "Старт DB-вызова"
+                "DB stage start"
             );
         }
         matcher = DB_STAGE_END_PATTERN.matcher(safeMessage);
@@ -304,9 +395,9 @@ public class AnalyticsLogViewService {
                 "OK",
                 "DATABASE",
                 matcher.group("class") + "." + matcher.group("method"),
-                "операция доступа к данным",
+                "data access operation",
                 parseInt(matcher.group("dur")),
-                "DB-вызов выполнен"
+                "DB stage finished"
             );
         }
         matcher = DB_STAGE_ERROR_PATTERN.matcher(safeMessage);
@@ -315,9 +406,9 @@ public class AnalyticsLogViewService {
                 "ERROR",
                 "DATABASE",
                 matcher.group("class") + "." + matcher.group("method"),
-                "операция доступа к данным",
+                "data access operation",
                 parseInt(matcher.group("dur")),
-                "DB-вызов с ошибкой"
+                "DB stage failed"
             );
         }
         matcher = DB_CALL_OK_PATTERN.matcher(safeMessage);
@@ -326,9 +417,9 @@ public class AnalyticsLogViewService {
                 "SKIP",
                 "DATABASE",
                 matcher.group("class") + "." + matcher.group("method"),
-                "операция доступа к данным",
+                "data access operation",
                 parseInt(matcher.group("dur")),
-                "DB-вызов выполнен (дубликат)"
+                "DB call finished (duplicate)"
             );
         }
         matcher = DB_CALL_ERROR_PATTERN.matcher(safeMessage);
@@ -337,9 +428,9 @@ public class AnalyticsLogViewService {
                 "SKIP",
                 "DATABASE",
                 matcher.group("class") + "." + matcher.group("method"),
-                "операция доступа к данным",
+                "data access operation",
                 parseInt(matcher.group("dur")),
-                "DB-вызов с ошибкой (дубликат)"
+                "DB call failed (duplicate)"
             );
         }
         matcher = HTTP_PATTERN.matcher(safeMessage);
@@ -531,6 +622,32 @@ public class AnalyticsLogViewService {
                 traceId,
                 eventUid,
                 moduleCode
+            );
+        }
+    }
+
+    public record TraceLogLookupResult(
+        List<EventLogEntryDto> rows,
+        EventTraceLogStatusDto status
+    ) {
+        static TraceLogLookupResult notFound(String message) {
+            return new TraceLogLookupResult(
+                List.of(),
+                new EventTraceLogStatusDto(
+                    "NOT_FOUND",
+                    message,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    0L,
+                    0L,
+                    0L,
+                    false,
+                    null,
+                    List.of()
+                )
             );
         }
     }

@@ -1,6 +1,7 @@
 package com.example.gqw.analytics.service;
 
 import java.sql.Date;
+import java.sql.Types;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -18,29 +19,43 @@ import org.springframework.transaction.annotation.Transactional;
 public class AnalyticsFilterRollupService {
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
+    private final AnalyticsRuntimeSettingsService runtimeSettingsService;
     private final Clock clock;
-    private final boolean enabled;
-    private final int longRangeDays;
-    private final int refreshRecentDays;
+    private final boolean defaultEnabled;
+    private final int defaultLongRangeDays;
+    private final int defaultRefreshRecentDays;
+    private final int defaultRefreshIntervalMinutes;
+    private final Object refreshLock = new Object();
+    private volatile Instant lastScheduledRefreshAt;
 
     public AnalyticsFilterRollupService(
         NamedParameterJdbcTemplate jdbcTemplate,
+        AnalyticsRuntimeSettingsService runtimeSettingsService,
         @Value("${app.analytics.filter-rollup.enabled:true}") boolean enabled,
         @Value("${app.analytics.filter-rollup.long-range-days:30}") int longRangeDays,
-        @Value("${app.analytics.filter-rollup.refresh-recent-days:7}") int refreshRecentDays
+        @Value("${app.analytics.filter-rollup.refresh-recent-days:7}") int refreshRecentDays,
+        @Value("${app.analytics.filter-rollup.refresh-interval-minutes:10}") int refreshIntervalMinutes
     ) {
         this.jdbcTemplate = jdbcTemplate;
+        this.runtimeSettingsService = runtimeSettingsService;
         this.clock = Clock.systemUTC();
-        this.enabled = enabled;
-        this.longRangeDays = Math.max(1, longRangeDays);
-        this.refreshRecentDays = Math.max(1, refreshRecentDays);
+        this.defaultEnabled = enabled;
+        this.defaultLongRangeDays = Math.max(1, longRangeDays);
+        this.defaultRefreshRecentDays = Math.max(1, refreshRecentDays);
+        this.defaultRefreshIntervalMinutes = Math.max(1, refreshIntervalMinutes);
     }
 
     @Transactional
     public void initializeIfNeeded() {
-        if (!enabled || !rollupTablesExist()) {
+        if (!isEnabled() || !rollupTablesExist()) {
             return;
         }
+        int refreshRecentDays = runtimeSettingsService.getInt(
+            AnalyticsRuntimeSettingsService.KEY_FILTER_ROLLUP_REFRESH_RECENT_DAYS,
+            defaultRefreshRecentDays,
+            1,
+            365
+        );
         if (rollupIsEmpty()) {
             rebuildAll();
             return;
@@ -48,25 +63,86 @@ public class AnalyticsFilterRollupService {
         refreshRecentWindow(refreshRecentDays);
     }
 
-    @Scheduled(cron = "${app.analytics.filter-rollup.refresh-cron:0 */10 * * * *}")
     @Transactional
-    public void scheduledRefresh() {
-        if (!enabled || !rollupTablesExist()) {
+    public void refreshRecentNow() {
+        if (!isEnabled() || !rollupTablesExist()) {
             return;
         }
-        refreshRecentWindow(refreshRecentDays);
+        int refreshRecentDays = runtimeSettingsService.getInt(
+            AnalyticsRuntimeSettingsService.KEY_FILTER_ROLLUP_REFRESH_RECENT_DAYS,
+            defaultRefreshRecentDays,
+            1,
+            365
+        );
+        synchronized (refreshLock) {
+            refreshRecentWindow(refreshRecentDays);
+            lastScheduledRefreshAt = Instant.now(clock);
+        }
+    }
+
+    @Transactional
+    public void rebuildAllNow() {
+        if (!isEnabled() || !rollupTablesExist()) {
+            return;
+        }
+        synchronized (refreshLock) {
+            rebuildAll();
+            lastScheduledRefreshAt = Instant.now(clock);
+        }
+    }
+
+    @Scheduled(cron = "0 * * * * *")
+    @Transactional
+    public void scheduledRefresh() {
+        int intervalMinutes = runtimeSettingsService.getInt(
+            AnalyticsRuntimeSettingsService.KEY_FILTER_ROLLUP_REFRESH_INTERVAL_MINUTES,
+            defaultRefreshIntervalMinutes,
+            1,
+            180
+        );
+        Instant now = Instant.now(clock);
+        synchronized (refreshLock) {
+            if (lastScheduledRefreshAt != null
+                && now.isBefore(lastScheduledRefreshAt.plusSeconds(intervalMinutes * 60L))) {
+                return;
+            }
+            if (!isEnabled() || !rollupTablesExist()) {
+                return;
+            }
+            int refreshRecentDays = runtimeSettingsService.getInt(
+                AnalyticsRuntimeSettingsService.KEY_FILTER_ROLLUP_REFRESH_RECENT_DAYS,
+                defaultRefreshRecentDays,
+                1,
+                365
+            );
+            refreshRecentWindow(refreshRecentDays);
+            lastScheduledRefreshAt = now;
+        }
     }
 
     @Transactional(readOnly = true)
     public boolean shouldUseRollup(Instant from, Instant to, String requestPath) {
-        if (!enabled || !rollupTablesExist() || !hasRollupData()) {
+        if (!isEnabled() || !rollupTablesExist() || !hasRollupData()) {
             return false;
         }
         if (requestPath != null) {
             return false;
         }
         long rangeDays = DateRange.daysBetweenInclusive(from, to);
+        int longRangeDays = runtimeSettingsService.getInt(
+            AnalyticsRuntimeSettingsService.KEY_FILTER_ROLLUP_LONG_RANGE_DAYS,
+            defaultLongRangeDays,
+            1,
+            3650
+        );
         return rangeDays >= longRangeDays;
+    }
+
+    private boolean isEnabled() {
+        return runtimeSettingsService.getBoolean(
+            AnalyticsRuntimeSettingsService.KEY_FILTER_ROLLUP_ENABLED,
+            defaultEnabled
+        );
     }
 
     @Transactional(readOnly = true)
@@ -76,7 +152,7 @@ public class AnalyticsFilterRollupService {
         String moduleCode
     ) {
         MapSqlParameterSource params = baseRangeParams(from, to)
-            .addValue("moduleCode", moduleCode);
+            .addValue("moduleCode", moduleCode, Types.VARCHAR);
         return jdbcTemplate.queryForList(
             """
                 select distinct event_type_code
@@ -98,8 +174,8 @@ public class AnalyticsFilterRollupService {
         String eventTypeCode
     ) {
         MapSqlParameterSource params = baseRangeParams(from, to)
-            .addValue("moduleCode", moduleCode)
-            .addValue("eventTypeCode", eventTypeCode);
+            .addValue("moduleCode", moduleCode, Types.VARCHAR)
+            .addValue("eventTypeCode", eventTypeCode, Types.VARCHAR);
         return jdbcTemplate.queryForList(
             """
                 select distinct attribute_type_code
@@ -123,9 +199,9 @@ public class AnalyticsFilterRollupService {
         String attributeCode
     ) {
         MapSqlParameterSource params = baseRangeParams(from, to)
-            .addValue("moduleCode", moduleCode)
-            .addValue("eventTypeCode", eventTypeCode)
-            .addValue("attributeCode", attributeCode);
+            .addValue("moduleCode", moduleCode, Types.VARCHAR)
+            .addValue("eventTypeCode", eventTypeCode, Types.VARCHAR)
+            .addValue("attributeCode", attributeCode, Types.VARCHAR);
         return jdbcTemplate.queryForList(
             """
                 select distinct attribute_value

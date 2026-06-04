@@ -114,11 +114,16 @@ public class AnalyticsAdminController {
     }
 
     @GetMapping("/analytics-admin/dashboard")
-    public String dashboard(Model model, HttpServletRequest request) {
+    public String dashboard(
+        Model model,
+        HttpServletRequest request,
+        @RequestParam(required = false) String tab
+    ) {
         model.addAttribute(
             "analyticsAdminUsername",
             request.getSession(true).getAttribute(AnalyticsAdminAuthService.SESSION_KEY_USERNAME)
         );
+        model.addAttribute("analyticsActiveTab", normalizeDashboardTab(tab));
         LocalDateTime now = LocalDateTime.now();
         model.addAttribute("analyticsTo", now.format(INPUT_DT));
         model.addAttribute("analyticsFrom", now.minusHours(24).format(INPUT_DT));
@@ -736,6 +741,17 @@ public class AnalyticsAdminController {
         }
         return "redirect:/analytics-admin/dictionaries?eventModuleCode="
             + eventModuleFilter.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private static String normalizeDashboardTab(String tab) {
+        if (tab == null || tab.isBlank()) {
+            return "overview";
+        }
+        String normalized = tab.trim();
+        return switch (normalized) {
+            case "raw", "universal", "metrics", "compare" -> normalized;
+            default -> "overview";
+        };
     }
 
     private static String resolveDictionaryCode(String preferred, String fallback) {
