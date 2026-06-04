@@ -25,17 +25,20 @@ public class AnalyticsEventService {
     private final EventTypeRepository eventTypeRepository;
     private final ModuleTypeRepository moduleTypeRepository;
     private final AnalyticsCodeResolverService codeResolverService;
+    private final AnalyticsSystemEventClassifier systemEventClassifier;
 
     public AnalyticsEventService(
         AnalyticsEventRepository eventRepository,
         EventTypeRepository eventTypeRepository,
         ModuleTypeRepository moduleTypeRepository,
-        AnalyticsCodeResolverService codeResolverService
+        AnalyticsCodeResolverService codeResolverService,
+        AnalyticsSystemEventClassifier systemEventClassifier
     ) {
         this.eventRepository = eventRepository;
         this.eventTypeRepository = eventTypeRepository;
         this.moduleTypeRepository = moduleTypeRepository;
         this.codeResolverService = codeResolverService;
+        this.systemEventClassifier = systemEventClassifier;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -53,6 +56,7 @@ public class AnalyticsEventService {
         if (!Boolean.TRUE.equals(type.getIsActive())) {
             throw new IllegalArgumentException("Inactive event type: " + resolvedCode);
         }
+        markSystemEventTypeIfNeeded(type, requestPath, null);
         alignEventTypeModuleIfNeeded(type, resolvedCode);
 
         AnalyticsEvent event = new AnalyticsEvent();
@@ -86,6 +90,7 @@ public class AnalyticsEventService {
         type.setName(humanizeCode(code));
         type.setDescription(null);
         type.setModuleCode(moduleCode);
+        type.setIsSystem(systemEventClassifier.isSystemEvent(code, type.getName(), null, null));
         type.setIsActive(true);
         try {
             return eventTypeRepository.save(type);
@@ -93,6 +98,17 @@ public class AnalyticsEventService {
             type.setModuleCode(EventType.DEFAULT_MODULE_CODE);
             return eventTypeRepository.save(type);
         }
+    }
+
+    private void markSystemEventTypeIfNeeded(EventType type, String requestPath, Integer statusCode) {
+        if (type == null || Boolean.TRUE.equals(type.getIsSystem())) {
+            return;
+        }
+        if (!systemEventClassifier.isSystemEvent(type.getCode(), type.getName(), requestPath, statusCode)) {
+            return;
+        }
+        type.setIsSystem(true);
+        eventTypeRepository.save(type);
     }
 
     private void alignEventTypeModuleIfNeeded(EventType type, String eventTypeCode) {
@@ -215,6 +231,7 @@ public class AnalyticsEventService {
         event.setStatusCode(statusCode);
         event.setIsError(false);
         event.setDurationMs((int) Duration.between(event.getStartedAt(), endedAt).toMillis());
+        markStoredEventTypeIfNeeded(event);
         eventRepository.save(event);
     }
 
@@ -227,6 +244,7 @@ public class AnalyticsEventService {
         event.setIsError(true);
         event.setErrorMessage(errorMessage);
         event.setDurationMs((int) Duration.between(event.getStartedAt(), endedAt).toMillis());
+        markStoredEventTypeIfNeeded(event);
         eventRepository.save(event);
         log.warn(
             "Analytics error event: uid='{}', code='{}', module='{}', status={}, traceId='{}', path='{}', method='{}', message='{}'",
@@ -239,6 +257,14 @@ public class AnalyticsEventService {
             event.getHttpMethod(),
             errorMessage == null ? "" : errorMessage
         );
+    }
+
+    private void markStoredEventTypeIfNeeded(AnalyticsEvent event) {
+        if (event == null || event.getEventTypeCode() == null || event.getEventTypeCode().isBlank()) {
+            return;
+        }
+        eventTypeRepository.findById(event.getEventTypeCode())
+            .ifPresent(type -> markSystemEventTypeIfNeeded(type, event.getRequestPath(), event.getStatusCode()));
     }
 }
 

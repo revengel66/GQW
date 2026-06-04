@@ -81,6 +81,7 @@ public class AnalyticsSystemFlagsSchemaPatchConfig {
 
             patchStageMetricTypeSchema(jdbcTemplate);
             patchTable(jdbcTemplate, "analytics.event_type", "code", SYSTEM_EVENT_CODES);
+            patchHistoricalSystemEventTypes(jdbcTemplate);
             patchTable(jdbcTemplate, "analytics.event_attribute_type", "code", SYSTEM_ATTRIBUTE_CODES);
             patchTable(jdbcTemplate, "analytics.stage_type", "code", SYSTEM_STAGE_CODES);
             patchTable(jdbcTemplate, "analytics.stage_metric_type", "code", SYSTEM_METRIC_CODES);
@@ -106,6 +107,37 @@ public class AnalyticsSystemFlagsSchemaPatchConfig {
                 code
             );
         }
+    }
+
+    private void patchHistoricalSystemEventTypes(JdbcTemplate jdbcTemplate) {
+        if (!tableExists(jdbcTemplate, "analytics.event_type") || !tableExists(jdbcTemplate, "analytics.event")) {
+            return;
+        }
+        jdbcTemplate.execute(
+            """
+                update analytics.event_type t
+                   set is_system = true
+                 where exists (
+                       select 1
+                         from analytics.event e
+                        where e.event_type_code = t.code
+                          and (
+                               lower(coalesce(e.request_path, '')) in ('/favicon.ico', '/robots.txt', '/error')
+                               or lower(coalesce(e.request_path, '')) like '/static/%'
+                               or lower(coalesce(e.request_path, '')) like '/css/%'
+                               or lower(coalesce(e.request_path, '')) like '/js/%'
+                               or lower(coalesce(e.request_path, '')) like '/images/%'
+                               or lower(coalesce(e.request_path, '')) like '/img/%'
+                               or lower(coalesce(e.request_path, '')) like '/webjars/%'
+                               or lower(coalesce(e.request_path, '')) like '/actuator/%'
+                               or (
+                                   e.status_code = 404
+                                   and lower(coalesce(e.request_path, '')) ~ '\\.(css|js|map|ico|png|jpg|jpeg|svg|gif|webp|woff|woff2|ttf)(\\?.*)?$'
+                               )
+                          )
+                 )
+                """
+        );
     }
 
     private void patchStageMetricTypeSchema(JdbcTemplate jdbcTemplate) {

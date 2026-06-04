@@ -548,6 +548,11 @@ public class AnalyticsDictionaryAdminService {
     @Transactional
     public void deleteEventType(String codeRaw) {
         String code = normalizeCode(codeRaw, true);
+        EventType eventTypeForDelete = eventTypeRepository.findById(code)
+            .orElseThrow(() -> new IllegalArgumentException("Event type not found: " + code));
+        if (Boolean.TRUE.equals(eventTypeForDelete.getIsSystem())) {
+            throw new IllegalArgumentException("System event types cannot be deleted. Disable tracking instead.");
+        }
         List<String> usages = analyticsEventTypeMaintenanceService.findTrackedEventUsages(code);
         if (!usages.isEmpty()) {
             int limit = Math.min(usages.size(), 8);

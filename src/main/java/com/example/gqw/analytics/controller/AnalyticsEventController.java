@@ -43,6 +43,7 @@ public class AnalyticsEventController {
         @RequestParam(required = false) BigDecimal metricMaxValue,
         @RequestParam(required = false) String sortBy,
         @RequestParam(required = false) String sortDir,
+        @RequestParam(required = false, defaultValue = "false") Boolean systemEventsOnly,
         @RequestParam(required = false, defaultValue = "0") Integer page,
         @RequestParam(required = false, defaultValue = "20") Integer size
     ) {
@@ -63,6 +64,7 @@ public class AnalyticsEventController {
             metricMaxValue,
             sortBy,
             sortDir,
+            Boolean.TRUE.equals(systemEventsOnly),
             page,
             size
         );

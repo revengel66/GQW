@@ -82,6 +82,11 @@
             to: ""
         },
         metricHelpByCode: {},
+        expandedIntervalSelectionEnabledBySource: {},
+        expandedIntervalSelectionBySource: {},
+        activeAnalysisInterval: null,
+        submitMainFilters: null,
+        preserveChartUiStateDuringMainSubmit: false,
         globalLoadingDepth: 0,
         panelLoadingDepthByElement: new WeakMap(),
         sectionLocalLoadingDepthByElement: new WeakMap(),
@@ -110,6 +115,9 @@
         eventsPage: 0,
         eventsSize: 15,
         eventsHasMore: false,
+        eventsRequestId: 0,
+        currentDashboardTab: "overview",
+        eventsSystemOnly: false,
         cardLoaderHostsByScope: {},
         sectionLoaderTokens: {},
         sectionLoaderScopes: {},
@@ -158,6 +166,19 @@
         "chart-event-kpi",
         "chart-stage-latency",
         "chart-stage-errors"
+    ]);
+    const OVERVIEW_MINI_DISPLAY_ONLY_CHART_IDS = new Set([
+        "chart-events-count",
+        "chart-latency",
+        "chart-error-rate",
+        "chart-event-kpi",
+        "chart-stage-latency",
+        "chart-stage-errors"
+    ]);
+    const EXPANDED_TIME_RANGE_SELECTABLE_CHART_IDS = new Set([
+        "chart-events-count",
+        "chart-latency",
+        "chart-error-rate"
     ]);
     const EXPANDED_EVENT_FILTER_CHART_IDS = new Set([
         "chart-events-count",
@@ -213,9 +234,9 @@
         {value: "all", label: "Все время"}
     ];
     const INLINE_COMPARE_MODE_OPTIONS = [
-        {value: "off", label: "\u0412\u044b\u043a\u043b\u044e\u0447\u0435\u043d\u043e"},
-        {value: "split", label: "\u0420\u0430\u0437\u0434\u0435\u043b\u044c\u043d\u043e"},
-        {value: "overlay", label: "\u041d\u0430\u043b\u043e\u0436\u0435\u043d\u0438\u0435\u043c"}
+        {value: "off", label: "Выключено"},
+        {value: "split", label: "Раздельно"},
+        {value: "overlay", label: "Наложением"}
     ];
     const CHART_SCENARIOS_BY_CANVAS = {
         "chart-events-count": [
@@ -1217,8 +1238,7 @@
         {selector: "#events-quick-range", helpCode: "quickPeriod"},
         {selector: "#events-is-error, #events-error-class", helpCode: "rawStatus"},
         {selector: "#events-event-type", helpCode: "rawEvent"},
-        {selector: "#events-metric-type, #events-metric-min, #events-metric-max, #events-min-duration, #events-attribute-code, #events-attribute-value, #events-sort-by, #events-sort-dir, #events-advanced-toggle", helpCode: "rawAdvanced"},
-        {selector: "[data-expanded-preset], [data-expanded-bucket], [data-expanded-compare-mode], [data-expanded-latency-metric], [data-expanded-stage-latency-event-metric], [data-range]", helpCode: "expandedPeriod", placement: "before"}
+        {selector: "#events-metric-type, #events-metric-min, #events-metric-max, #events-min-duration, #events-attribute-code, #events-attribute-value, #events-sort-by, #events-sort-dir, #events-advanced-toggle", helpCode: "rawAdvanced"}
     ];
 
     const refs = {};
@@ -1288,6 +1308,7 @@
         refs.analyticsTabUniversal = document.getElementById("analytics-tab-universal");
         refs.analyticsTabMetrics = document.getElementById("analytics-tab-metrics");
         refs.analyticsTabRaw = document.getElementById("analytics-tab-raw");
+        refs.analyticsTabSystem = document.getElementById("analytics-tab-system");
         refs.analyticsTabCompare = document.getElementById("analytics-tab-compare");
         refs.analyticsTabButtons = document.querySelectorAll("[data-analytics-tab]");
         refs.analyticsTopTabButtons = document.querySelectorAll("[data-analytics-top-tab]");
@@ -1376,6 +1397,8 @@
         refs.stageMetricPanel = refs.stageMetricForm?.closest("section.analytics-panel") || null;
 
         refs.eventsForm = document.getElementById("analytics-events-form");
+        refs.eventsPanelTitle = document.getElementById("analytics-events-panel-title");
+        refs.eventsPanelSub = document.getElementById("analytics-events-panel-sub");
         refs.eventsIsError = document.getElementById("events-is-error");
         refs.eventsErrorClassWrap = document.getElementById("events-error-class-wrap");
         refs.eventsErrorClass = document.getElementById("events-error-class");
@@ -1425,10 +1448,15 @@
             if (mainRangeChanged && state.globalCompareEnabled) {
                 state.globalCompareBeforeCustom = false;
             }
-            clearAllChartLocalOverrides();
-            resetInlineComparePresetsFromTopFilter();
+            const preserveChartUiState = !!state.preserveChartUiStateDuringMainSubmit;
+            if (!preserveChartUiState) {
+                clearAllChartLocalOverrides();
+                resetInlineComparePresetsFromTopFilter();
+            }
             state.expandedRangesBySource = {};
-            state.expandedBucketBySource = {};
+            if (!preserveChartUiState) {
+                state.expandedBucketBySource = {};
+            }
             syncStageMetricQuickRangeFromMain();
             syncStageMetricRangesFromMain(true);
             syncStageTextQuickRangeFromMain();
@@ -1459,6 +1487,7 @@
                 state.mainFiltersSubmitting = false;
             }
         };
+        state.submitMainFilters = submitMainFilters;
         const submitStageMetricFilters = async () => {
             await withStageMetricLoaders("all", () => loadStageMetrics());
         };
@@ -2539,9 +2568,12 @@
 
     function setDashboardViewTab(tab, shouldPushState) {
         const normalizedTab = String(tab || "").trim().toLowerCase();
-        const normalized = ["overview", "universal", "raw", "metrics", "compare"].includes(normalizedTab)
+        const normalized = ["overview", "universal", "raw", "system", "metrics", "compare"].includes(normalizedTab)
             ? normalizedTab
             : "overview";
+        const previousSystemOnly = state.eventsSystemOnly;
+        state.currentDashboardTab = normalized;
+        state.eventsSystemOnly = normalized === "system";
 
         refs.analyticsOverviewSections?.forEach((section) => {
             section.hidden = normalized !== "overview";
@@ -2553,7 +2585,7 @@
             section.hidden = normalized !== "metrics";
         });
         refs.analyticsRawSections?.forEach((section) => {
-            section.hidden = normalized !== "raw";
+            section.hidden = normalized !== "raw" && normalized !== "system";
         });
         refs.analyticsCompareSections?.forEach((section) => {
             section.hidden = normalized !== "compare";
@@ -2568,11 +2600,16 @@
         refs.analyticsTabUniversal?.classList.toggle("active", normalized === "universal");
         refs.analyticsTabMetrics?.classList.toggle("active", normalized === "metrics");
         refs.analyticsTabRaw?.classList.toggle("active", normalized === "raw");
+        refs.analyticsTabSystem?.classList.toggle("active", normalized === "system");
         refs.analyticsTabCompare?.classList.toggle("active", normalized === "compare");
         refs.analyticsTopTabButtons?.forEach((button) => {
             const tab = (button.getAttribute("data-analytics-top-tab") || "overview").trim();
             button.classList.toggle("active", tab.toLowerCase() === normalized);
         });
+        syncEventsPanelMode();
+        if (previousSystemOnly !== state.eventsSystemOnly) {
+            void refreshEventsScopeForMode();
+        }
 
         if (!shouldPushState) {
             return;
@@ -2584,6 +2621,37 @@
             url.searchParams.set("tab", normalized);
         }
         window.history.replaceState({}, "", url.toString());
+    }
+
+    function syncEventsPanelMode() {
+        if (!refs.eventsPanelTitle && !refs.eventsPanelSub) {
+            return;
+        }
+        if (state.eventsSystemOnly) {
+            if (refs.eventsPanelTitle) {
+                refs.eventsPanelTitle.textContent = "\u0421\u043b\u0443\u0436\u0435\u0431\u043d\u044b\u0435 \u0441\u043e\u0431\u044b\u0442\u0438\u044f";
+            }
+            if (refs.eventsPanelSub) {
+                refs.eventsPanelSub.textContent = "\u0421\u0438\u0441\u0442\u0435\u043c\u043d\u044b\u0435 HTTP/asset/technical \u0441\u043e\u0431\u044b\u0442\u0438\u044f, \u0438\u0441\u043a\u043b\u044e\u0447\u0451\u043d\u043d\u044b\u0435 \u0438\u0437 \u043e\u0441\u043d\u043e\u0432\u043d\u043e\u0439 \u0430\u043d\u0430\u043b\u0438\u0442\u0438\u043a\u0438";
+            }
+            return;
+        }
+        if (refs.eventsPanelTitle) {
+            refs.eventsPanelTitle.textContent = "Raw \u0441\u043e\u0431\u044b\u0442\u0438\u044f";
+        }
+        if (refs.eventsPanelSub) {
+            refs.eventsPanelSub.textContent = "\u0424\u0438\u043b\u044c\u0442\u0440\u0430\u0446\u0438\u044f \u043f\u0440\u043e\u0431\u043b\u0435\u043c\u043d\u044b\u0445 \u043a\u0435\u0439\u0441\u043e\u0432 \u0438 \u043f\u0435\u0440\u0435\u0445\u043e\u0434 \u043a \u0434\u0435\u0442\u0430\u043b\u044f\u043c";
+        }
+    }
+
+    async function refreshEventsScopeForMode() {
+        try {
+            await loadDictionaries();
+            state.eventsPage = 0;
+            await loadEvents(true);
+        } catch (error) {
+            console.error("Events scope refresh failed", error);
+        }
     }
 
     async function reloadAll() {
@@ -2810,7 +2878,29 @@
         fillSelect(refs.eventsAttributeCode, data.eventAttributeTypes, "Без фильтра", true);
         fillSelect(refs.globalMetricCode, data.eventAttributeTypes, "Не выбран", true, refs.globalMetricCode?.value || "");
         fillUniversalEventSelector(data.eventTypes || []);
+        await refreshRawEventTypeOptionsForMode(selectedEventsEventType);
         await refreshGlobalMetricBlock();
+    }
+
+    async function refreshRawEventTypeOptionsForMode(selectedCode) {
+        if (!refs.eventsEventType || !state.eventsSystemOnly) {
+            return;
+        }
+        const selectedModule = refs.moduleType?.value?.trim() || "";
+        const selectedEventsEventType = String(selectedCode || refs.eventsEventType?.value || "").trim();
+        const params = new URLSearchParams();
+        params.set("systemEventsOnly", "true");
+        if (selectedModule) {
+            params.set("moduleCode", selectedModule);
+        }
+        const data = await fetchJson(`${api("/dictionaries")}?${params.toString()}`);
+        fillSelect(
+            refs.eventsEventType,
+            data.eventTypes || [],
+            "\u0412\u0441\u0435 \u0441\u043b\u0443\u0436\u0435\u0431\u043d\u044b\u0435",
+            true,
+            selectedEventsEventType
+        );
     }
 
     function firstLabels(items, labelResolver, limit = 5) {
@@ -5075,6 +5165,7 @@
         const eventKpiData = needInlineCompareEventKpi ? (targetDataByKey.get(eventKpiKeys?.afterKey || "") || data) : data;
 
         const eventTimeLabels = (eventsCountData.series || []).map((point) => formatTime(point.time));
+        const eventTimePoints = (eventsCountData.series || []).map((point) => point.time || "");
         const eventCountSeries = (eventsCountData.series || []).map((point) => point.count || 0);
         const sampledEvents = downsampleSeries(
             eventTimeLabels,
@@ -5082,6 +5173,7 @@
             MAX_CHART_POINTS
         );
         const latencyLabels = (latencyData.series || []).map((point) => formatTime(point.time));
+        const latencyTimePoints = (latencyData.series || []).map((point) => point.time || "");
         const latencyAvgSeries = (latencyData.series || []).map((point) => point.avgMs || 0);
         const latencyP95Series = (latencyData.series || []).map((point) => point.p95Ms || 0);
         const latencyP99Series = (latencyData.series || []).map((point) => point.p99Ms || 0);
@@ -5091,6 +5183,7 @@
             MAX_CHART_POINTS
         );
         const errorLabels = (errorData.series || []).map((point) => formatTime(point.time));
+        const errorTimePoints = (errorData.series || []).map((point) => point.time || "");
         const errorSeries = (errorData.series || []).map((point) => toPercentNumber(point.errorRate));
         const sampledError = downsampleSeries(
             errorLabels,
@@ -5112,7 +5205,8 @@
                     pointRadius: 1.5
                 }]
             },
-            options: baseChartOptions("Количество")
+            options: baseChartOptions("Количество"),
+            __analyticsTimePoints: sampledEvents.indexes.map((index) => eventTimePoints[index]).filter(Boolean)
         });
         if (needInlineCompareEventsCount) {
             const baselineData = baselineDataByKey.get(eventsCountKeys?.beforeKey || "");
@@ -5169,7 +5263,8 @@
                     }
                 ]
             },
-            options: baseChartOptions("ms")
+            options: baseChartOptions("ms"),
+            __analyticsTimePoints: sampledLatency.indexes.map((index) => latencyTimePoints[index]).filter(Boolean)
         });
         if (needInlineCompareLatency) {
             const baselineData = baselineDataByKey.get(latencyKeys?.beforeKey || "");
@@ -5211,7 +5306,8 @@
                     pointRadius: 1.2
                 }]
             },
-            options: barChartOptions("%")
+            options: barChartOptions("%"),
+            __analyticsTimePoints: sampledError.indexes.map((index) => errorTimePoints[index]).filter(Boolean)
         });
         if (needInlineCompareError) {
             const baselineData = baselineDataByKey.get(errorKeys?.beforeKey || "");
@@ -6279,7 +6375,7 @@
         const selectedMode = normalizeCompareMode(modeRaw);
         Array.from(selectEl.options || []).forEach((option) => {
             const value = normalizeCompareMode(option.value);
-            option.textContent = `${value === selectedMode ? "вњ“ " : ""}${compareModeLabel(value)}`;
+            option.textContent = compareModeLabel(value);
         });
         selectEl.value = selectedMode;
     }
@@ -6906,6 +7002,8 @@
         if (reset) {
             state.eventsPage = 0;
         }
+        const requestId = ++state.eventsRequestId;
+        const requestSystemOnly = !!state.eventsSystemOnly;
         const params = rangeParams();
         const eventsFromIso = toIso(refs.eventsFrom?.value);
         const eventsToIso = toIso(refs.eventsTo?.value);
@@ -6917,6 +7015,9 @@
         }
         params.set("page", String(state.eventsPage));
         params.set("size", String(state.eventsSize));
+        if (requestSystemOnly) {
+            params.set("systemEventsOnly", "true");
+        }
 
         const rawEventType = refs.eventsEventType?.value?.trim();
         const mainEventType = refs.eventType?.value?.trim();
@@ -6971,6 +7072,9 @@
 
         try {
             const data = await fetchJson(`${api("/events")}?${params.toString()}`);
+            if (requestId !== state.eventsRequestId || requestSystemOnly !== !!state.eventsSystemOnly) {
+                return;
+            }
             state.eventsHasMore = !!data.hasMore;
             refs.eventsLoadMore.classList.toggle("d-none", !state.eventsHasMore);
 
@@ -7007,6 +7111,9 @@
                 refs.eventsTableBody.insertAdjacentHTML("beforeend", rowsHtml);
             }
         } catch (error) {
+            if (requestId !== state.eventsRequestId || requestSystemOnly !== !!state.eventsSystemOnly) {
+                return;
+            }
             console.error("Events load failed", error);
             state.eventsHasMore = false;
             refs.eventsLoadMore.classList.add("d-none");
@@ -9979,14 +10086,14 @@
                     item.removeAttribute("title");
                 }
                 const label = compareModeLabel(mode);
-                item.textContent = `${selected ? "вњ“ " : ""}${label}`;
+                item.textContent = label;
             });
         if (state.expandedChart.sourceCanvasId === canvasId && state.expandedChart.containerEl) {
             const expanded = state.expandedChart.containerEl.querySelector("[data-expanded-compare-mode]");
             if (expanded) {
                 const expandedValue = resolveExpandedCompareMode(canvasId);
                 expanded.innerHTML = INLINE_COMPARE_MODE_OPTIONS
-                    .map((item) => `<option value="${item.value}" ${item.value === expandedValue ? "selected" : ""}>${item.value === expandedValue ? "вњ“ " : ""}${item.label}</option>`)
+                    .map((item) => `<option value="${item.value}" ${item.value === expandedValue ? "selected" : ""}>${item.label}</option>`)
                     .join("");
                 expanded.value = expandedValue;
             }
@@ -10156,11 +10263,17 @@
                 return;
             }
             const actions = ensureChartActionsBar(wrap);
-            if (INLINE_COMPARE_CHART_IDS.has(canvas.id)) {
+            const isOverviewMiniDisplayOnly = isOverviewMiniChartCanvas(canvas);
+            if (isOverviewMiniDisplayOnly) {
+                cleanupOverviewMiniChartActions(actions, canvas.id);
+            }
+            if (!isOverviewMiniDisplayOnly && INLINE_COMPARE_CHART_IDS.has(canvas.id)) {
                 ensureInlineCompareModeControl(actions, canvas.id);
                 ensureInlineComparePresetControl(actions, canvas.id);
             }
-            ensureChartScenarioPicker(actions, canvas.id);
+            if (!isOverviewMiniDisplayOnly) {
+                ensureChartScenarioPicker(actions, canvas.id);
+            }
             if (actions.querySelector(`[data-chart-expand='${canvas.id}']`)) {
                 return;
             }
@@ -10594,6 +10707,10 @@
 
     function collapseExpandedChart() {
         const sourceCanvasId = state.expandedChart.sourceCanvasId;
+        if (sourceCanvasId) {
+            delete state.expandedIntervalSelectionBySource[sourceCanvasId];
+            state.expandedIntervalSelectionEnabledBySource[sourceCanvasId] = false;
+        }
         if (state.expandedChart.instance) {
             state.expandedChart.instance.destroy();
             state.expandedChart.instance = null;
@@ -10653,17 +10770,23 @@
                 return;
             }
             const actions = ensureChartActionsBar(wrap);
-            ensureChartScenarioPicker(actions, canvas.id);
+            if (!isOverviewMiniChartCanvas(canvas)) {
+                ensureChartScenarioPicker(actions, canvas.id);
+            } else {
+                cleanupOverviewMiniChartActions(actions, canvas.id);
+            }
         });
 
         INLINE_COMPARE_CHART_IDS.forEach((canvasId) => {
             const canvas = document.getElementById(canvasId);
             const wrap = canvas?.closest(".analytics-chart-wrap");
             const actions = wrap ? ensureChartActionsBar(wrap) : null;
-            if (actions) {
+            if (actions && !isOverviewMiniChartCanvas(canvas)) {
                 ensureInlineCompareModeControl(actions, canvasId);
                 ensureInlineComparePresetControl(actions, canvasId);
                 ensureChartScenarioPicker(actions, canvasId);
+            } else if (actions) {
+                cleanupOverviewMiniChartActions(actions, canvasId);
             }
             syncInlineCompareModeSelectValues(canvasId);
             syncInlineCompareModeResetVisibility(canvasId);
@@ -10900,6 +11023,11 @@
         return `${prefix}: ${scenario.label || scenarioCodeOf(scenario)}. ${scenario.shortDescription || scenario.description || scenario.details || ""}`.trim();
     }
 
+    function chartScenarioToggleText(canvasId) {
+        const scenario = resolveChartScenario(resolveChartScenarioSourceCanvasId(canvasId));
+        return scenario ? `Сценарий · ${scenario.label || scenarioCodeOf(scenario)}` : "Без сценария";
+    }
+
     function ensureScenarioSummaryEl(host, canvasId, expanded) {
         if (!host) {
             return null;
@@ -10921,17 +11049,19 @@
         const sourceCanvas = document.getElementById(sourceCanvasId);
         const wrap = sourceCanvas?.closest(".analytics-chart-wrap");
         const miniHost = wrap?.parentElement || wrap;
-        const miniSummary = ensureScenarioSummaryEl(miniHost, sourceCanvasId, false);
-        if (miniSummary) {
-            miniSummary.textContent = text;
-            miniSummary.classList.toggle("d-none", !text);
+        if (!OVERVIEW_MINI_DISPLAY_ONLY_CHART_IDS.has(sourceCanvasId)) {
+            const miniSummary = ensureScenarioSummaryEl(miniHost, sourceCanvasId, false);
+            if (miniSummary) {
+                miniSummary.textContent = text;
+                miniSummary.classList.toggle("d-none", !text);
+            }
+        } else {
+            miniHost?.querySelector(`[data-chart-scenario-summary='${sourceCanvasId}']`)?.remove();
         }
         if (state.expandedChart.sourceCanvasId === sourceCanvasId && state.expandedChart.containerEl) {
-            const expandedSummary = ensureScenarioSummaryEl(state.expandedChart.containerEl, sourceCanvasId, true);
-            if (expandedSummary) {
-                expandedSummary.textContent = text;
-                expandedSummary.classList.toggle("d-none", !text);
-            }
+            state.expandedChart.containerEl
+                .querySelector(`[data-expanded-scenario-summary='${sourceCanvasId}']`)
+                ?.remove();
         }
     }
 
@@ -11217,21 +11347,30 @@
         if (!actions || !canvasId) {
             return;
         }
+        if (isOverviewMiniChartActions(actions, canvasId)) {
+            cleanupOverviewMiniChartActions(actions, canvasId);
+            return;
+        }
         if (!actions.querySelector(`[data-chart-scenario-picker='${canvasId}']`)) {
             const options = resolveChartScenarioOptions(canvasId);
             if (!options.length) {
                 return;
             }
+            const expandedPicker = isExpandedChartActions(actions);
             const picker = document.createElement("div");
-            picker.className = "analytics-chart-scenario-picker";
+            picker.className = expandedPicker
+                ? "analytics-chart-scenario-picker analytics-chart-scenario-picker-expanded"
+                : "analytics-chart-scenario-picker";
             picker.setAttribute("data-chart-scenario-picker", canvasId);
             picker.innerHTML = `
                 <button type="button"
-                        class="btn btn-outline-dark analytics-chart-icon-btn analytics-chart-scenario-toggle"
+                        class="btn btn-outline-dark ${expandedPicker ? "analytics-chart-scenario-text-toggle" : "analytics-chart-icon-btn"} analytics-chart-scenario-toggle"
                         data-chart-scenario-toggle="${canvasId}"
                         title="Сценарии графика"
                         aria-label="Сценарии графика">
-                    <i class="bi bi-lightning-charge"></i>
+                    ${expandedPicker
+                        ? `<span data-chart-scenario-toggle-label="${canvasId}">${escapeHtml(chartScenarioToggleText(canvasId))}</span>`
+                        : '<i class="bi bi-lightning-charge"></i>'}
                 </button>
                 <div class="analytics-chart-scenario-popup d-none" data-chart-scenario-popup="${canvasId}">
                     <div class="analytics-chart-scenario-item">
@@ -11333,6 +11472,10 @@
             const sourceLabel = selectedScenario && !hasScenarioOverride ? "глобальный" : "локальный";
             toggle.title = selectedScenario ? `Сценарий графика (${sourceLabel}): ${selectedScenario.label}` : "Сценарии графика";
             toggle.setAttribute("aria-label", toggle.title);
+            const label = actions.querySelector(`[data-chart-scenario-toggle-label='${canvasId}']`);
+            if (label) {
+                label.textContent = chartScenarioToggleText(canvasId);
+            }
         }
         syncChartScenarioSummary(canvasId);
 
@@ -11384,6 +11527,10 @@
     }
 
     function ensureInlineCompareModeControl(actions, canvasId) {
+        if (isOverviewMiniChartActions(actions, canvasId)) {
+            cleanupOverviewMiniChartActions(actions, canvasId);
+            return;
+        }
         let select = actions.querySelector(`[data-inline-compare-mode='${canvasId}']`);
         if (!select) {
             select = document.createElement("select");
@@ -11448,6 +11595,10 @@
     }
 
     function ensureInlineComparePresetControl(actions, canvasId) {
+        if (isOverviewMiniChartActions(actions, canvasId)) {
+            cleanupOverviewMiniChartActions(actions, canvasId);
+            return;
+        }
         const existing = actions.querySelector(`[data-inline-compare-preset='${canvasId}']`);
         const existingReset = actions.querySelector(`[data-inline-compare-reset='${canvasId}']`);
         existing?.remove();
@@ -12412,6 +12563,48 @@
         return "overview";
     }
 
+    function isOverviewMiniChartCanvas(canvasOrId) {
+        const canvas = typeof canvasOrId === "string"
+            ? document.getElementById(canvasOrId)
+            : canvasOrId;
+        const canvasId = String(canvas?.id || canvasOrId || "").trim();
+        if (!OVERVIEW_MINI_DISPLAY_ONLY_CHART_IDS.has(canvasId)) {
+            return false;
+        }
+        const wrap = canvas?.closest?.(".analytics-chart-wrap");
+        const viewHost = wrap?.closest?.("[data-analytics-view]");
+        return viewHost?.getAttribute("data-analytics-view") === "overview"
+            && !wrap?.closest?.(".analytics-expanded-graph");
+    }
+
+    function isOverviewMiniChartActions(actions, canvasId) {
+        const wrap = actions?.closest?.(".analytics-chart-wrap");
+        if (!wrap || wrap.classList.contains("analytics-chart-wrap-expanded") || wrap.classList.contains("analytics-expanded-block")) {
+            return false;
+        }
+        const canvas = wrap.querySelector("canvas[id^='chart-']");
+        return canvas?.id === canvasId && isOverviewMiniChartCanvas(canvas);
+    }
+
+    function cleanupOverviewMiniChartActions(actions, canvasId) {
+        if (!actions || !canvasId) {
+            return;
+        }
+        actions.querySelector(`[data-chart-scenario-picker='${canvasId}']`)?.remove();
+        actions.querySelector(`[data-inline-compare-mode='${canvasId}']`)?.remove();
+        actions.querySelector(`[data-inline-compare-mode-dropdown='${canvasId}']`)?.remove();
+        actions.querySelector(`[data-inline-compare-preset='${canvasId}']`)?.remove();
+        actions.querySelector(`[data-inline-compare-reset='${canvasId}']`)?.remove();
+    }
+
+    function isExpandedChartActions(actions) {
+        return !!actions?.closest?.(".analytics-chart-wrap-expanded, .analytics-expanded-block");
+    }
+
+    function isTimeRangeSelectableExpandedChart(canvasId) {
+        return EXPANDED_TIME_RANGE_SELECTABLE_CHART_IDS.has(String(canvasId || "").trim());
+    }
+
     function getOpenedExpandedMetricsHost() {
         const sourceCanvasId = state.expandedChart.sourceCanvasId || "";
         if (!isStageMetricPrimaryCanvas(sourceCanvasId) && !isStageMetricCompareCanvas(sourceCanvasId)) {
@@ -12972,6 +13165,285 @@
         return 100;
     }
 
+    function attachAnalyticsTimePoints(config, sourceTimePoints, sampled) {
+        const indexes = Array.isArray(sampled?.indexes) ? sampled.indexes : [];
+        const points = Array.isArray(sourceTimePoints) ? sourceTimePoints : [];
+        config.__analyticsTimePoints = indexes
+            .map((index) => points[index])
+            .filter(Boolean);
+        return config;
+    }
+
+    function ensureActiveAnalysisIntervalChip() {
+        const existing = refs.analyticsPage?.querySelector("[data-active-analysis-interval-chip]");
+        const interval = state.activeAnalysisInterval;
+        if (!refs.analyticsPage || !interval?.from || !interval?.to) {
+            existing?.remove();
+            syncExpandedIntervalCancelButtons();
+            return;
+        }
+        const text = `Интервал анализа: ${formatComparePeriodTime(interval.from)} — ${formatComparePeriodTime(interval.to)}`;
+        let chip = existing;
+        if (!chip) {
+            chip = document.createElement("div");
+            chip.className = "analytics-active-interval-chip";
+            chip.setAttribute("data-active-analysis-interval-chip", "1");
+            chip.innerHTML = `
+                <span data-active-analysis-interval-text></span>
+                <button type="button" class="analytics-active-interval-reset" data-active-analysis-interval-reset aria-label="Сбросить интервал анализа">×</button>
+            `;
+            const anchor = refs.analyticsPage.querySelector("[data-analytics-view='overview']");
+            refs.analyticsPage.insertBefore(chip, anchor || refs.analyticsPage.firstChild);
+            chip.querySelector("[data-active-analysis-interval-reset]")?.addEventListener("click", () => {
+                void resetActiveAnalysisInterval();
+            });
+        }
+        const textEl = chip.querySelector("[data-active-analysis-interval-text]");
+        if (textEl) {
+            textEl.textContent = text;
+        }
+        syncExpandedIntervalCancelButtons();
+    }
+
+    async function resetActiveAnalysisInterval() {
+        const current = state.activeAnalysisInterval;
+        if (!current) {
+            syncExpandedIntervalCancelButtons();
+            return;
+        }
+        if (refs.from) refs.from.value = current.fromBefore || "";
+        if (refs.to) refs.to.value = current.toBefore || "";
+        state.activeAnalysisInterval = null;
+        Object.keys(state.expandedIntervalSelectionBySource || {}).forEach((canvasId) => {
+            clearExpandedIntervalSelection(canvasId);
+        });
+        ensureActiveAnalysisIntervalChip();
+        syncExpandedIntervalCancelButtons();
+        await submitMainFiltersPreservingExpandedUiState();
+    }
+
+    async function submitMainFiltersPreservingExpandedUiState() {
+        if (typeof state.submitMainFilters !== "function") {
+            return;
+        }
+        const previous = !!state.preserveChartUiStateDuringMainSubmit;
+        state.preserveChartUiStateDuringMainSubmit = true;
+        try {
+            await state.submitMainFilters();
+        } finally {
+            state.preserveChartUiStateDuringMainSubmit = previous;
+        }
+    }
+
+    function clearExpandedIntervalSelection(canvasId) {
+        delete state.expandedIntervalSelectionBySource[canvasId];
+        const container = state.expandedChart.sourceCanvasId === canvasId ? state.expandedChart.containerEl : null;
+        container?.querySelector("[data-expanded-interval-selection]")?.classList.add("d-none");
+        container?.querySelector("[data-expanded-interval-panel]")?.classList.add("d-none");
+    }
+
+    function syncExpandedIntervalSelectionButton(canvasId) {
+        const enabled = !!state.expandedIntervalSelectionEnabledBySource[canvasId];
+        state.expandedChart.containerEl
+            ?.querySelector(`[data-expanded-interval-toggle='${canvasId}']`)
+            ?.classList.toggle("active", enabled);
+    }
+
+    function syncExpandedIntervalCancelButtons() {
+        const hasActiveInterval = !!state.activeAnalysisInterval?.from && !!state.activeAnalysisInterval?.to;
+        document
+            .querySelectorAll("[data-active-analysis-interval-cancel]")
+            .forEach((button) => button.classList.toggle("d-none", !hasActiveInterval));
+    }
+
+    function readExpandedChartTimePoints(chart) {
+        const configPoints = Array.isArray(chart?.config?._config?.__analyticsTimePoints)
+            ? chart.config._config.__analyticsTimePoints
+            : (Array.isArray(chart?.config?.__analyticsTimePoints) ? chart.config.__analyticsTimePoints : []);
+        if (configPoints.length) {
+            return configPoints;
+        }
+        const labels = Array.isArray(chart?.data?.labels) ? chart.data.labels : [];
+        const canvasId = state.expandedChart.sourceCanvasId || "";
+        const ranges = state.expandedRangesBySource?.[canvasId] || {};
+        const fromRaw = ranges.afterFrom || refs.from?.value || "";
+        const toRaw = ranges.afterTo || refs.to?.value || "";
+        const fromMs = new Date(fromRaw).getTime();
+        const toMs = new Date(toRaw).getTime();
+        if (labels.length > 1 && Number.isFinite(fromMs) && Number.isFinite(toMs) && fromMs < toMs) {
+            const step = (toMs - fromMs) / (labels.length - 1);
+            return labels.map((_, index) => new Date(fromMs + step * index).toISOString());
+        }
+        return labels;
+    }
+
+    function selectedIntervalFromPixels(chart, startX, endX) {
+        const points = readExpandedChartTimePoints(chart);
+        const area = chart?.chartArea;
+        if (!area || points.length < 2) {
+            return null;
+        }
+        const minX = Math.max(area.left, Math.min(startX, endX));
+        const maxX = Math.min(area.right, Math.max(startX, endX));
+        if (maxX - minX < 8) {
+            return null;
+        }
+        const toIndex = (x) => {
+            const ratio = (x - area.left) / Math.max(1, area.right - area.left);
+            return Math.max(0, Math.min(points.length - 1, Math.round(ratio * (points.length - 1))));
+        };
+        const leftIndex = toIndex(minX);
+        const rightIndex = toIndex(maxX);
+        if (leftIndex === rightIndex) {
+            return null;
+        }
+        const fromDate = new Date(points[Math.min(leftIndex, rightIndex)]);
+        const toDate = new Date(points[Math.max(leftIndex, rightIndex)]);
+        if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime()) || fromDate >= toDate) {
+            return null;
+        }
+        return {
+            from: toDateTimeLocalString(fromDate),
+            to: toDateTimeLocalString(toDate)
+        };
+    }
+
+    function setupExpandedIntervalSelection(container, canvasId) {
+        if (!container || !isTimeRangeSelectableExpandedChart(canvasId)) {
+            return;
+        }
+        const actions = container.querySelector("[data-expanded-actions]");
+        if (actions && !actions.querySelector(`[data-expanded-interval-toggle='${canvasId}']`)) {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "btn btn-outline-dark analytics-chart-icon-btn analytics-expanded-interval-toggle";
+            button.setAttribute("data-expanded-interval-toggle", canvasId);
+            button.title = "Режим выбора интервала";
+            button.setAttribute("aria-label", "Режим выбора интервала");
+            button.innerHTML = '<i class="bi bi-arrows-collapse"></i>';
+            button.addEventListener("click", () => {
+                const next = !state.expandedIntervalSelectionEnabledBySource[canvasId];
+                state.expandedIntervalSelectionEnabledBySource[canvasId] = next;
+                if (!next) {
+                    clearExpandedIntervalSelection(canvasId);
+                }
+                syncExpandedIntervalSelectionButton(canvasId);
+            });
+            const reset = actions.querySelector("[data-expanded-reset]");
+            actions.insertBefore(button, reset || actions.lastChild);
+            const cancelButton = document.createElement("button");
+            cancelButton.type = "button";
+            cancelButton.className = "btn btn-outline-dark btn-sm analytics-expanded-interval-cancel d-none";
+            cancelButton.setAttribute("data-active-analysis-interval-cancel", canvasId);
+            cancelButton.title = "Отменить применённый интервал";
+            cancelButton.setAttribute("aria-label", "Отменить применённый интервал");
+            cancelButton.textContent = "Отменить";
+            cancelButton.addEventListener("click", () => {
+                void resetActiveAnalysisInterval();
+            });
+            actions.insertBefore(cancelButton, reset || actions.lastChild);
+            syncExpandedIntervalCancelButtons();
+        }
+        const canvas = container.querySelector(`#chart-expanded-${canvasId}`);
+        const wrap = canvas?.closest(".analytics-chart-wrap-expanded");
+        if (!canvas || !wrap || wrap.dataset.intervalSelectionBound === "1") {
+            syncExpandedIntervalSelectionButton(canvasId);
+            syncExpandedIntervalCancelButtons();
+            return;
+        }
+        wrap.dataset.intervalSelectionBound = "1";
+        const overlay = document.createElement("div");
+        overlay.className = "analytics-expanded-interval-selection d-none";
+        overlay.setAttribute("data-expanded-interval-selection", canvasId);
+        wrap.appendChild(overlay);
+
+        let panel = container.querySelector(`[data-expanded-interval-panel='${canvasId}']`);
+        if (!panel) {
+            panel = document.createElement("div");
+            panel.className = "analytics-expanded-interval-panel d-none";
+            panel.setAttribute("data-expanded-interval-panel", canvasId);
+            panel.innerHTML = `
+                <span data-expanded-interval-label></span>
+                <button type="button" class="btn btn-dark btn-sm" data-expanded-interval-apply>Применить</button>
+                <button type="button" class="btn btn-outline-dark btn-sm" data-expanded-interval-clear>Сбросить</button>
+            `;
+            wrap.appendChild(panel);
+            panel.querySelector("[data-expanded-interval-clear]")?.addEventListener("click", () => clearExpandedIntervalSelection(canvasId));
+            panel.querySelector("[data-expanded-interval-apply]")?.addEventListener("click", async () => {
+                const selection = state.expandedIntervalSelectionBySource[canvasId];
+                if (!selection?.from || !selection?.to) {
+                    return;
+                }
+                state.activeAnalysisInterval = {
+                    fromBefore: refs.from?.value || "",
+                    toBefore: refs.to?.value || "",
+                    from: selection.from,
+                    to: selection.to,
+                    sourceCanvasId: canvasId
+                };
+                if (refs.from) refs.from.value = selection.from;
+                if (refs.to) refs.to.value = selection.to;
+                state.expandedRangesBySource[canvasId] = normalizeCompareRangesByAfter(selection.from, selection.to, "", "");
+                clearExpandedIntervalSelection(canvasId);
+                ensureActiveAnalysisIntervalChip();
+                syncExpandedIntervalCancelButtons();
+                await submitMainFiltersPreservingExpandedUiState();
+            });
+        }
+
+        let startX = 0;
+        let dragging = false;
+        const updateOverlay = (leftX, rightX) => {
+            const chart = state.expandedChart.instance;
+            const area = chart?.chartArea;
+            if (!area) return;
+            const minX = Math.max(area.left, Math.min(leftX, rightX));
+            const maxX = Math.min(area.right, Math.max(leftX, rightX));
+            const wrapRect = wrap.getBoundingClientRect();
+            const canvasRect = canvas.getBoundingClientRect();
+            const offsetLeft = canvasRect.left - wrapRect.left;
+            const offsetTop = canvasRect.top - wrapRect.top;
+            overlay.style.left = `${offsetLeft + minX}px`;
+            overlay.style.top = `${offsetTop + area.top}px`;
+            overlay.style.width = `${Math.max(0, maxX - minX)}px`;
+            overlay.style.height = `${Math.max(0, area.bottom - area.top)}px`;
+            overlay.classList.remove("d-none");
+        };
+        const localX = (event) => event.clientX - canvas.getBoundingClientRect().left;
+        canvas.addEventListener("mousedown", (event) => {
+            if (!state.expandedIntervalSelectionEnabledBySource[canvasId]) return;
+            const chart = state.expandedChart.instance;
+            const area = chart?.chartArea;
+            const x = localX(event);
+            if (!area || x < area.left || x > area.right) return;
+            event.preventDefault();
+            dragging = true;
+            startX = x;
+            updateOverlay(startX, startX);
+        });
+        window.addEventListener("mousemove", (event) => {
+            if (!dragging) return;
+            updateOverlay(startX, localX(event));
+        });
+        window.addEventListener("mouseup", (event) => {
+            if (!dragging) return;
+            dragging = false;
+            const selection = selectedIntervalFromPixels(state.expandedChart.instance, startX, localX(event));
+            if (!selection) {
+                clearExpandedIntervalSelection(canvasId);
+                return;
+            }
+            state.expandedIntervalSelectionBySource[canvasId] = selection;
+            const label = panel.querySelector("[data-expanded-interval-label]");
+            if (label) {
+                label.textContent = `Интервал: ${formatComparePeriodTime(selection.from)} — ${formatComparePeriodTime(selection.to)}`;
+            }
+            panel.classList.remove("d-none");
+        });
+        syncExpandedIntervalSelectionButton(canvasId);
+        syncExpandedIntervalCancelButtons();
+    }
+
     function setupExpandedGraphControls(container, canvasId) {
         if (!container || container.querySelector(".analytics-expanded-graph-controls")) {
             return;
@@ -12989,13 +13461,20 @@
         const selectedLatencyMetric = getExpandedLatencyMetricMode(canvasId);
         const selectedStageLatencyEventMetric = getExpandedStageLatencyEventMetricMode(canvasId);
         const availableEventOptions = getExpandedEventOptions(canvasId);
+        const expandedEventToggleText = () => {
+            const count = Array.isArray(eventFilterState.codes) ? eventFilterState.codes.length : 0;
+            if (eventFilterState.includeOverall || count === 0) {
+                return "События: все";
+            }
+            return `События (${count})`;
+        };
         const eventOptionsHtml = availableEventOptions
             .map((item) => `<option value="${escapeHtml(item.code)}" ${eventFilterState.codes.includes(item.code) ? "selected" : ""}>${escapeHtml(item.name || item.code)}</option>`)
             .join("");
         const eventFilterHtml = supportsExpandedEventFilter ? `
                     <div class="analytics-expanded-events-inline">
                         <button type="button" class="btn btn-outline-dark btn-sm analytics-expanded-events-toggle" data-event-popup-toggle>
-                            События
+                            ${escapeHtml(expandedEventToggleText())}
                         </button>
                         ${singleEventSelectMode ? `
                         <label class="form-check mb-0 analytics-expanded-events-overall-inline">
@@ -13031,36 +13510,37 @@
                 <div class="analytics-expanded-toolbar-left" data-expanded-toolbar-left>
                     ${eventFilterHtml}
                     <div class="analytics-expanded-range-group" data-expanded-quick-group>
-                        <span class="analytics-expanded-range-label">Пресет</span>
                         <select class="form-select form-select-sm analytics-expanded-quick-preset" data-expanded-preset aria-label="Быстрый период графика">
                             ${buildQuickRangeOptionsHtml(quickPresetValue)}
                         </select>
                     </div>
                     <div class="analytics-expanded-range-group ${isCompareEnabled ? "d-none" : ""}" data-after-group>
-                        <span class="analytics-expanded-range-label">Период</span>
-                        <input type="datetime-local" class="form-control form-control-sm" data-range="after-from" value="${escapeHtml(defaults.afterFrom)}">
-                        <input type="datetime-local" class="form-control form-control-sm" data-range="after-to" value="${escapeHtml(defaults.afterTo)}">
+                        <input type="datetime-local" class="form-control form-control-sm analytics-expanded-date-input" data-range="after-from" value="${escapeHtml(defaults.afterFrom)}" aria-label="Период с">
+                        <input type="datetime-local" class="form-control form-control-sm analytics-expanded-date-input" data-range="after-to" value="${escapeHtml(defaults.afterTo)}" aria-label="Период по">
                     </div>
                 </div>
                 <div class="analytics-expanded-actions" data-expanded-actions>
                     ${supportsLatencyMetricSelect ? `
-                    <select class="form-select form-select-sm analytics-expanded-latency-metric ${showLatencyMetricSelect ? "" : "d-none"}" data-expanded-latency-metric ${selectedEventCount <= 1 ? "disabled" : ""}>
+                    <select class="form-select form-select-sm analytics-expanded-latency-metric ${showLatencyMetricSelect ? "" : "d-none"}" data-expanded-latency-metric ${selectedEventCount <= 1 ? "disabled" : ""} aria-label="Метрика latency">
                         <option value="avg" ${selectedLatencyMetric === "avg" ? "selected" : ""}>AVG</option>
                         <option value="p95" ${selectedLatencyMetric === "p95" ? "selected" : ""}>P95</option>
                         <option value="p99" ${selectedLatencyMetric === "p99" ? "selected" : ""}>P99</option>
                     </select>
                     ` : ""}
                     ${supportsStageLatencyEventMetricSelect ? `
-                    <select class="form-select form-select-sm analytics-expanded-stage-latency-event-metric ${showStageLatencyEventMetricSelect ? "" : "d-none"}" data-expanded-stage-latency-event-metric>
-                        <option value="avg" ${selectedStageLatencyEventMetric === "avg" ? "selected" : ""}>AVG (события)</option>
-                        <option value="p95" ${selectedStageLatencyEventMetric === "p95" ? "selected" : ""}>P95 (события)</option>
+                    <select class="form-select form-select-sm analytics-expanded-stage-latency-event-metric ${showStageLatencyEventMetricSelect ? "" : "d-none"}" data-expanded-stage-latency-event-metric aria-label="Метрика событий по слоям">
+                        <option value="avg" ${selectedStageLatencyEventMetric === "avg" ? "selected" : ""}>AVG</option>
+                        <option value="p95" ${selectedStageLatencyEventMetric === "p95" ? "selected" : ""}>P95</option>
                     </select>
                     ` : ""}
-                    <select class="form-select form-select-sm analytics-inline-bucket" data-expanded-bucket>
+                    <label class="analytics-expanded-compare-field">
+                        <span>&#1057;&#1088;&#1072;&#1074;&#1085;&#1077;&#1085;&#1080;&#1077;</span>
+                        <select class="form-select form-select-sm analytics-inline-compare-mode" data-expanded-compare-mode>
+                            ${INLINE_COMPARE_MODE_OPTIONS.map((item) => `<option value="${item.value}" ${item.value === compareModeResolved ? "selected" : ""}>${item.label}</option>`).join("")}
+                        </select>
+                    </label>
+                    <select class="form-select form-select-sm analytics-inline-bucket" data-expanded-bucket aria-label="Bucket">
                         ${bucketOptionsHtml}
-                    </select>
-                    <select class="form-select form-select-sm analytics-inline-compare-mode" data-expanded-compare-mode>
-                        ${INLINE_COMPARE_MODE_OPTIONS.map((item) => `<option value="${item.value}" ${item.value === compareModeResolved ? "selected" : ""}>${item.value === compareModeResolved ? "вњ“ " : ""}${item.label}</option>`).join("")}
                     </select>
                     <button type="button" class="btn btn-outline-dark analytics-chart-icon-btn d-none" data-expanded-reset title="Сбросить к верхнему фильтру" aria-label="Сбросить к верхнему фильтру">
                         <i class="bi bi-arrow-counterclockwise"></i>
@@ -13071,8 +13551,8 @@
                 <div class="small text-muted" data-expanded-before-summary></div>
                 <div class="analytics-expanded-range-group" data-after-compare-group>
                     <span class="analytics-expanded-range-label">После</span>
-                    <input type="datetime-local" class="form-control form-control-sm" data-range="after-from-compare" value="${escapeHtml(defaults.afterFrom)}">
-                    <input type="datetime-local" class="form-control form-control-sm" data-range="after-to-compare" value="${escapeHtml(defaults.afterTo)}">
+                    <input type="datetime-local" class="form-control form-control-sm analytics-expanded-date-input" data-range="after-from-compare" value="${escapeHtml(defaults.afterFrom)}" aria-label="После с">
+                    <input type="datetime-local" class="form-control form-control-sm analytics-expanded-date-input" data-range="after-to-compare" value="${escapeHtml(defaults.afterTo)}" aria-label="После по">
                 </div>
             </div>
         `;
@@ -13085,6 +13565,15 @@
         const compareModeEl = controls.querySelector("[data-expanded-compare-mode]");
         const actionsEl = controls.querySelector(".analytics-expanded-actions");
         ensureChartScenarioPicker(actionsEl, canvasId);
+        const scenarioPickerEl = actionsEl?.querySelector(`[data-chart-scenario-picker='${canvasId}']`);
+        if (scenarioPickerEl && resetEl) {
+            actionsEl.insertBefore(scenarioPickerEl, resetEl);
+        }
+        const closeButtonEl = container.querySelector(".analytics-expanded-close-btn");
+        if (closeButtonEl && actionsEl) {
+            actionsEl.appendChild(closeButtonEl);
+        }
+        setupExpandedIntervalSelection(container, canvasId);
         const toolbarLeft = controls.querySelector("[data-expanded-toolbar-left]");
         const rangesRow = controls.querySelector("[data-expanded-ranges-row]");
         const beforeSummaryEl = controls.querySelector("[data-expanded-before-summary]");
@@ -13104,6 +13593,11 @@
         const latencyMetricEl = controls.querySelector("[data-expanded-latency-metric]");
         const stageLatencyEventMetricEl = controls.querySelector("[data-expanded-stage-latency-event-metric]");
         let applyTimerId = null;
+        const syncExpandedEventToggleLabel = () => {
+            if (popupToggleEl) {
+                popupToggleEl.textContent = expandedEventToggleText();
+            }
+        };
         const isCompareMode = () => resolveExpandedCompareMode(canvasId) !== "off";
         const readRangesFromUi = () => {
             if (isCompareMode()) {
@@ -13178,6 +13672,7 @@
                     ];
                     syncMultiSelectValues(eventCodesEl, selectedNormalized);
                 }
+                syncExpandedEventToggleLabel();
             } catch (error) {
                 console.error("Expanded events options load failed", error);
             }
@@ -13246,6 +13741,7 @@
         syncResetVisibility();
         syncLatencyMetricVisibility();
         syncStageLatencyMetricVisibility();
+        syncExpandedEventToggleLabel();
         syncDateMode();
         syncInlineCompareModeSelectValues(canvasId);
         syncInlineCompareModeResetVisibility(canvasId);
@@ -13282,6 +13778,7 @@
                 }
                 syncLatencyMetricVisibility();
                 syncStageLatencyMetricVisibility();
+                syncExpandedEventToggleLabel();
                 const ranges = readRangesFromUi();
                 if (!isValidExpandedRanges(ranges)) {
                     return;
@@ -14009,6 +14506,7 @@
         }
         const data = await fetchJson(`${api("/overview")}?${params.toString()}`);
         const labels = (data.series || []).map((point) => formatTime(point.time));
+        const timePoints = (data.series || []).map((point) => point.time || "");
         const countSeries = (data.series || []).map((point) => point.count || 0);
         const avgSeries = (data.series || []).map((point) => point.avgMs || 0);
         const p95Series = (data.series || []).map((point) => point.p95Ms || 0);
@@ -14036,7 +14534,8 @@
                         pointRadius: 1.5
                     }]
                 },
-                options: baseChartOptions("Количество")
+                options: baseChartOptions("Количество"),
+                __analyticsTimePoints: sampled.indexes.map((index) => timePoints[index]).filter(Boolean)
             };
         }
         if (canvasId === "chart-latency") {
@@ -14047,6 +14546,7 @@
                     eventParams.set("eventTypeCode", singleCode);
                     const payload = await fetchJson(`${api("/overview")}?${eventParams.toString()}`);
                     const singleLabels = (payload?.series || []).map((point) => formatTime(point.time));
+                    const singleTimePoints = (payload?.series || []).map((point) => point.time || "");
                     const singleAvg = (payload?.series || []).map((point) => point.avgMs || 0);
                     const singleP95 = (payload?.series || []).map((point) => point.p95Ms || 0);
                     const singleP99 = (payload?.series || []).map((point) => point.p99Ms || 0);
@@ -14062,7 +14562,8 @@
                                 {label: `${singleName}: P99`, data: sampledSingle.datasets[2] || [], borderColor: colors.amber, backgroundColor: "rgba(180,83,9,0.16)", tension: 0.25, pointRadius: 1.2}
                             ]
                         },
-                        options: baseChartOptions("ms")
+                        options: baseChartOptions("ms"),
+                        __analyticsTimePoints: sampledSingle.indexes.map((index) => singleTimePoints[index]).filter(Boolean)
                     };
                 }
                 return await buildExpandedEventSeriesChartConfig(params, options.eventCodes, "latency", labelSuffix, {
@@ -14082,7 +14583,8 @@
                         {label: withSuffix("P99"), data: sampled.datasets[2] || [], borderColor: colors.amber, backgroundColor: "rgba(180,83,9,0.16)", tension: 0.25, pointRadius: 1.2}
                     ]
                 },
-                options: baseChartOptions("ms")
+                options: baseChartOptions("ms"),
+                __analyticsTimePoints: sampled.indexes.map((index) => timePoints[index]).filter(Boolean)
             };
         }
         if (canvasId === "chart-error-rate") {
@@ -14107,7 +14609,8 @@
                         pointRadius: 1.2
                     }]
                 },
-                options: baseChartOptions("%")
+                options: baseChartOptions("%"),
+                __analyticsTimePoints: sampled.indexes.map((index) => timePoints[index]).filter(Boolean)
             };
         }
         return buildEventKpiSingleChartConfig(buildEventKpiRows(data.eventBreakdown || []), {
@@ -14132,6 +14635,7 @@
             return {code, payload};
         }));
         const labelsRaw = (responses[0]?.payload?.series || []).map((point) => formatTime(point.time));
+        const timePointsRaw = (responses[0]?.payload?.series || []).map((point) => point.time || "");
         const colorByCode = buildDistinctEventColors(selectedCodes);
         const datasetsRaw = responses.map(({code, payload}, index) => {
             const points = payload?.series || [];
@@ -14185,7 +14689,8 @@
                 labels: sampled.labels,
                 datasets
             },
-            options: baseChartOptions(mode === "error" ? "%" : (mode === "latency" ? "P95, ms" : "Количество"))
+            options: baseChartOptions(mode === "error" ? "%" : (mode === "latency" ? "P95, ms" : "Количество")),
+            __analyticsTimePoints: sampled.indexes.map((index) => timePointsRaw[index]).filter(Boolean)
         };
     }
 
@@ -14923,7 +15428,8 @@
         if (safeLabels.length <= maxPoints || maxPoints <= 0) {
             return {
                 labels: safeLabels,
-                datasets: safeSeries
+                datasets: safeSeries,
+                indexes: safeLabels.map((_, index) => index)
             };
         }
 
@@ -14940,7 +15446,8 @@
 
         return {
             labels: indexes.map((index) => safeLabels[index]),
-            datasets: safeSeries.map((series) => indexes.map((index) => toNumber(series[index])))
+            datasets: safeSeries.map((series) => indexes.map((index) => toNumber(series[index]))),
+            indexes
         };
     }
 

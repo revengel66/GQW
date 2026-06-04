@@ -18,7 +18,10 @@ public class AnalyticsDictionaryController {
     }
 
     @GetMapping
-    public DictionariesResponse dictionaries(@RequestParam(required = false) String moduleCode) {
-        return analyticsInsightsService.dictionaries(moduleCode);
+    public DictionariesResponse dictionaries(
+        @RequestParam(required = false) String moduleCode,
+        @RequestParam(required = false, defaultValue = "false") Boolean systemEventsOnly
+    ) {
+        return analyticsInsightsService.dictionaries(moduleCode, Boolean.TRUE.equals(systemEventsOnly));
     }
 }

@@ -27,7 +27,8 @@ public class AnalyticsFilterOptionsController {
         @RequestParam(required = false) String moduleCode,
         @RequestParam(required = false) String eventTypeCode,
         @RequestParam(required = false) String requestPath,
-        @RequestParam(required = false) String attributeCode
+        @RequestParam(required = false) String attributeCode,
+        @RequestParam(required = false, defaultValue = "false") Boolean systemEventsOnly
     ) {
         AnalyticsTimeRangeResolver.TimeRange range = AnalyticsTimeRangeResolver.resolveRange(from, to, Duration.ofHours(24));
         return analyticsInsightsService.filterOptions(
@@ -36,7 +37,8 @@ public class AnalyticsFilterOptionsController {
             moduleCode,
             eventTypeCode,
             requestPath,
-            attributeCode
+            attributeCode,
+            Boolean.TRUE.equals(systemEventsOnly)
         );
     }
 }

@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.gqw.analytics.repository.AnalyticsEventRepository;
+import com.example.gqw.analytics.service.AnalyticsEventService;
 import com.example.gqw.shop.entity.ShopUser;
 import com.example.gqw.shop.repository.ShopUserRepository;
 import java.time.Instant;
@@ -35,6 +36,9 @@ class AnalyticsIntegrationTest {
 
     @Autowired
     private AnalyticsEventRepository analyticsEventRepository;
+
+    @Autowired
+    private AnalyticsEventService analyticsEventService;
 
     @Autowired
     private ShopUserRepository shopUserRepository;
@@ -117,32 +121,18 @@ class AnalyticsIntegrationTest {
     }
 
     @Test
-    void analyticsEventsEndpointReturnsCreatedFrontendEvent() throws Exception {
+    void analyticsEventsEndpointScopesSystemEventsAndDetailsRemainAddressable() throws Exception {
         MockHttpSession adminSession = loginAs("analytics_admin_events", true);
 
-        String payload = """
-            {
-              "events": [
-                {
-                  "code": "FRONTEND_JS_ERROR",
-                  "pagePath": "/product/laptop",
-                  "requestPath": "/product/laptop",
-                  "httpMethod": "GET",
-                  "traceId": "trace-integration-2",
-                  "statusCode": 500,
-                  "error": true,
-                  "errorMessage": "Frontend crash"
-                }
-              ]
-            }
-            """;
-
-        mockMvc.perform(
-                post("/api/analytics/frontend/ingest")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(payload)
-            )
-            .andExpect(status().isAccepted());
+        var event = analyticsEventService.createEvent(
+            "FRONTEND_JS_ERROR",
+            null,
+            null,
+            "/product/laptop",
+            "GET",
+            "trace-integration-2"
+        );
+        analyticsEventService.finishEventError(event.getEventUid(), 500, "Frontend crash");
 
         Instant now = Instant.now();
         String from = now.minus(1, ChronoUnit.DAYS).toString();
@@ -153,11 +143,45 @@ class AnalyticsIntegrationTest {
                     .session(adminSession)
                     .param("from", from)
                     .param("to", to)
+                    .param("eventTypeCode", "FRONTEND_JS_ERROR")
+                    .accept(MediaType.APPLICATION_JSON)
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.total").value(0));
+
+        mockMvc.perform(
+                get("/analytics/api/events")
+                    .session(adminSession)
+                    .param("from", from)
+                    .param("to", to)
+                    .param("eventTypeCode", "FRONTEND_JS_ERROR")
+                    .param("systemEventsOnly", "true")
                     .accept(MediaType.APPLICATION_JSON)
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.total", greaterThan(0)))
             .andExpect(content().string(containsString("\"items\"")));
+
+        String uid = analyticsEventRepository.findAllByRangeOrdered(
+                now.minus(1, ChronoUnit.DAYS),
+                now.plus(1, ChronoUnit.HOURS),
+                "FRONTEND_JS_ERROR",
+                null
+            )
+            .stream()
+            .filter(item -> "trace-integration-2".equals(item.getTraceId()))
+            .findFirst()
+            .orElseThrow()
+            .getEventUid()
+            .toString();
+
+        mockMvc.perform(
+                get("/analytics/api/events/{eventUid}", uid)
+                    .session(adminSession)
+                    .accept(MediaType.APPLICATION_JSON)
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.eventUid").value(uid));
     }
 
     private MockHttpSession loginAs(String username, boolean admin) throws Exception {

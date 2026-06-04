@@ -59,6 +59,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -115,13 +117,22 @@ public class AnalyticsInsightsService {
     }
 
     public DictionariesResponse dictionaries(String moduleCode) {
+        return dictionaries(moduleCode, false);
+    }
+
+    public DictionariesResponse dictionaries(String moduleCode, boolean systemEventsOnly) {
         String normalizedModuleCode = normalizeModuleFilterCode(moduleCode);
         List<OptionDto> modules = moduleTypeRepository.findByIsActiveTrueOrderByNameAsc().stream()
             .map(type -> new OptionDto(type.getCode(), type.getName()))
             .toList();
-        List<OptionDto> eventTypes = (normalizedModuleCode == null
-            ? eventTypeRepository.findByIsActiveTrueAndIsSystemFalseOrderByNameAsc()
-            : eventTypeRepository.findByIsActiveTrueAndModuleCodeAndIsSystemFalseOrderByNameAsc(normalizedModuleCode)).stream()
+        List<EventType> eventTypeSource = systemEventsOnly
+            ? eventTypeRepository.findByIsSystemTrueOrderByCodeAsc()
+            : (normalizedModuleCode == null
+                ? eventTypeRepository.findByIsActiveTrueAndIsSystemFalseOrderByNameAsc()
+                : eventTypeRepository.findByIsActiveTrueAndModuleCodeAndIsSystemFalseOrderByNameAsc(normalizedModuleCode));
+        List<OptionDto> eventTypes = eventTypeSource.stream()
+            .filter(type -> normalizedModuleCode == null || normalizedModuleCode.equalsIgnoreCase(type.getModuleCode()))
+            .filter(type -> systemEventsOnly || Boolean.TRUE.equals(type.getIsActive()))
             .map(type -> new OptionDto(type.getCode(), type.getName()))
             .toList();
         List<OptionDto> stageTypes = stageTypeRepository.findByIsActiveTrueOrderByNameAsc().stream()
@@ -148,13 +159,25 @@ public class AnalyticsInsightsService {
         String requestPath,
         String attributeCode
     ) {
+        return filterOptions(from, to, moduleCode, eventTypeCode, requestPath, attributeCode, false);
+    }
+
+    public FilterOptionsResponse filterOptions(
+        Instant from,
+        Instant to,
+        String moduleCode,
+        String eventTypeCode,
+        String requestPath,
+        String attributeCode,
+        boolean systemEventsOnly
+    ) {
         long serviceStarted = System.nanoTime();
         String normalizedModuleCode = normalizeModuleFilterCode(moduleCode);
         String normalizedEventType = normalizeCode(eventTypeCode);
         String normalizedRequestPath = normalizeText(requestPath);
         String normalizedAttributeCode = normalizeCode(attributeCode);
-        Set<String> hiddenSystemEventCodes = hiddenSystemEventTypeCodes();
-        if (normalizedEventType != null && hiddenSystemEventCodes.contains(normalizedEventType)) {
+        Set<String> scopedEventCodes = scopedEventTypeCodes(systemEventsOnly);
+        if (normalizedEventType != null && !scopedEventCodes.contains(normalizedEventType)) {
             normalizedEventType = null;
         }
 
@@ -170,7 +193,7 @@ public class AnalyticsInsightsService {
                 : eventRepository.findDistinctEventTypeCodesByScope(from, to, normalizedModuleCode, normalizedRequestPath));
         List<OptionDto> eventTypes = eventTypeCodes
             .stream()
-            .filter(code -> !hiddenSystemEventCodes.contains(normalizeCode(code)))
+            .filter(code -> scopedEventCodes.contains(normalizeCode(code)))
             .map(code -> new OptionDto(code, eventTypeNames.getOrDefault(code, code)))
             .toList();
 
@@ -247,6 +270,10 @@ public class AnalyticsInsightsService {
         String normalizedModuleCode = normalizeModuleFilterCode(moduleCode);
         String normalizedEventType = normalizeCode(eventTypeCode);
         String normalizedRequestPath = normalizeText(requestPath);
+        Set<String> visibleEventCodes = scopedEventTypeCodes(false);
+        if (normalizedEventType != null && !visibleEventCodes.contains(normalizedEventType)) {
+            normalizedEventType = "__NO_MATCH__";
+        }
         int resolvedBucket = resolveBucketMinutes(from, to, bucketMinutes);
 
         if (canUseTimeRollup(
@@ -260,7 +287,7 @@ public class AnalyticsInsightsService {
             filterAttributeMinValue,
             filterAttributeMaxValue
         )) {
-            Set<String> eventTypeFilter = normalizedEventType == null ? Set.of() : Set.of(normalizedEventType);
+            Set<String> eventTypeFilter = normalizedEventType == null ? nonEmptyEventTypeFilter(visibleEventCodes) : Set.of(normalizedEventType);
             List<AnalyticsTimeRollupService.AggregatePoint> points = timeRollupService.loadEventAggregatePoints(
                 from,
                 to,
@@ -299,6 +326,7 @@ public class AnalyticsInsightsService {
             eventRepository.findAllByRangeOrdered(from, to, normalizedEventType, normalizedModuleCode),
             normalizedRequestPath
         );
+        events = filterEventsByScope(events, false);
         events = filterEventsByMetric(events, filterMetricTypeCode, filterMetricValue, filterMetricMinValue, filterMetricMaxValue);
         events = filterEventsByAttribute(events, filterAttributeCode, filterAttributeValue, filterAttributeMinValue, filterAttributeMaxValue);
         KpiSnapshot totals = snapshotFromEvents(events);
@@ -356,6 +384,10 @@ public class AnalyticsInsightsService {
         String normalizedModuleCode = normalizeModuleFilterCode(moduleCode);
         String normalizedEventType = normalizeCode(eventTypeCode);
         String normalizedRequestPath = normalizeText(requestPath);
+        Set<String> visibleEventCodes = scopedEventTypeCodes(false);
+        if (normalizedEventType != null && !visibleEventCodes.contains(normalizedEventType)) {
+            normalizedEventType = "__NO_MATCH__";
+        }
         int resolvedBucket = resolveBucketMinutes(from, to, bucketMinutes);
 
         if (canUseTimeRollup(
@@ -369,7 +401,7 @@ public class AnalyticsInsightsService {
             filterAttributeMinValue,
             filterAttributeMaxValue
         )) {
-            Set<String> eventTypeFilter = normalizedEventType == null ? Set.of() : Set.of(normalizedEventType);
+            Set<String> eventTypeFilter = normalizedEventType == null ? nonEmptyEventTypeFilter(visibleEventCodes) : Set.of(normalizedEventType);
             List<AnalyticsTimeRollupService.AggregatePoint> points = timeRollupService.loadStageAggregatePoints(
                 from,
                 to,
@@ -428,6 +460,7 @@ public class AnalyticsInsightsService {
             eventRepository.findAllByRangeOrdered(from, to, normalizedEventType, normalizedModuleCode),
             normalizedRequestPath
         );
+        events = filterEventsByScope(events, false);
         events = filterEventsByMetric(events, filterMetricTypeCode, filterMetricValue, filterMetricMinValue, filterMetricMaxValue);
         events = filterEventsByAttribute(events, filterAttributeCode, filterAttributeValue, filterAttributeMinValue, filterAttributeMaxValue);
         if (events.isEmpty()) {
@@ -514,6 +547,10 @@ public class AnalyticsInsightsService {
         String normalizedRequestPath = normalizeText(requestPath);
         String normalizedStageType = normalizeCode(stageTypeCode);
         String normalizedMetricType = normalizeCode(metricTypeCode);
+        Set<String> visibleEventCodes = scopedEventTypeCodes(false);
+        if (normalizedEventType != null && !visibleEventCodes.contains(normalizedEventType)) {
+            normalizedEventType = "__NO_MATCH__";
+        }
         int resolvedBucket = resolveBucketMinutes(from, to, bucketMinutes);
 
         boolean hasAdditionalEventFilters = normalizeCode(filterMetricTypeCode) != null
@@ -527,7 +564,8 @@ public class AnalyticsInsightsService {
 
         boolean canUseStageMetricRollup = stageMetricRollupService.isEnabled()
             && normalizedRequestPath == null
-            && !hasAdditionalEventFilters;
+            && !hasAdditionalEventFilters
+            && normalizedEventType != null;
         if (canUseStageMetricRollup) {
             if (!includeSummaries && normalizedMetricType != null) {
                 long buildStarted = System.nanoTime();
@@ -933,6 +971,7 @@ public class AnalyticsInsightsService {
             eventRepository.findAllByRangeOrdered(from, to, normalizedEventType, normalizedModuleCode),
             normalizedRequestPath
         );
+        events = filterEventsByScope(events, false);
         events = filterEventsByMetric(events, filterMetricTypeCode, filterMetricValue, filterMetricMinValue, filterMetricMaxValue);
         events = filterEventsByAttribute(events, filterAttributeCode, filterAttributeValue, filterAttributeMinValue, filterAttributeMaxValue);
         long rawQueryMs = elapsedMs(rawQueryStarted);
@@ -1243,6 +1282,15 @@ public class AnalyticsInsightsService {
         String normalizedAttributeCode = normalizeCode(attributeCode);
         String normalizedAttributeValue = normalizeText(attributeValue);
         String normalizedStageType = normalizeCode(stageTypeCode);
+        Set<String> visibleEventCodes = scopedEventTypeCodes(false);
+        normalizedEventTypes = normalizedEventTypes.isEmpty()
+            ? nonEmptyEventTypeFilter(visibleEventCodes)
+            : normalizedEventTypes.stream()
+                .filter(visibleEventCodes::contains)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        if (normalizedEventTypes.isEmpty()) {
+            normalizedEventTypes = Set.of("__NO_MATCH__");
+        }
         int resolvedBucket = resolveBucketMinutes(from, to, bucketMinutes);
         boolean canUseRollup = canUseTimeRollup(
             normalizedRequestPath,
@@ -1445,11 +1493,10 @@ public class AnalyticsInsightsService {
             );
         long rawQueryMs = elapsedMs(rawQueryStarted);
         long javaFilterStarted = System.nanoTime();
-        if (!normalizedEventTypes.isEmpty()) {
-            events = events.stream()
-                .filter(event -> normalizedEventTypes.contains(normalizeCode(event.getEventTypeCode())))
-                .toList();
-        }
+        Set<String> effectiveEventTypes = normalizedEventTypes;
+        events = events.stream()
+            .filter(event -> effectiveEventTypes.contains(normalizeCode(event.getEventTypeCode())))
+            .toList();
         events = filterEventsByRequestPath(events, normalizedRequestPath);
         events = filterEventsByMetric(events, filterMetricTypeCode, filterMetricValue, filterMetricMinValue, filterMetricMaxValue);
         events = filterEventsByAttribute(events, filterAttributeCode, filterAttributeValue, filterAttributeMinValue, filterAttributeMaxValue);
@@ -1733,6 +1780,7 @@ public class AnalyticsInsightsService {
         BigDecimal metricMaxValue,
         String sortBy,
         String sortDir,
+        boolean systemEventsOnly,
         Integer page,
         Integer size
     ) {
@@ -1743,8 +1791,8 @@ public class AnalyticsInsightsService {
         String normalizedRequestPath = normalizeText(requestPath);
         String normalizedAttributeValue = normalizeText(attributeValue);
         String normalizedMetricType = normalizeCode(metricTypeCode);
-        String normalizedSortBy = normalizeText(sortBy);
-        String normalizedSortDir = normalizeText(sortDir);
+        String normalizedSortBy = normalizeEventSortBy(sortBy);
+        boolean sortAscending = "asc".equalsIgnoreCase(normalizeText(sortDir));
 
         int safePage = page == null || page < 0 ? 0 : page;
         int safeSize = size == null || size <= 0 ? DEFAULT_EVENT_PAGE_SIZE : Math.min(size, MAX_EVENT_PAGE_SIZE);
@@ -1752,64 +1800,32 @@ public class AnalyticsInsightsService {
         Integer safeMinDuration = minDurationMs != null && minDurationMs > 0 ? minDurationMs : null;
         BigDecimal safeMetricMin = metricMinValue;
         BigDecimal safeMetricMax = metricMaxValue;
-        List<AnalyticsEvent> candidates = eventRepository.findAllByRangeOrdered(from, to, normalizedEventType, normalizedModuleCode).stream()
-            .filter(event -> isError == null || Objects.equals(Boolean.TRUE.equals(event.getIsError()), isError))
-            .filter(event -> normalizedErrorClass == null || normalizedErrorClass.equals(ErrorClassClassifier.classifyFromEvent(event)))
-            .filter(event -> safeMinDuration == null || (event.getDurationMs() != null && event.getDurationMs() >= safeMinDuration))
-            .filter(event -> normalizedRequestPath == null || containsIgnoreCase(event.getRequestPath(), normalizedRequestPath))
-            .toList();
-
-        if (normalizedAttributeCode != null) {
-            List<Long> candidateIds = ids(candidates);
-            Map<Long, List<AnalyticsEventAttribute>> attributesByEventId = candidateIds.isEmpty()
-                ? Map.of()
-                : findAttributesByEventIds(candidateIds).stream()
-                    .collect(Collectors.groupingBy(AnalyticsEventAttribute::getEventId));
-
-            candidates = candidates.stream()
-                .filter(event -> attributesByEventId.getOrDefault(event.getId(), List.of()).stream().anyMatch(attribute ->
-                    normalizedAttributeCode.equals(attribute.getAttributeTypeCode())
-                        && (normalizedAttributeValue == null
-                        || containsIgnoreCase(eventAttributeValue(attribute), normalizedAttributeValue))
-                ))
-                .toList();
+        if (normalizedEventType != null && !eventTypeMatchesSystemScope(normalizedEventType, systemEventsOnly)) {
+            return new EventListResponse(0, safePage, safeSize, false, List.of());
         }
 
-        Map<Long, BigDecimal> metricSortValuesByEventId = Map.of();
-        if (hasMetricFilter(normalizedMetricType, safeMetricMin, safeMetricMax)) {
-            List<Long> candidateIds = ids(candidates);
-            List<AnalyticsStage> candidateStages = findStagesByEventIds(candidateIds);
-            Map<Long, Long> stageToEventId = candidateStages.stream()
-                .collect(Collectors.toMap(
-                    AnalyticsStage::getId,
-                    AnalyticsStage::getEventId,
-                    (first, second) -> first,
-                    LinkedHashMap::new
-                ));
-            List<Long> stageIds = ids(candidateStages);
-            List<AnalyticsStageMetric> candidateMetrics = findStageMetricsByStageIds(stageIds, normalizedMetricType);
-
-            metricSortValuesByEventId = resolveMetricValuesByEventId(
-                candidateMetrics,
-                stageToEventId,
-                safeMetricMin,
-                safeMetricMax
-            );
-            Map<Long, BigDecimal> metricFilterMap = metricSortValuesByEventId;
-            candidates = candidates.stream()
-                .filter(event -> metricFilterMap.containsKey(event.getId()))
-                .toList();
-        }
-
-        Comparator<AnalyticsEvent> comparator = eventComparator(normalizedSortBy, normalizedSortDir, metricSortValuesByEventId);
-        candidates = candidates.stream()
-            .sorted(comparator)
-            .toList();
-
-        long totalElements = candidates.size();
-        int fromIndex = Math.max(0, safePage * safeSize);
-        int toIndex = Math.min(candidates.size(), fromIndex + safeSize);
-        List<AnalyticsEvent> events = fromIndex >= toIndex ? List.of() : candidates.subList(fromIndex, toIndex);
+        Page<AnalyticsEvent> eventPage = eventRepository.searchEventsScoped(
+            from,
+            to,
+            normalizedEventType,
+            normalizedModuleCode,
+            isError,
+            normalizedErrorClass,
+            safeMinDuration,
+            normalizedRequestPath,
+            normalizedAttributeCode,
+            normalizedAttributeValue,
+            hasMetricFilter(normalizedMetricType, safeMetricMin, safeMetricMax),
+            normalizedMetricType,
+            safeMetricMin,
+            safeMetricMax,
+            systemEventsOnly,
+            normalizedSortBy,
+            sortAscending,
+            PageRequest.of(safePage, safeSize)
+        );
+        long totalElements = eventPage.getTotalElements();
+        List<AnalyticsEvent> events = eventPage.getContent();
         List<Long> eventIds = ids(events);
         List<AnalyticsStage> stages = findStagesByEventIds(eventIds);
         List<AnalyticsEventAttribute> attributes = findAttributesByEventIds(eventIds);
@@ -1859,8 +1875,29 @@ public class AnalyticsInsightsService {
             ))
             .toList();
 
-        boolean hasMore = (long) (safePage + 1) * safeSize < totalElements;
+        boolean hasMore = eventPage.hasNext();
         return new EventListResponse(totalElements, safePage, safeSize, hasMore, items);
+    }
+
+    private boolean eventTypeMatchesSystemScope(String eventTypeCode, boolean systemEventsOnly) {
+        String normalized = normalizeCode(eventTypeCode);
+        if (normalized == null) {
+            return true;
+        }
+        return eventTypeRepository.findById(normalized)
+            .map(type -> Boolean.TRUE.equals(type.getIsSystem()) == systemEventsOnly)
+            .orElse(false);
+    }
+
+    private String normalizeEventSortBy(String sortBy) {
+        String normalized = normalizeText(sortBy);
+        if (normalized == null) {
+            return "startedAt";
+        }
+        return switch (normalized) {
+            case "startedAt", "durationMs", "statusCode", "eventTypeCode", "traceId", "requestPath", "isError", "metricValue" -> normalized;
+            default -> "startedAt";
+        };
     }
 
     private boolean hasMetricFilter(String metricTypeCode, BigDecimal metricMinValue, BigDecimal metricMaxValue) {
@@ -2130,13 +2167,7 @@ public class AnalyticsInsightsService {
         Map<String, String> stageTypeNames = stageTypeNameMap();
         Map<String, String> metricTypeNames = stageMetricTypeNameMap();
         Map<String, String> attributeTypeNames = eventAttributeTypeNameMap();
-        AnalyticsLogViewService.TraceLogLookupResult traceLogLookup = analyticsLogViewService.loadTraceLogs(
-            event.getTraceId(),
-            event.getEventUid() == null ? null : event.getEventUid().toString(),
-            event.getModuleCode(),
-            event.getStartedAt(),
-            event.getEndedAt()
-        );
+        AnalyticsLogViewService.TraceLogLookupResult traceLogLookup = safeLoadTraceLogs(event);
         List<EventLogEntryDto> traceLogs = traceLogLookup.rows();
 
         Map<Long, List<EventStageMetricDto>> metricsByStage = metrics.stream()
@@ -2205,6 +2236,28 @@ public class AnalyticsInsightsService {
         );
     }
 
+    private AnalyticsLogViewService.TraceLogLookupResult safeLoadTraceLogs(AnalyticsEvent event) {
+        try {
+            return analyticsLogViewService.loadTraceLogs(
+                event.getTraceId(),
+                event.getEventUid() == null ? null : event.getEventUid().toString(),
+                event.getModuleCode(),
+                event.getStartedAt(),
+                event.getEndedAt()
+            );
+        } catch (RuntimeException ex) {
+            log.warn(
+                "Trace log lookup failed for eventUid={}, traceId={}: {}",
+                event.getEventUid(),
+                event.getTraceId(),
+                ex.getMessage()
+            );
+            return AnalyticsLogViewService.TraceLogLookupResult.notFound(
+                "Trace logs are temporarily unavailable, event details are shown without log rows."
+            );
+        }
+    }
+
     private List<EventLogEntryDto> filterLogsForStage(
         List<EventLogEntryDto> logs,
         String stageTypeCode,
@@ -2266,6 +2319,10 @@ public class AnalyticsInsightsService {
         String normalizedModuleCode = normalizeModuleFilterCode(moduleCode);
         String normalizedEventType = normalizeCode(eventTypeCode);
         String normalizedRequestPath = normalizeText(requestPath);
+        Set<String> visibleEventCodes = scopedEventTypeCodes(false);
+        if (normalizedEventType != null && !visibleEventCodes.contains(normalizedEventType)) {
+            normalizedEventType = "__NO_MATCH__";
+        }
 
         List<AnalyticsEvent> baselineEvents = filterEventsByRequestPath(
             eventRepository.findAllByRangeOrdered(
@@ -2276,6 +2333,7 @@ public class AnalyticsInsightsService {
             ),
             normalizedRequestPath
         );
+        baselineEvents = filterEventsByScope(baselineEvents, false);
         List<AnalyticsEvent> targetEvents = filterEventsByRequestPath(
             eventRepository.findAllByRangeOrdered(
                 targetFrom,
@@ -2285,6 +2343,7 @@ public class AnalyticsInsightsService {
             ),
             normalizedRequestPath
         );
+        targetEvents = filterEventsByScope(targetEvents, false);
 
         KpiSnapshot baseline = snapshotFromEvents(baselineEvents);
         KpiSnapshot target = snapshotFromEvents(targetEvents);
@@ -2656,6 +2715,38 @@ public class AnalyticsInsightsService {
             .map(this::normalizeCode)
             .filter(Objects::nonNull)
             .collect(Collectors.toSet());
+    }
+
+    private Set<String> userEventTypeCodes() {
+        return eventTypeRepository.findByIsActiveTrueAndIsSystemFalseOrderByNameAsc().stream()
+            .map(EventType::getCode)
+            .map(this::normalizeCode)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private Set<String> scopedEventTypeCodes(boolean systemEventsOnly) {
+        if (systemEventsOnly) {
+            return hiddenSystemEventTypeCodes();
+        }
+        return userEventTypeCodes();
+    }
+
+    private Set<String> nonEmptyEventTypeFilter(Set<String> eventTypeCodes) {
+        if (eventTypeCodes == null || eventTypeCodes.isEmpty()) {
+            return Set.of("__NO_MATCH__");
+        }
+        return eventTypeCodes;
+    }
+
+    private List<AnalyticsEvent> filterEventsByScope(List<AnalyticsEvent> events, boolean systemEventsOnly) {
+        if (events == null || events.isEmpty()) {
+            return List.of();
+        }
+        Set<String> scopedEventCodes = scopedEventTypeCodes(systemEventsOnly);
+        return events.stream()
+            .filter(event -> scopedEventCodes.contains(normalizeCode(event.getEventTypeCode())))
+            .toList();
     }
 
     private Map<String, String> moduleTypeNameMap() {

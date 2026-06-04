@@ -1,4 +1,4 @@
-﻿(function () {
+(function () {
     const inferredBase = window.location.pathname.startsWith("/analytics-admin")
         ? "/analytics-admin/api"
         : "/analytics/api";
@@ -593,7 +593,8 @@
 
     function cleanRuntimeText(value, fallback) {
         const text = String(value || "").trim();
-        if (!text || /Р.|С.|вЂ|�/.test(text)) {
+        const mojibakePattern = /[\u0420\u0421].|\u0432\u0402|\uFFFD/;
+        if (!text || mojibakePattern.test(text)) {
             return String(fallback || "");
         }
         return text;

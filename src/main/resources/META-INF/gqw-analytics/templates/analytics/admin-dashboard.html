@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta th:if="${_csrf != null}" name="_csrf" th:content="${_csrf.token}">
     <meta th:if="${_csrf != null}" name="_csrf_header" th:content="${_csrf.headerName}">
-    <title>Analytics Admin В· Dashboard</title>
+    <title>Analytics Admin · Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
     <link rel="stylesheet" th:href="@{/analytics/css/app.css(v='20260604-06')}">
@@ -16,39 +16,39 @@
 <main class="container container-wide py-4 analytics-page">
     <nav class="admin-breadcrumb mb-3" aria-label="breadcrumb">
         <ol class="breadcrumb mb-0">
-            <li class="breadcrumb-item"><a th:href="@{/analytics-admin/dictionaries}">РЎРїСЂР°РІРѕС‡РЅРёРєРё</a></li>
-            <li class="breadcrumb-item active" aria-current="page">Р”Р°С€Р±РѕСЂРґ</li>
+            <li class="breadcrumb-item"><a th:href="@{/analytics-admin/dictionaries}">Справочники</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Дашборд</li>
         </ol>
     </nav>
 
     <div class="analytics-filter-hotspot" aria-hidden="true"></div>
-    <button class="btn btn-dark analytics-filter-fab" type="button" aria-label="Р¤РёР»СЊС‚СЂС‹">
+    <button class="btn btn-dark analytics-filter-fab" type="button" aria-label="Фильтры">
         <i class="bi bi-funnel"></i>
     </button>
     <section class="glass-card p-3 p-lg-4 analytics-hero analytics-hero-floating mb-4">
         <div class="d-flex align-items-center mb-3">
-            <h1 class="h6 mb-0 analytics-title">Р¤РёР»СЊС‚СЂ</h1>
+            <h1 class="h6 mb-0 analytics-title">Фильтр</h1>
         </div>
 
         <form class="analytics-controls" id="analytics-main-form">
             <input type="hidden" id="analytics-request-path" value="">
             <section class="analytics-filter-block">
-                <div class="analytics-filter-block-title">РћСЃРЅРѕРІРЅС‹Рµ РїР°СЂР°РјРµС‚СЂС‹</div>
+                <div class="analytics-filter-block-title">Основные параметры</div>
                 <div class="analytics-filter-row analytics-filter-row-2">
                     <div class="analytics-filter-field">
-                        <label class="form-label mb-1">РџРµСЂРёРѕРґ СЃ</label>
+                        <label class="form-label mb-1">Период с</label>
                         <input class="form-control" type="datetime-local" id="analytics-from" th:value="${analyticsFrom}">
                     </div>
                     <div class="analytics-filter-field">
-                        <label class="form-label mb-1">РџРѕ</label>
+                        <label class="form-label mb-1">По</label>
                         <input class="form-control" type="datetime-local" id="analytics-to" th:value="${analyticsTo}">
                     </div>
                 </div>
                 <div class="analytics-filter-row analytics-filter-row-2">
                     <div class="analytics-filter-field">
-                        <label class="form-label mb-1">Р‘Р°РєРµС‚, РјРёРЅ</label>
+                        <label class="form-label mb-1">Бакет, мин</label>
                         <select class="form-select" id="analytics-bucket">
-                            <option value="">РђРІС‚Рѕ</option>
+                            <option value="">Авто</option>
                             <option value="1">1</option>
                             <option value="2">2</option>
                             <option value="5">5</option>
@@ -61,89 +61,89 @@
                         </select>
                     </div>
                     <div class="analytics-filter-field">
-                        <label class="form-label mb-1">Р‘С‹СЃС‚СЂС‹Рµ РїСЂРµСЃРµС‚С‹</label>
+                        <label class="form-label mb-1">Быстрые пресеты</label>
                         <select class="form-select analytics-quick-preset-select" id="analytics-quick-preset-select">
-                            <option value="">вЂ”</option>
-                            <option value="15m">15 РјРёРЅСѓС‚</option>
-                            <option value="30m">30 РјРёРЅСѓС‚</option>
-                            <option value="1h">1 С‡Р°СЃ</option>
-                            <option value="3h">3 С‡Р°СЃР°</option>
-                            <option value="6h">6 С‡Р°СЃРѕРІ</option>
-                            <option value="12h">12 С‡Р°СЃРѕРІ</option>
-                            <option value="24h" selected>24 С‡Р°СЃР°</option>
-                            <option value="1w">1 РЅРµРґРµР»СЏ</option>
-                            <option value="1mo">1 РјРµСЃСЏС†</option>
-                            <option value="3mo">3 РјРµСЃСЏС†Р°</option>
-                            <option value="6mo">6 РјРµСЃСЏС†РµРІ</option>
-                            <option value="1y">1 РіРѕРґ</option>
-                            <option value="all">Р’СЃРµ РІСЂРµРјСЏ</option>
+                            <option value="">—</option>
+                            <option value="15m">15 минут</option>
+                            <option value="30m">30 минут</option>
+                            <option value="1h">1 час</option>
+                            <option value="3h">3 часа</option>
+                            <option value="6h">6 часов</option>
+                            <option value="12h">12 часов</option>
+                            <option value="24h" selected>24 часа</option>
+                            <option value="1w">1 неделя</option>
+                            <option value="1mo">1 месяц</option>
+                            <option value="3mo">3 месяца</option>
+                            <option value="6mo">6 месяцев</option>
+                            <option value="1y">1 год</option>
+                            <option value="all">Все время</option>
                         </select>
                     </div>
                 </div>
                 <div class="analytics-filter-row analytics-filter-row-1">
                     <div class="analytics-quick-range">
                         <div class="analytics-quick-range-main">
-                            <span class="analytics-quick-range-label">Р‘С‹СЃС‚СЂС‹Р№ РїРµСЂРёРѕРґ</span>
+                            <span class="analytics-quick-range-label">Быстрый период</span>
                             <input class="form-control form-control-sm analytics-quick-input" type="number" id="analytics-range-n" min="1" step="1" value="24">
                             <select class="form-select form-select-sm analytics-quick-select" id="analytics-range-unit">
-                                <option value="minutes">РјРёРЅСѓС‚</option>
-                                <option value="hours" selected>С‡Р°СЃРѕРІ</option>
-                                <option value="days">РґРЅРµР№</option>
-                                <option value="weeks">РЅРµРґРµР»СЊ</option>
-                                <option value="months">РјРµСЃСЏС†РµРІ</option>
+                                <option value="minutes">минут</option>
+                                <option value="hours" selected>часов</option>
+                                <option value="days">дней</option>
+                                <option value="weeks">недель</option>
+                                <option value="months">месяцев</option>
                             </select>
-                            <button class="btn btn-sm btn-outline-dark" type="button" id="analytics-range-apply">РџСЂРёРјРµРЅРёС‚СЊ</button>
+                            <button class="btn btn-sm btn-outline-dark" type="button" id="analytics-range-apply">Применить</button>
                         </div>
                     </div>
                 </div>
             </section>
             <section class="analytics-filter-block">
-                <div class="analytics-filter-block-title">РљРѕРЅС‚РµРєСЃС‚ СЃРѕР±С‹С‚РёР№</div>
+                <div class="analytics-filter-block-title">Контекст событий</div>
                 <div class="analytics-filter-row analytics-filter-row-2">
                     <div class="analytics-filter-field">
-                        <label class="form-label mb-1">РњРѕРґСѓР»СЊ</label>
+                        <label class="form-label mb-1">Модуль</label>
                         <select class="form-select" id="analytics-module-type"></select>
                     </div>
                     <div class="analytics-filter-field">
-                        <label class="form-label mb-1">РўРёРї СЃРѕР±С‹С‚РёСЏ</label>
+                        <label class="form-label mb-1">Тип события</label>
                         <select class="form-select" id="analytics-event-type"></select>
                     </div>
                 </div>
                 <div class="analytics-filter-row analytics-filter-row-1">
                     <div class="analytics-filter-field">
-                        <label class="form-label mb-1">РћР±С‰РёР№ СЃС†РµРЅР°СЂРёР№ Р°РЅР°Р»РёР·Р°</label>
+                        <label class="form-label mb-1">Общий сценарий анализа</label>
                         <div class="d-flex align-items-center gap-2">
                             <select class="form-select" id="analytics-analysis-scenario">
-                                <option value="">РќРµ РІС‹Р±СЂР°РЅ</option>
-                                <option value="traffic_spike">РџРёРєРѕРІР°СЏ РЅР°РіСЂСѓР·РєР°</option>
-                                <option value="tail_latency">РџСЂРѕР±Р»РµРјР° С…РІРѕСЃС‚Р° latency</option>
-                                <option value="error_burst">Р’СЃРїР»РµСЃРє РѕС€РёР±РѕРє</option>
-                                <option value="release_compare">Р”Рѕ/РїРѕСЃР»Рµ СЂРµР»РёР·Р°</option>
-                                <option value="layer_bottleneck">РЈР·РєРѕРµ РјРµСЃС‚Рѕ РїРѕ СЃР»РѕСЏРј</option>
-                                <option value="error_without_load">РћС€РёР±РєРё Р±РµР· СЂРѕСЃС‚Р° РЅР°РіСЂСѓР·РєРё</option>
+                                <option value="">Не выбран</option>
+                                <option value="traffic_spike">Пиковая нагрузка</option>
+                                <option value="tail_latency">Проблема хвоста latency</option>
+                                <option value="error_burst">Всплеск ошибок</option>
+                                <option value="release_compare">До/после релиза</option>
+                                <option value="layer_bottleneck">Узкое место по слоям</option>
+                                <option value="error_without_load">Ошибки без роста нагрузки</option>
                             </select>
-                            <button class="btn btn-outline-secondary analytics-chart-icon-btn" type="button" id="analytics-analysis-scenario-help" title="РћРїРёСЃР°РЅРёРµ РѕР±С‰РµРіРѕ СЃС†РµРЅР°СЂРёСЏ" aria-label="РћРїРёСЃР°РЅРёРµ РѕР±С‰РµРіРѕ СЃС†РµРЅР°СЂРёСЏ">?</button>
+                            <button class="btn btn-outline-secondary analytics-chart-icon-btn" type="button" id="analytics-analysis-scenario-help" title="Описание общего сценария" aria-label="Описание общего сценария">?</button>
                         </div>
                     </div>
                 </div>
             </section>
             <section class="analytics-filter-block">
-                <div class="analytics-filter-block-title">РЎСЂР°РІРЅРµРЅРёРµ</div>
+                <div class="analytics-filter-block-title">Сравнение</div>
                 <div class="analytics-filter-row analytics-filter-row-1">
                     <div class="analytics-filter-field">
-                        <label class="form-label mb-1">Р РµР¶РёРј СЃСЂР°РІРЅРµРЅРёСЏ</label>
+                        <label class="form-label mb-1">Режим сравнения</label>
                         <div class="analytics-compare-mode-radios mt-1">
                             <label class="form-check mb-0">
                                 <input class="form-check-input" type="radio" name="analytics-global-compare-mode" id="analytics-global-compare-mode-off" value="off" checked>
-                                <span class="form-check-label">Р’С‹РєР»СЋС‡РµРЅРѕ</span>
+                                <span class="form-check-label">Выключено</span>
                             </label>
                             <label class="form-check mb-0">
                                 <input class="form-check-input" type="radio" name="analytics-global-compare-mode" id="analytics-global-compare-mode-split" value="split">
-                                <span class="form-check-label">Р Р°Р·РґРµР»СЊРЅРѕ</span>
+                                <span class="form-check-label">Раздельно</span>
                             </label>
                             <label class="form-check mb-0">
                                 <input class="form-check-input" type="radio" name="analytics-global-compare-mode" id="analytics-global-compare-mode-overlay" value="overlay">
-                                <span class="form-check-label">РќР°Р»РѕР¶РµРЅРёРµРј</span>
+                                <span class="form-check-label">Наложением</span>
                             </label>
                         </div>
                         <div class="small text-muted mt-2 d-none" id="analytics-global-before-summary"></div>
@@ -151,39 +151,39 @@
                 </div>
             </section>
             <section class="analytics-filter-block">
-                <div class="analytics-filter-block-title">РђС‚СЂРёР±СѓС‚</div>
+                <div class="analytics-filter-block-title">Атрибут</div>
                 <div class="analytics-filter-row analytics-filter-row-1">
                     <div class="analytics-filter-field">
-                        <label class="form-label mb-1">РђС‚СЂРёР±СѓС‚</label>
+                        <label class="form-label mb-1">Атрибут</label>
                         <select class="form-select" id="analytics-global-attr-code">
-                            <option value="">РќРµ РІС‹Р±СЂР°РЅ</option>
+                            <option value="">Не выбран</option>
                         </select>
                     </div>
                 </div>
                 <div class="analytics-filter-row analytics-filter-row-1" id="analytics-global-attr-value-row">
                     <div class="analytics-filter-field">
-                        <label class="form-label mb-1">Р—РЅР°С‡РµРЅРёРµ</label>
+                        <label class="form-label mb-1">Значение</label>
                         <select class="form-select" id="analytics-global-attr-value-select">
-                            <option value="">РќРµ РІС‹Р±СЂР°РЅРѕ</option>
+                            <option value="">Не выбрано</option>
                         </select>
                     </div>
                 </div>
                 <div class="analytics-filter-row analytics-filter-row-2 d-none" id="analytics-global-attr-range-row">
                     <div class="analytics-filter-field">
-                        <label class="form-label mb-1">Р”РёР°РїР°Р·РѕРЅ РѕС‚</label>
+                        <label class="form-label mb-1">Диапазон от</label>
                         <input class="form-range" type="range" id="analytics-global-attr-min-range" min="0" max="100" step="1" value="0">
                         <input class="form-control form-control-sm mt-1" type="number" step="any" id="analytics-global-attr-min">
                     </div>
                     <div class="analytics-filter-field">
-                        <label class="form-label mb-1">Р”Рѕ</label>
+                        <label class="form-label mb-1">До</label>
                         <input class="form-range" type="range" id="analytics-global-attr-max-range" min="0" max="100" step="1" value="100">
                         <input class="form-control form-control-sm mt-1" type="number" step="any" id="analytics-global-attr-max">
                     </div>
                 </div>
                 <div class="analytics-filter-row analytics-filter-row-1">
                     <div class="analytics-filter-field">
-                        <label class="form-label mb-1">Р СѓС‡РЅРѕР№ РІРІРѕРґ Р·РЅР°С‡РµРЅРёСЏ</label>
-                        <input class="form-control" type="text" id="analytics-global-attr-value-input" placeholder="РњРѕР¶РЅРѕ РІРІРµСЃС‚Рё РІСЂСѓС‡РЅСѓСЋ">
+                        <label class="form-label mb-1">Ручной ввод значения</label>
+                        <input class="form-control" type="text" id="analytics-global-attr-value-input" placeholder="Можно ввести вручную">
                     </div>
                 </div>
             </section>
@@ -192,39 +192,40 @@
         <div class="analytics-floating-reset-wrap">
             <button class="btn btn-outline-dark w-100" type="button" id="analytics-floating-reset">
                 <i class="bi bi-arrow-counterclockwise"></i>
-                РЎР±СЂРѕСЃРёС‚СЊ С„РёР»СЊС‚СЂС‹
+                Сбросить фильтры
             </button>
         </div>
     </section>
 
     <section class="analytics-view-tabs mb-4">
-        <div class="nav nav-pills analytics-subtabs" role="tablist" aria-label="Р’РєР»Р°РґРєРё Р°РЅР°Р»РёС‚РёРєРё">
-            <button class="nav-link active" type="button" id="analytics-tab-overview" data-analytics-tab="overview">РћР±Р·РѕСЂ</button>
-            <button class="nav-link" type="button" id="analytics-tab-universal" data-analytics-tab="universal">РЈРЅРёРІРµСЂСЃР°Р»СЊРЅС‹Р№ Р°РЅР°Р»РёР·</button>
-            <button class="nav-link" type="button" id="analytics-tab-metrics" data-analytics-tab="metrics">РњРµС‚СЂРёРєРё</button>
-            <button class="nav-link" type="button" id="analytics-tab-raw" data-analytics-tab="raw">Raw СЃРѕР±С‹С‚РёСЏ</button>
-            <button class="nav-link" type="button" id="analytics-tab-compare" data-analytics-tab="compare">РЎСЂР°РІРЅРµРЅРёРµ</button>
+        <div class="nav nav-pills analytics-subtabs" role="tablist" aria-label="Вкладки аналитики">
+            <button class="nav-link active" type="button" id="analytics-tab-overview" data-analytics-tab="overview">Обзор</button>
+            <button class="nav-link" type="button" id="analytics-tab-universal" data-analytics-tab="universal">Универсальный анализ</button>
+            <button class="nav-link" type="button" id="analytics-tab-metrics" data-analytics-tab="metrics">Метрики</button>
+            <button class="nav-link" type="button" id="analytics-tab-raw" data-analytics-tab="raw">Raw события</button>
+            <button class="nav-link" type="button" id="analytics-tab-system" data-analytics-tab="system">Служебные события</button>
+            <button class="nav-link" type="button" id="analytics-tab-compare" data-analytics-tab="compare">Сравнение</button>
         </div>
     </section>
 
     <section class="glass-card analytics-panel p-3 p-lg-4 mb-4" data-analytics-view="universal" hidden>
         <div class="analytics-panel-head mb-3">
-            <div class="analytics-panel-title">РЈРЅРёРІРµСЂСЃР°Р»СЊРЅС‹Р№ Р°РЅР°Р»РёР· РїРѕ Р°С‚СЂРёР±СѓС‚Сѓ</div>
-            <div class="analytics-panel-sub">РЎС†РµРЅР°СЂРёРё СЂР°СЃСЃР»РµРґРѕРІР°РЅРёСЏ: СЃРѕР±С‹С‚РёРµ, СЃР»РѕР№, Р°С‚СЂРёР±СѓС‚, Р·РЅР°С‡РµРЅРёРµ Рё СЃСЂР°РІРЅРµРЅРёРµ РґРѕ/РїРѕСЃР»Рµ</div>
+            <div class="analytics-panel-title">Универсальный анализ по атрибуту</div>
+            <div class="analytics-panel-sub">Сценарии расследования: событие, слой, атрибут, значение и сравнение до/после</div>
         </div>
         <form class="analytics-universal-form mb-3" id="analytics-universal-form">
             <div class="analytics-universal-main-row analytics-universal-main-row-compact">
                 <div class="analytics-universal-field analytics-universal-field-event">
-                    <label class="form-label mb-1">РЎРѕР±С‹С‚РёСЏ</label>
+                    <label class="form-label mb-1">События</label>
                     <div class="analytics-universal-events-inline">
                         <button class="btn btn-outline-secondary analytics-universal-events-toggle" type="button" id="universal-event-type-toggle" aria-expanded="false">
-                            РЎРѕР±С‹С‚РёСЏ
+                            События
                         </button>
                         <div class="analytics-universal-events-popup d-none" id="universal-event-type-popup">
                             <div class="analytics-universal-events-popup-head">
                                 <label class="form-check">
                                     <input class="form-check-input" type="checkbox" id="universal-event-overall" checked>
-                                    <span class="form-check-label">РћР±С‰Р°СЏ СЃС‚Р°С‚РёСЃС‚РёРєР°</span>
+                                    <span class="form-check-label">Общая статистика</span>
                                 </label>
                             </div>
                             <select class="form-select" id="universal-event-type-list" multiple size="10"></select>
@@ -232,14 +233,14 @@
                     </div>
                 </div>
                 <div class="analytics-universal-field analytics-universal-field-stage">
-                    <label class="form-label mb-1">РЎР»РѕР№</label>
+                    <label class="form-label mb-1">Слой</label>
                     <select class="form-select" id="universal-stage-type"></select>
                 </div>
                 <div class="analytics-universal-field analytics-universal-field-metrics">
-                    <label class="form-label mb-1">РњРµС‚СЂРёРєРё</label>
+                    <label class="form-label mb-1">Метрики</label>
                     <div class="analytics-universal-metrics-inline">
                         <button class="btn btn-outline-secondary analytics-universal-metrics-toggle" type="button" id="universal-series-metric-toggle" aria-expanded="false">
-                            РњРµС‚СЂРёРєРё С‚Р°Р№РјР»Р°Р№РЅР°
+                            Метрики таймлайна
                         </button>
                         <div class="analytics-universal-metrics-popup d-none" id="universal-series-metric-popup">
                             <select class="form-select" id="universal-series-metric-list" multiple size="8">
@@ -255,7 +256,7 @@
                     <label class="form-label mb-1 d-none d-lg-block">&nbsp;</label>
                     <label class="form-check analytics-universal-layers-check">
                         <input class="form-check-input" type="checkbox" data-universal-series="stages" checked>
-                        <span class="form-check-label">РЎР»РѕРё</span>
+                        <span class="form-check-label">Слои</span>
                     </label>
                 </div>
             </div>
@@ -277,7 +278,7 @@
         <div class="analytics-grid analytics-grid-2 mb-3" id="analytics-universal-grid">
             <div class="glass-card p-2" id="analytics-universal-timeline-card">
                 <div class="d-flex align-items-center justify-content-between mb-1">
-                    <div class="small text-muted">РўР°Р№РјР»Р°Р№РЅ</div>
+                    <div class="small text-muted">Таймлайн</div>
                 </div>
                 <div class="analytics-chart-wrap">
                     <canvas id="chart-universal-timeline" height="150"></canvas>
@@ -285,11 +286,11 @@
             </div>
             <div class="glass-card p-2" id="analytics-universal-stages-card">
                 <div class="d-flex align-items-center justify-content-between mb-1">
-                    <div class="small text-muted">РЎР»РѕРё</div>
+                    <div class="small text-muted">Слои</div>
                     <div class="d-flex align-items-center gap-2">
                         <div class="analytics-universal-stage-metrics-inline">
                             <button class="btn btn-outline-secondary analytics-universal-stage-metrics-toggle" type="button" id="universal-stage-metric-toggle" aria-expanded="false">
-                                РњРµС‚СЂРёРєРё СЃР»РѕС‘РІ
+                                Метрики слоёв
                             </button>
                             <div class="analytics-universal-stage-metrics-popup d-none" id="universal-stage-metric-popup">
                                 <select class="form-select" id="universal-stage-metric-list" multiple size="6">
@@ -308,7 +309,7 @@
         </div>
         <div class="glass-card p-2 mb-2" id="analytics-universal-event-kpi-card">
             <div class="d-flex align-items-center justify-content-between mb-1">
-                <div class="small text-muted">KPI РїРѕ С‚РёРїР°Рј СЃРѕР±С‹С‚РёР№</div>
+                <div class="small text-muted">KPI по типам событий</div>
             </div>
             <div class="analytics-chart-wrap">
                 <canvas id="chart-universal-event-kpi" height="220"></canvas>
@@ -318,7 +319,7 @@
 
     <section class="analytics-kpi-grid mb-4" data-analytics-view="overview">
         <article class="glass-card analytics-kpi-card p-3">
-            <div class="analytics-kpi-label">РЎРѕР±С‹С‚РёР№</div>
+            <div class="analytics-kpi-label">Событий</div>
             <div class="analytics-kpi-value" id="kpi-total-events">0</div>
         </article>
         <article class="glass-card analytics-kpi-card p-3">
@@ -334,7 +335,7 @@
             <div class="analytics-kpi-value" id="kpi-error-rate">0%</div>
         </article>
         <article class="glass-card analytics-kpi-card p-3">
-            <div class="analytics-kpi-label">РћС€РёР±РѕРє</div>
+            <div class="analytics-kpi-label">Ошибок</div>
             <div class="analytics-kpi-value" id="kpi-errors">0</div>
         </article>
         <article class="glass-card analytics-kpi-card p-3">
@@ -346,8 +347,8 @@
     <section class="analytics-grid analytics-grid-2 mb-4" data-analytics-view="overview">
         <article class="glass-card analytics-panel p-3 p-lg-4">
             <div class="analytics-panel-head">
-                <div class="analytics-panel-title">РџРѕС‚РѕРє СЃРѕР±С‹С‚РёР№</div>
-                <div class="analytics-panel-sub">РљРѕР»РёС‡РµСЃС‚РІРѕ СЃРѕР±С‹С‚РёР№ РїРѕ РІСЂРµРјРµРЅРё</div>
+                <div class="analytics-panel-title">Поток событий</div>
+                <div class="analytics-panel-sub">Количество событий по времени</div>
             </div>
             <div class="analytics-chart-wrap">
                 <canvas id="chart-events-count" height="130"></canvas>
@@ -365,7 +366,7 @@
         <article class="glass-card analytics-panel p-3 p-lg-4">
             <div class="analytics-panel-head">
                 <div class="analytics-panel-title">Error rate trend</div>
-                <div class="analytics-panel-sub">Р”РѕР»СЏ РѕС€РёР±РѕРє РїРѕ РІСЂРµРјРµРЅРё</div>
+                <div class="analytics-panel-sub">Доля ошибок по времени</div>
             </div>
             <div class="analytics-chart-wrap">
                 <canvas id="chart-error-rate" height="130"></canvas>
@@ -373,7 +374,7 @@
         </article>
         <article class="glass-card analytics-panel p-3 p-lg-4">
             <div class="analytics-panel-head">
-                <div class="analytics-panel-title">KPI РїРѕ С‚РёРїР°Рј СЃРѕР±С‹С‚РёР№</div>
+                <div class="analytics-panel-title">KPI по типам событий</div>
                 <div class="analytics-panel-sub">Count / P95 / Error rate</div>
             </div>
             <div class="analytics-chart-wrap">
@@ -384,8 +385,8 @@
 
     <section class="glass-card analytics-panel p-3 p-lg-4 mb-4" data-analytics-view="overview">
         <div class="analytics-panel-head mb-3">
-            <div class="analytics-panel-title">Р­С‚Р°РїС‹ РІС‹РїРѕР»РЅРµРЅРёСЏ</div>
-            <div class="analytics-panel-sub">Drill-down РїРѕ CONTROLLER/SERVICE/DATABASE/FRONTEND</div>
+            <div class="analytics-panel-title">Этапы выполнения</div>
+            <div class="analytics-panel-sub">Drill-down по CONTROLLER/SERVICE/DATABASE/FRONTEND</div>
         </div>
         <div class="analytics-grid analytics-grid-2">
             <div>
@@ -400,13 +401,13 @@
             </div>
         </div>
         <div class="small text-muted mt-3 mb-1">
-            РЎРІРѕРґРєР° РЅРёР¶Рµ РІСЃРµРіРґР° РїРѕРєР°Р·С‹РІР°РµС‚ РѕР±С‰СѓСЋ СЃС‚Р°С‚РёСЃС‚РёРєСѓ РїРѕ РІРµСЂС…РЅРёРј С„РёР»СЊС‚СЂР°Рј (РїРµСЂРёРѕРґ, РјРѕРґСѓР»СЊ, path, С‚РёРї СЃРѕР±С‹С‚РёСЏ), Р±РµР· СѓС‡С‘С‚Р° РІС‹Р±РѕСЂР° СЃРѕР±С‹С‚РёР№ РІ РіСЂР°С„РёРєР°С… СЌС‚РѕРіРѕ Р±Р»РѕРєР°.
+            Сводка ниже всегда показывает общую статистику по верхним фильтрам (период, модуль, path, тип события), без учёта выбора событий в графиках этого блока.
         </div>
         <div class="table-responsive">
             <table class="table table-sm align-middle analytics-table" id="analytics-stage-table">
                 <thead>
                 <tr>
-                    <th>Р­С‚Р°Рї</th>
+                    <th>Этап</th>
                     <th class="text-end">Count</th>
                     <th class="text-end">AVG</th>
                     <th class="text-end">P95</th>
@@ -421,61 +422,61 @@
 
     <section class="glass-card analytics-panel p-3 p-lg-4 mb-4 analytics-metrics-section" data-analytics-view="metrics" hidden>
         <div class="analytics-panel-head mb-3">
-            <div class="analytics-panel-title">РњРµС‚СЂРёРєРё СЌС‚Р°РїРѕРІ</div>
-            <div class="analytics-panel-sub">РљРѕР»РёС‡РµСЃС‚РІРѕ SQL-Р·Р°РїСЂРѕСЃРѕРІ, РїРѕРІС‚РѕСЂС‹, СЂР°Р·РјРµСЂ РѕС‚РІРµС‚Р°, РєРѕРґ РѕС€РёР±РєРё</div>
+            <div class="analytics-panel-title">Метрики этапов</div>
+            <div class="analytics-panel-sub">Количество SQL-запросов, повторы, размер ответа, код ошибки</div>
         </div>
         <form class="mb-3 analytics-stage-metric-form-grid" id="analytics-stage-metrics-form">
             <div class="analytics-stage-metric-main-row">
                 <div class="analytics-stage-metric-field">
-                    <label class="form-label mb-1">Р­С‚Р°Рї</label>
+                    <label class="form-label mb-1">Этап</label>
                     <select class="form-select" id="stage-metric-stage-type">
-                        <option value="">Р’СЃРµ СЌС‚Р°РїС‹</option>
+                        <option value="">Все этапы</option>
                     </select>
                 </div>
                 <div class="analytics-stage-metric-field analytics-stage-metric-quick-range-wrap">
-                    <label class="form-label mb-1">Р‘С‹СЃС‚СЂС‹Р№ РїРµСЂРёРѕРґ</label>
+                    <label class="form-label mb-1">Быстрый период</label>
                     <select class="form-select" id="stage-metric-quick-range">
-                        <option value="">вЂ”</option>
-                        <option value="15m">15 РјРёРЅСѓС‚</option>
-                        <option value="30m">30 РјРёРЅСѓС‚</option>
-                        <option value="1h">1 С‡Р°СЃ</option>
-                        <option value="3h">3 С‡Р°СЃР°</option>
-                        <option value="6h">6 С‡Р°СЃРѕРІ</option>
-                        <option value="12h">12 С‡Р°СЃРѕРІ</option>
-                        <option value="24h" selected>24 С‡Р°СЃР°</option>
-                        <option value="1w">1 РЅРµРґРµР»СЏ</option>
-                        <option value="1mo">1 РјРµСЃСЏС†</option>
-                        <option value="3mo">3 РјРµСЃСЏС†Р°</option>
-                        <option value="6mo">6 РјРµСЃСЏС†РµРІ</option>
-                        <option value="1y">1 РіРѕРґ</option>
-                        <option value="all">Р’СЃРµ РІСЂРµРјСЏ</option>
+                        <option value="">—</option>
+                        <option value="15m">15 минут</option>
+                        <option value="30m">30 минут</option>
+                        <option value="1h">1 час</option>
+                        <option value="3h">3 часа</option>
+                        <option value="6h">6 часов</option>
+                        <option value="12h">12 часов</option>
+                        <option value="24h" selected>24 часа</option>
+                        <option value="1w">1 неделя</option>
+                        <option value="1mo">1 месяц</option>
+                        <option value="3mo">3 месяца</option>
+                        <option value="6mo">6 месяцев</option>
+                        <option value="1y">1 год</option>
+                        <option value="all">Все время</option>
                     </select>
                 </div>
                 <div class="analytics-stage-metric-field analytics-stage-metric-field-date">
-                    <label class="form-label mb-1" for="stage-metric-from-a">РџРµСЂРёРѕРґ СЃ</label>
+                    <label class="form-label mb-1" for="stage-metric-from-a">Период с</label>
                     <input class="form-control" type="datetime-local" id="stage-metric-from-a">
                 </div>
                 <div class="analytics-stage-metric-field analytics-stage-metric-field-date">
-                    <label class="form-label mb-1" for="stage-metric-to-a">РџРµСЂРёРѕРґ РїРѕ</label>
+                    <label class="form-label mb-1" for="stage-metric-to-a">Период по</label>
                     <input class="form-control" type="datetime-local" id="stage-metric-to-a">
                 </div>
                 <div class="analytics-stage-metric-compare-toggle-wrap">
                     <div class="analytics-stage-metric-field">
-                        <label class="form-label mb-1" for="stage-metric-compare-mode">Р РµР¶РёРј СЃСЂР°РІРЅРµРЅРёСЏ</label>
+                        <label class="form-label mb-1" for="stage-metric-compare-mode">Режим сравнения</label>
                         <select class="form-select" id="stage-metric-compare-mode">
-                            <option value="off" selected>Р’С‹РєР»СЋС‡РµРЅРѕ</option>
-                            <option value="split">Р Р°Р·РґРµР»СЊРЅРѕ</option>
-                            <option value="overlay">РќР°Р»РѕР¶РµРЅРёРµРј</option>
+                            <option value="off" selected>Выключено</option>
+                            <option value="split">Раздельно</option>
+                            <option value="overlay">Наложением</option>
                         </select>
                     </div>
                 </div>
                 <div class="analytics-stage-metric-action">
-                    <button class="btn btn-outline-secondary analytics-chart-icon-btn" type="button" id="stage-metric-reset" title="РЎР±СЂРѕСЃРёС‚СЊ Рє РІРµСЂС…РЅРµРјСѓ С„РёР»СЊС‚СЂСѓ" aria-label="РЎР±СЂРѕСЃРёС‚СЊ Рє РІРµСЂС…РЅРµРјСѓ С„РёР»СЊС‚СЂСѓ">
+                    <button class="btn btn-outline-secondary analytics-chart-icon-btn" type="button" id="stage-metric-reset" title="Сбросить к верхнему фильтру" aria-label="Сбросить к верхнему фильтру">
                         <i class="bi bi-arrow-clockwise"></i>
                     </button>
                 </div>
                 <div class="analytics-stage-metric-field analytics-stage-metric-text-metric-field">
-                    <label class="form-label mb-1">РўРµРєСЃС‚РѕРІР°СЏ РјРµС‚СЂРёРєР°</label>
+                    <label class="form-label mb-1">Текстовая метрика</label>
                     <select class="form-select" id="stage-text-metric-type"></select>
                 </div>
             </div>
@@ -484,17 +485,17 @@
         <div class="analytics-stage-metric-block analytics-stage-metric-block-main">
             <div class="analytics-stage-metric-charts-row">
                 <section class="analytics-stage-metric-chart-card">
-                    <div class="analytics-stage-metric-block-title">Р§РёСЃР»РѕРІС‹Рµ РјРµС‚СЂРёРєРё</div>
+                    <div class="analytics-stage-metric-block-title">Числовые метрики</div>
                     <div class="analytics-stage-metric-chart-zone">
                         <div class="analytics-grid analytics-grid-2 analytics-stage-metric-charts" id="analytics-stage-metric-charts">
                             <div class="analytics-stage-metric-series-col">
-                                <div class="small text-muted mb-1" data-stage-metric-compare-label>Р”Рѕ</div>
+                                <div class="small text-muted mb-1" data-stage-metric-compare-label>До</div>
                                 <div class="analytics-chart-wrap">
                                     <canvas id="chart-stage-metric-series" height="130"></canvas>
                                 </div>
                             </div>
                             <div class="analytics-stage-metric-series-col" id="analytics-stage-metric-compare-col">
-                                <div class="small text-muted mb-1" data-stage-metric-compare-label>РџРѕСЃР»Рµ</div>
+                                <div class="small text-muted mb-1" data-stage-metric-compare-label>После</div>
                                 <div class="analytics-chart-wrap">
                                     <canvas id="chart-stage-metric-series-compare" height="130"></canvas>
                                 </div>
@@ -503,17 +504,17 @@
                     </div>
                 </section>
                 <section class="analytics-stage-metric-chart-card">
-                    <div class="analytics-stage-metric-block-title">РўРµРєСЃС‚РѕРІС‹Рµ РјРµС‚СЂРёРєРё</div>
+                    <div class="analytics-stage-metric-block-title">Текстовые метрики</div>
                     <div class="analytics-stage-metric-chart-zone">
                         <div class="analytics-grid analytics-grid-2 analytics-stage-metric-charts" id="analytics-stage-metric-text-charts">
                             <div class="analytics-stage-metric-top-col">
-                                <div class="small text-muted mb-1" data-stage-metric-compare-label>Р”Рѕ</div>
+                                <div class="small text-muted mb-1" data-stage-metric-compare-label>До</div>
                                 <div class="analytics-chart-wrap">
                                     <canvas id="chart-stage-metric-text" height="130"></canvas>
                                 </div>
                             </div>
                             <div class="analytics-stage-metric-top-col" id="analytics-stage-metric-text-compare-col">
-                                <div class="small text-muted mb-1" data-stage-metric-compare-label>РџРѕСЃР»Рµ</div>
+                                <div class="small text-muted mb-1" data-stage-metric-compare-label>После</div>
                                 <div class="analytics-chart-wrap">
                                     <canvas id="chart-stage-metric-text-compare" height="130"></canvas>
                                 </div>
@@ -528,9 +529,9 @@
                         <table class="table table-sm align-middle analytics-table" id="analytics-stage-metric-table">
                             <thead>
                             <tr>
-                                <th>РњРµС‚СЂРёРєР°</th>
-                                <th class="text-end">Р’С‹Р±РѕСЂРєР°</th>
-                                <th class="text-end">РЎСЂРµРґРЅРµРµ</th>
+                                <th>Метрика</th>
+                                <th class="text-end">Выборка</th>
+                                <th class="text-end">Среднее</th>
                                 <th class="text-end">P95</th>
                                 <th class="text-end">MAX</th>
                             </tr>
@@ -544,8 +545,8 @@
                         <table class="table table-sm align-middle analytics-table" id="analytics-stage-metric-text-table">
                             <thead>
                             <tr>
-                                <th>РњРµС‚СЂРёРєР°</th>
-                                <th class="text-end">Р’С‹Р±РѕСЂРєР°</th>
+                                <th>Метрика</th>
+                                <th class="text-end">Выборка</th>
                             </tr>
                             </thead>
                             <tbody></tbody>
@@ -558,87 +559,87 @@
 
     <section class="glass-card analytics-panel p-3 p-lg-4 mb-4" data-analytics-view="raw">
         <div class="analytics-panel-head mb-3">
-            <div class="analytics-panel-title">Raw СЃРѕР±С‹С‚РёСЏ</div>
-            <div class="analytics-panel-sub">Р¤РёР»СЊС‚СЂР°С†РёСЏ РїСЂРѕР±Р»РµРјРЅС‹С… РєРµР№СЃРѕРІ Рё РїРµСЂРµС…РѕРґ Рє РґРµС‚Р°Р»СЏРј</div>
+            <div class="analytics-panel-title" id="analytics-events-panel-title">Raw события</div>
+            <div class="analytics-panel-sub" id="analytics-events-panel-sub">Фильтрация проблемных кейсов и переход к деталям</div>
         </div>
         <form class="mb-3 analytics-events-form" id="analytics-events-form">
             <section class="analytics-filter-group mb-2">
-                <div class="analytics-filter-group-title">Р‘Р°Р·РѕРІС‹Рµ С„РёР»СЊС‚СЂС‹</div>
+                <div class="analytics-filter-group-title">Базовые фильтры</div>
                 <div class="analytics-events-base-row">
                     <div class="analytics-events-field analytics-events-field-date">
-                        <label class="form-label mb-1">РџРµСЂРёРѕРґ СЃ</label>
+                        <label class="form-label mb-1">Период с</label>
                         <input class="form-control" type="datetime-local" id="events-from">
                     </div>
                     <div class="analytics-events-field analytics-events-field-date">
-                        <label class="form-label mb-1">РџРµСЂРёРѕРґ РїРѕ</label>
+                        <label class="form-label mb-1">Период по</label>
                         <input class="form-control" type="datetime-local" id="events-to">
                     </div>
                     <div class="analytics-events-field analytics-events-field-sm">
-                        <label class="form-label mb-1">РџСЂРµСЃРµС‚</label>
+                        <label class="form-label mb-1">Пресет</label>
                         <select class="form-select" id="events-quick-range">
-                            <option value="">вЂ”</option>
-                            <option value="15m">15 РјРёРЅСѓС‚</option>
-                            <option value="30m">30 РјРёРЅСѓС‚</option>
-                            <option value="1h">1 С‡Р°СЃ</option>
-                            <option value="3h">3 С‡Р°СЃР°</option>
-                            <option value="6h">6 С‡Р°СЃРѕРІ</option>
-                            <option value="12h">12 С‡Р°СЃРѕРІ</option>
-                            <option value="24h">24 С‡Р°СЃР°</option>
-                            <option value="1w">1 РЅРµРґРµР»СЏ</option>
-                            <option value="1mo">1 РјРµСЃСЏС†</option>
-                            <option value="3mo">3 РјРµСЃСЏС†Р°</option>
-                            <option value="6mo">6 РјРµСЃСЏС†РµРІ</option>
-                            <option value="1y">1 РіРѕРґ</option>
-                            <option value="all">Р’СЃРµ РІСЂРµРјСЏ</option>
+                            <option value="">—</option>
+                            <option value="15m">15 минут</option>
+                            <option value="30m">30 минут</option>
+                            <option value="1h">1 час</option>
+                            <option value="3h">3 часа</option>
+                            <option value="6h">6 часов</option>
+                            <option value="12h">12 часов</option>
+                            <option value="24h">24 часа</option>
+                            <option value="1w">1 неделя</option>
+                            <option value="1mo">1 месяц</option>
+                            <option value="3mo">3 месяца</option>
+                            <option value="6mo">6 месяцев</option>
+                            <option value="1y">1 год</option>
+                            <option value="all">Все время</option>
                         </select>
                     </div>
                     <div class="analytics-events-field analytics-events-field-sm">
-                        <label class="form-label mb-1">РЎС‚Р°С‚СѓСЃ</label>
+                        <label class="form-label mb-1">Статус</label>
                         <select class="form-select" id="events-is-error">
-                            <option value="">Р’СЃРµ</option>
-                            <option value="true">РўРѕР»СЊРєРѕ РѕС€РёР±РєРё</option>
-                            <option value="false">РўРѕР»СЊРєРѕ СѓСЃРїРµС€РЅС‹Рµ</option>
+                            <option value="">Все</option>
+                            <option value="true">Только ошибки</option>
+                            <option value="false">Только успешные</option>
                         </select>
                     </div>
                     <div class="analytics-events-field analytics-events-field-sm d-none" id="events-error-class-wrap">
-                        <label class="form-label mb-1">РљР»Р°СЃСЃ РѕС€РёР±РєРё</label>
+                        <label class="form-label mb-1">Класс ошибки</label>
                         <select class="form-select" id="events-error-class">
-                            <option value="">Р’СЃРµ</option>
+                            <option value="">Все</option>
                             <option value="VALIDATION">VALIDATION</option>
                             <option value="BUSINESS">BUSINESS</option>
                             <option value="SYSTEM">SYSTEM</option>
                         </select>
                     </div>
                     <div class="analytics-events-field analytics-events-field-lg">
-                        <label class="form-label mb-1">РЎРѕР±С‹С‚РёРµ</label>
+                        <label class="form-label mb-1">Событие</label>
                         <select class="form-select" id="events-event-type">
-                            <option value="">Р’СЃРµ СЃРѕР±С‹С‚РёСЏ</option>
+                            <option value="">Все события</option>
                         </select>
                     </div>
                     <div class="analytics-events-field analytics-events-field-sort">
-                        <label class="form-label mb-1">РЎРѕСЂС‚РёСЂРѕРІРєР°</label>
+                        <label class="form-label mb-1">Сортировка</label>
                         <select class="form-select" id="events-sort-by">
-                            <option value="startedAt">Р’СЂРµРјСЏ</option>
-                            <option value="durationMs">Р”Р»РёС‚РµР»СЊРЅРѕСЃС‚СЊ</option>
+                            <option value="startedAt">Время</option>
+                            <option value="durationMs">Длительность</option>
                             <option value="statusCode">HTTP</option>
-                            <option value="eventTypeCode">РЎРѕР±С‹С‚РёРµ</option>
+                            <option value="eventTypeCode">Событие</option>
                             <option value="traceId">Trace</option>
                             <option value="requestPath">Path</option>
-                            <option value="isError">РЎС‚Р°С‚СѓСЃ</option>
-                            <option value="metricValue">Р—РЅР°С‡РµРЅРёРµ РјРµС‚СЂРёРєРё</option>
+                            <option value="isError">Статус</option>
+                            <option value="metricValue">Значение метрики</option>
                         </select>
                     </div>
                     <div class="analytics-events-field analytics-events-field-sm analytics-events-field-order">
-                        <label class="form-label mb-1">РџРѕСЂСЏРґРѕРє</label>
+                        <label class="form-label mb-1">Порядок</label>
                         <select class="form-select" id="events-sort-dir">
-                            <option value="desc">в†“</option>
-                            <option value="asc">в†‘</option>
+                            <option value="desc">↓</option>
+                            <option value="asc">↑</option>
                         </select>
                     </div>
                     <div class="analytics-events-toggle-wrap analytics-events-toggle-wrap-sm">
                         <label class="form-label mb-1 d-none d-lg-block">&nbsp;</label>
                         <button class="btn btn-sm btn-outline-secondary" type="button" id="events-advanced-toggle">
-                            Р”РѕРї. С„РёР»СЊС‚СЂС‹
+                            Доп. фильтры
                         </button>
                     </div>
                 </div>
@@ -646,41 +647,41 @@
 
             <div class="analytics-events-advanced d-none" id="events-advanced-wrap">
                 <section class="analytics-filter-group">
-                    <div class="analytics-filter-group-title">РњРµС‚СЂРёРєРё</div>
+                    <div class="analytics-filter-group-title">Метрики</div>
                     <div class="analytics-events-inline-row analytics-events-inline-row-metrics">
                         <div class="analytics-events-field analytics-events-field-metric-type">
-                            <label class="form-label mb-1">РњРµС‚СЂРёРєР° СЌС‚Р°РїР°</label>
+                            <label class="form-label mb-1">Метрика этапа</label>
                             <select class="form-select" id="events-metric-type">
-                                <option value="">Р›СЋР±Р°СЏ РјРµС‚СЂРёРєР°</option>
+                                <option value="">Любая метрика</option>
                             </select>
                         </div>
                         <div class="analytics-events-field">
-                            <label class="form-label mb-1">РњРµС‚СЂРёРєР° РѕС‚</label>
+                            <label class="form-label mb-1">Метрика от</label>
                             <input class="form-control" type="number" id="events-metric-min" step="0.001" placeholder="0">
                         </div>
                         <div class="analytics-events-field">
-                            <label class="form-label mb-1">РњРµС‚СЂРёРєР° РґРѕ</label>
+                            <label class="form-label mb-1">Метрика до</label>
                             <input class="form-control" type="number" id="events-metric-max" step="0.001" placeholder="1000">
                         </div>
                         <div class="analytics-events-field">
-                            <label class="form-label mb-1">РњРёРЅ. РґР»РёС‚РµР»СЊРЅРѕСЃС‚СЊ, ms</label>
+                            <label class="form-label mb-1">Мин. длительность, ms</label>
                             <input class="form-control" type="number" id="events-min-duration" min="0" step="1" placeholder="0">
                         </div>
                     </div>
                 </section>
 
                 <section class="analytics-filter-group analytics-filter-group-attrs">
-                    <div class="analytics-filter-group-title">РђС‚СЂРёР±СѓС‚С‹</div>
+                    <div class="analytics-filter-group-title">Атрибуты</div>
                     <div class="analytics-events-inline-row analytics-events-inline-row-attrs">
                         <div class="analytics-events-field">
-                            <label class="form-label mb-1">РђС‚СЂРёР±СѓС‚</label>
+                            <label class="form-label mb-1">Атрибут</label>
                             <select class="form-select" id="events-attribute-code">
-                                <option value="">Р‘РµР· С„РёР»СЊС‚СЂР°</option>
+                                <option value="">Без фильтра</option>
                             </select>
                         </div>
                         <div class="analytics-events-field">
-                            <label class="form-label mb-1">Р—РЅР°С‡РµРЅРёРµ</label>
-                            <input class="form-control" type="text" id="events-attribute-value" placeholder="РЅР°РїСЂРёРјРµСЂ, 123">
+                            <label class="form-label mb-1">Значение</label>
+                            <input class="form-control" type="text" id="events-attribute-value" placeholder="например, 123">
                         </div>
                     </div>
                 </section>
@@ -690,13 +691,13 @@
             <table class="table table-sm align-middle analytics-table analytics-events-table" id="analytics-events-table">
                 <thead>
                 <tr>
-                    <th>Р’СЂРµРјСЏ</th>
-                    <th>РЎРѕР±С‹С‚РёРµ</th>
+                    <th>Время</th>
+                    <th>Событие</th>
                     <th class="text-end">ms</th>
                     <th class="text-end">HTTP</th>
                     <th>Path</th>
                     <th>Trace</th>
-                    <th>РЎС‚Р°С‚СѓСЃ</th>
+                    <th>Статус</th>
                     <th class="text-end"></th>
                 </tr>
                 </thead>
@@ -704,47 +705,47 @@
             </table>
         </div>
         <div class="d-flex justify-content-center pt-2">
-            <button class="btn btn-outline-dark" id="events-load-more" type="button">РџРѕРєР°Р·Р°С‚СЊ РµС‰С‘</button>
+            <button class="btn btn-outline-dark" id="events-load-more" type="button">Показать ещё</button>
         </div>
     </section>
 
     <section class="glass-card analytics-panel p-3 p-lg-4 mb-4" data-analytics-view="compare" hidden>
         <div class="analytics-panel-head mb-3">
-            <div class="analytics-panel-title">РЎСЂР°РІРЅРµРЅРёРµ РґРѕ/РїРѕСЃР»Рµ</div>
+            <div class="analytics-panel-title">Сравнение до/после</div>
         </div>
         <form class="row g-2 mb-3" id="analytics-compare-form">
             <div class="col-12 col-lg-2">
-                <label class="form-label mb-1">Р‘С‹СЃС‚СЂС‹Р№ РїРµСЂРёРѕРґ</label>
+                <label class="form-label mb-1">Быстрый период</label>
                 <select class="form-select" id="compare-quick-range">
-                    <option value="15m">15 РјРёРЅСѓС‚</option>
-                    <option value="30m">30 РјРёРЅСѓС‚</option>
-                    <option value="1h">1 С‡Р°СЃ</option>
-                    <option value="3h">3 С‡Р°СЃР°</option>
-                    <option value="6h">6 С‡Р°СЃРѕРІ</option>
-                    <option value="12h">12 С‡Р°СЃРѕРІ</option>
-                    <option value="24h" selected>24 С‡Р°СЃР°</option>
-                    <option value="1w">1 РЅРµРґРµР»СЏ</option>
-                    <option value="1mo">1 РјРµСЃСЏС†</option>
-                    <option value="3mo">3 РјРµСЃСЏС†Р°</option>
-                    <option value="6mo">6 РјРµСЃСЏС†РµРІ</option>
-                    <option value="1y">1 РіРѕРґ</option>
-                    <option value="all">Р’СЃРµ РІСЂРµРјСЏ</option>
+                    <option value="15m">15 минут</option>
+                    <option value="30m">30 минут</option>
+                    <option value="1h">1 час</option>
+                    <option value="3h">3 часа</option>
+                    <option value="6h">6 часов</option>
+                    <option value="12h">12 часов</option>
+                    <option value="24h" selected>24 часа</option>
+                    <option value="1w">1 неделя</option>
+                    <option value="1mo">1 месяц</option>
+                    <option value="3mo">3 месяца</option>
+                    <option value="6mo">6 месяцев</option>
+                    <option value="1y">1 год</option>
+                    <option value="all">Все время</option>
                 </select>
             </div>
             <div class="col-6 col-lg-3">
-                <label class="form-label mb-1">Р‘Р°Р·Р°: СЃ</label>
+                <label class="form-label mb-1">База: с</label>
                 <input class="form-control" type="datetime-local" id="compare-baseline-from">
             </div>
             <div class="col-6 col-lg-3">
-                <label class="form-label mb-1">Р‘Р°Р·Р°: РїРѕ</label>
+                <label class="form-label mb-1">База: по</label>
                 <input class="form-control" type="datetime-local" id="compare-baseline-to">
             </div>
             <div class="col-6 col-lg-3">
-                <label class="form-label mb-1">РўРµРєСѓС‰РёР№: СЃ</label>
+                <label class="form-label mb-1">Текущий: с</label>
                 <input class="form-control" type="datetime-local" id="compare-target-from">
             </div>
             <div class="col-6 col-lg-2">
-                <label class="form-label mb-1">РўРµРєСѓС‰РёР№: РїРѕ</label>
+                <label class="form-label mb-1">Текущий: по</label>
                 <input class="form-control" type="datetime-local" id="compare-target-to">
             </div>
             <div class="col-12 col-lg-1 d-grid">
@@ -845,7 +846,7 @@
 <script th:inline="javascript">
     window.analyticsApiBase = [[${analyticsApiBase}]];
 </script>
-<script th:src="@{/analytics/js/analytics-dashboard.js(v='20260604-09')}"></script>
-<script th:src="@{/analytics/js/analytics-settings.js(v='20260604-06')}"></script>
+<script th:src="@{/analytics/js/analytics-dashboard.js(v='20260604-10')}"></script>
+<script th:src="@{/analytics/js/analytics-settings.js(v='20260604-07')}"></script>
 </body>
 </html>

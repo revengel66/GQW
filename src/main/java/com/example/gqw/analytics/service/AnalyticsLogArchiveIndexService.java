@@ -39,6 +39,7 @@ import java.util.zip.GZIPInputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -122,6 +123,7 @@ public class AnalyticsLogArchiveIndexService {
 
     @Transactional
     public LogIndexRunResult indexAvailableFilesNow() {
+        long startedAt = System.nanoTime();
         if (!running.compareAndSet(false, true)) {
             return new LogIndexRunResult(0, 0, 0, 0, List.of("log index already running"));
         }
@@ -183,6 +185,18 @@ public class AnalyticsLogArchiveIndexService {
             }
             cleanupExpiredIndex();
             LogIndexDiagnostics diagnostics = diagnostics();
+            long durationMs = Duration.ofNanos(System.nanoTime() - startedAt).toMillis();
+            log.info(
+                "[LOG_INDEX] index run summary logDirectory={} currentLogFilesFound={} archiveLogFilesFound={} indexed={} pending={} skippedTooLarge={} errors={} durationMs={}",
+                Paths.get(moduleLogDir).toAbsolutePath().normalize(),
+                diagnostics.currentFiles(),
+                diagnostics.archiveFiles(),
+                indexed,
+                diagnostics.pendingFiles(),
+                diagnostics.skippedTooLargeFiles(),
+                errors,
+                durationMs
+            );
             log.info(
                 "[LOG_INDEX_DEBUG] index summary filesDiscovered={} filesIndexed={} filesPending={} filesSkippedTooLarge={} filesIndexError={} filesMissing={} traceRowsCount={} excerptRowsCount={} lastIndexStartedAt={} lastIndexFinishedAt={} lastError={}",
                 discovered,
@@ -673,7 +687,9 @@ public class AnalyticsLogArchiveIndexService {
         }
         List<Boolean> rows = jdbcTemplate.query(
             """
-                select size_bytes = :sizeBytes and last_modified_at = :lastModifiedAt and status <> 'INDEX_ERROR' as unchanged
+                select size_bytes = :sizeBytes
+                    and last_modified_at = :lastModifiedAt
+                    and status not in ('INDEX_ERROR', 'SKIPPED_TOO_LARGE') as unchanged
                 from analytics.log_file_index
                 where file_path = :filePath
             """,
@@ -798,6 +814,21 @@ public class AnalyticsLogArchiveIndexService {
         int deletedIndexRows = deleteExpiredIndexRows(indexRetentionDays, enabled && !safeMode, batchSize);
         long durationMs = Duration.ofNanos(System.nanoTime() - startedAt).toMillis();
         log.info(
+            "[LOG_RETENTION] cleanup summary logDirectory={} currentRetentionDays={} archiveRetentionDays={} indexRetentionDays={} cleanupCandidates={} deletedFiles={} skippedActive={} skippedNotIndexed={} deletedIndexRows={} durationMs={} dryRun={} safeMode={}",
+            Paths.get(moduleLogDir).toAbsolutePath().normalize(),
+            currentRetentionDays,
+            archiveRetentionDays,
+            indexRetentionDays,
+            candidateSnapshot.candidates(),
+            deletedFiles,
+            skippedActive,
+            skippedNotIndexed,
+            deletedIndexRows,
+            durationMs,
+            !enabled || safeMode,
+            safeMode
+        );
+        log.info(
             "[LOG_RETENTION] cleanup currentRetentionDays={} archiveRetentionDays={} indexRetentionDays={} candidates={} deletedFiles={} skippedActive={} skippedNotIndexed={} deletedIndexRows={} durationMs={} dryRun={} safeMode={}",
             currentRetentionDays,
             archiveRetentionDays,
@@ -882,6 +913,13 @@ public class AnalyticsLogArchiveIndexService {
             .limit(8)
             .map(path -> path.getFileName().toString())
             .toList();
+        log.info(
+            "[LOG_INDEX] scan summary logDirectory={} currentLogFilesFound={} archiveLogFilesFound={} sampleArchiveFiles={}",
+            Paths.get(moduleLogDir).toAbsolutePath().normalize(),
+            current,
+            archives,
+            samples
+        );
         for (Path root : roots) {
             log.info(
                 "[LOG_INDEX_DEBUG] scan roots configuredLogDirectory={} resolvedAbsolutePath={} exists={} readable={} currentLogFilesFound={} archiveLogFilesFound={} archivePatternsUsed={} sampleArchiveFiles={}",
@@ -1312,12 +1350,34 @@ public class AnalyticsLogArchiveIndexService {
     }
 
     private boolean tableExists(String regclass) {
-        Boolean exists = jdbcTemplate.queryForObject(
-            "select to_regclass(:regclass) is not null",
-            Map.of("regclass", regclass),
-            Boolean.class
-        );
-        return Boolean.TRUE.equals(exists);
+        try {
+            Boolean exists = jdbcTemplate.queryForObject(
+                "select to_regclass(:regclass) is not null",
+                Map.of("regclass", regclass),
+                Boolean.class
+            );
+            return Boolean.TRUE.equals(exists);
+        } catch (DataAccessException ex) {
+            String[] parts = regclass == null ? new String[0] : regclass.split("\\.", 2);
+            if (parts.length != 2) {
+                return false;
+            }
+            try {
+                Integer count = jdbcTemplate.queryForObject(
+                    """
+                        select count(*)
+                        from information_schema.tables
+                        where lower(table_schema) = lower(:schemaName)
+                          and lower(table_name) = lower(:tableName)
+                    """,
+                    Map.of("schemaName", parts[0], "tableName", parts[1]),
+                    Integer.class
+                );
+                return count != null && count > 0;
+            } catch (DataAccessException ignored) {
+                return false;
+            }
+        }
     }
 
     public record LogIndexRunResult(

@@ -270,5 +270,232 @@ public interface AnalyticsEventRepository extends JpaRepository<AnalyticsEvent, 
         @Param("attributeValue") String attributeValue,
         Pageable pageable
     );
+
+    @Query(
+        value = """
+            select e.*
+              from analytics.event e
+              join analytics.event_type et on et.code = e.event_type_code
+             where e.started_at between :from and :to
+               and et.is_system = :systemEventsOnly
+               and (:eventTypeCode is null or e.event_type_code = :eventTypeCode)
+               and (:moduleCode is null or e.module_code = :moduleCode)
+               and (:isError is null or e.is_error = :isError)
+               and (:minDurationMs is null or e.duration_ms >= :minDurationMs)
+               and (:requestPath is null or lower(coalesce(e.request_path, '')) like lower(concat('%', :requestPath, '%')))
+               and (
+                    :errorClass is null
+                    or (:errorClass = 'NONE' and coalesce(e.is_error, false) = false)
+                    or (:errorClass = 'VALIDATION' and coalesce(e.is_error, false) = true and coalesce(e.status_code, 0) < 500 and (
+                        lower(coalesce(e.error_message, '')) like '%required request parameter%'
+                        or lower(coalesce(e.error_message, '')) like '%validation%'
+                        or lower(coalesce(e.error_message, '')) like '%bind%'
+                        or lower(coalesce(e.error_message, '')) like '%failed to convert%'
+                        or lower(coalesce(e.error_message, '')) like '%cannot be null%'
+                        or lower(coalesce(e.error_message, '')) like '%must not%'
+                        or lower(coalesce(e.error_message, '')) like '%некоррект%'
+                        or lower(coalesce(e.error_message, '')) like '%не заполн%'
+                        or lower(coalesce(e.error_message, '')) like '%обязатель%'
+                        or lower(coalesce(e.error_message, '')) like '%валидац%'
+                    ))
+                    or (:errorClass = 'BUSINESS' and coalesce(e.is_error, false) = true and (
+                        (e.status_code = 400 and not (
+                            lower(coalesce(e.error_message, '')) like '%required request parameter%'
+                            or lower(coalesce(e.error_message, '')) like '%validation%'
+                            or lower(coalesce(e.error_message, '')) like '%bind%'
+                            or lower(coalesce(e.error_message, '')) like '%failed to convert%'
+                            or lower(coalesce(e.error_message, '')) like '%cannot be null%'
+                            or lower(coalesce(e.error_message, '')) like '%must not%'
+                            or lower(coalesce(e.error_message, '')) like '%некоррект%'
+                            or lower(coalesce(e.error_message, '')) like '%не заполн%'
+                            or lower(coalesce(e.error_message, '')) like '%обязатель%'
+                            or lower(coalesce(e.error_message, '')) like '%валидац%'
+                        ))
+                        or e.status_code between 401 and 499
+                    ))
+                    or (:errorClass = 'SYSTEM' and coalesce(e.is_error, false) = true and (
+                        coalesce(e.status_code, 0) >= 500
+                        or (
+                            (e.status_code is null or e.status_code < 400 or e.status_code > 499)
+                            and not (
+                                lower(coalesce(e.error_message, '')) like '%required request parameter%'
+                                or lower(coalesce(e.error_message, '')) like '%validation%'
+                                or lower(coalesce(e.error_message, '')) like '%bind%'
+                                or lower(coalesce(e.error_message, '')) like '%failed to convert%'
+                                or lower(coalesce(e.error_message, '')) like '%cannot be null%'
+                                or lower(coalesce(e.error_message, '')) like '%must not%'
+                                or lower(coalesce(e.error_message, '')) like '%некоррект%'
+                                or lower(coalesce(e.error_message, '')) like '%не заполн%'
+                                or lower(coalesce(e.error_message, '')) like '%обязатель%'
+                                or lower(coalesce(e.error_message, '')) like '%валидац%'
+                            )
+                        )
+                    ))
+               )
+               and (
+                    :attributeCode is null
+                    or exists (
+                        select 1
+                          from analytics.event_attribute a
+                         where a.event_id = e.id
+                           and a.attribute_type_code = :attributeCode
+                           and (
+                                :attributeValue is null
+                                or lower(coalesce(a.attr_value, coalesce(a.attr_value_json, ''))) like lower(concat('%', :attributeValue, '%'))
+                           )
+                    )
+               )
+               and (
+                    :metricFilterEnabled = false
+                    or exists (
+                        select 1
+                          from analytics.stage s
+                          join analytics.stage_metric m on m.stage_id = s.id
+                         where s.event_id = e.id
+                           and (:metricTypeCode is null or m.metric_type_code = :metricTypeCode)
+                           and (:metricMinValue is null or m.metric_value_num >= :metricMinValue)
+                           and (:metricMaxValue is null or m.metric_value_num <= :metricMaxValue)
+                    )
+               )
+             order by
+               case when :sortBy = 'durationMs' and :ascending = true then e.duration_ms end asc nulls last,
+               case when :sortBy = 'durationMs' and :ascending = false then e.duration_ms end desc nulls last,
+               case when :sortBy = 'statusCode' and :ascending = true then e.status_code end asc nulls last,
+               case when :sortBy = 'statusCode' and :ascending = false then e.status_code end desc nulls last,
+               case when :sortBy = 'eventTypeCode' and :ascending = true then e.event_type_code end asc nulls last,
+               case when :sortBy = 'eventTypeCode' and :ascending = false then e.event_type_code end desc nulls last,
+               case when :sortBy = 'traceId' and :ascending = true then e.trace_id end asc nulls last,
+               case when :sortBy = 'traceId' and :ascending = false then e.trace_id end desc nulls last,
+               case when :sortBy = 'requestPath' and :ascending = true then e.request_path end asc nulls last,
+               case when :sortBy = 'requestPath' and :ascending = false then e.request_path end desc nulls last,
+               case when :sortBy = 'isError' and :ascending = true then e.is_error end asc nulls last,
+               case when :sortBy = 'isError' and :ascending = false then e.is_error end desc nulls last,
+               case when :sortBy = 'metricValue' and :ascending = true then (
+                    select min(m.metric_value_num)
+                      from analytics.stage s
+                      join analytics.stage_metric m on m.stage_id = s.id
+                     where s.event_id = e.id
+                       and (:metricTypeCode is null or m.metric_type_code = :metricTypeCode)
+               ) end asc nulls last,
+               case when :sortBy = 'metricValue' and :ascending = false then (
+                    select min(m.metric_value_num)
+                      from analytics.stage s
+                      join analytics.stage_metric m on m.stage_id = s.id
+                     where s.event_id = e.id
+                       and (:metricTypeCode is null or m.metric_type_code = :metricTypeCode)
+               ) end desc nulls last,
+               case when :sortBy = 'startedAt' and :ascending = true then e.started_at end asc nulls last,
+               case when :sortBy = 'startedAt' and :ascending = false then e.started_at end desc nulls last,
+               e.started_at desc,
+               e.id desc
+            """,
+        countQuery = """
+            select count(e.id)
+              from analytics.event e
+              join analytics.event_type et on et.code = e.event_type_code
+             where e.started_at between :from and :to
+               and et.is_system = :systemEventsOnly
+               and (:eventTypeCode is null or e.event_type_code = :eventTypeCode)
+               and (:moduleCode is null or e.module_code = :moduleCode)
+               and (:isError is null or e.is_error = :isError)
+               and (:minDurationMs is null or e.duration_ms >= :minDurationMs)
+               and (:requestPath is null or lower(coalesce(e.request_path, '')) like lower(concat('%', :requestPath, '%')))
+               and (
+                    :errorClass is null
+                    or (:errorClass = 'NONE' and coalesce(e.is_error, false) = false)
+                    or (:errorClass = 'VALIDATION' and coalesce(e.is_error, false) = true and coalesce(e.status_code, 0) < 500 and (
+                        lower(coalesce(e.error_message, '')) like '%required request parameter%'
+                        or lower(coalesce(e.error_message, '')) like '%validation%'
+                        or lower(coalesce(e.error_message, '')) like '%bind%'
+                        or lower(coalesce(e.error_message, '')) like '%failed to convert%'
+                        or lower(coalesce(e.error_message, '')) like '%cannot be null%'
+                        or lower(coalesce(e.error_message, '')) like '%must not%'
+                        or lower(coalesce(e.error_message, '')) like '%некоррект%'
+                        or lower(coalesce(e.error_message, '')) like '%не заполн%'
+                        or lower(coalesce(e.error_message, '')) like '%обязатель%'
+                        or lower(coalesce(e.error_message, '')) like '%валидац%'
+                    ))
+                    or (:errorClass = 'BUSINESS' and coalesce(e.is_error, false) = true and (
+                        (e.status_code = 400 and not (
+                            lower(coalesce(e.error_message, '')) like '%required request parameter%'
+                            or lower(coalesce(e.error_message, '')) like '%validation%'
+                            or lower(coalesce(e.error_message, '')) like '%bind%'
+                            or lower(coalesce(e.error_message, '')) like '%failed to convert%'
+                            or lower(coalesce(e.error_message, '')) like '%cannot be null%'
+                            or lower(coalesce(e.error_message, '')) like '%must not%'
+                            or lower(coalesce(e.error_message, '')) like '%некоррект%'
+                            or lower(coalesce(e.error_message, '')) like '%не заполн%'
+                            or lower(coalesce(e.error_message, '')) like '%обязатель%'
+                            or lower(coalesce(e.error_message, '')) like '%валидац%'
+                        ))
+                        or e.status_code between 401 and 499
+                    ))
+                    or (:errorClass = 'SYSTEM' and coalesce(e.is_error, false) = true and (
+                        coalesce(e.status_code, 0) >= 500
+                        or (
+                            (e.status_code is null or e.status_code < 400 or e.status_code > 499)
+                            and not (
+                                lower(coalesce(e.error_message, '')) like '%required request parameter%'
+                                or lower(coalesce(e.error_message, '')) like '%validation%'
+                                or lower(coalesce(e.error_message, '')) like '%bind%'
+                                or lower(coalesce(e.error_message, '')) like '%failed to convert%'
+                                or lower(coalesce(e.error_message, '')) like '%cannot be null%'
+                                or lower(coalesce(e.error_message, '')) like '%must not%'
+                                or lower(coalesce(e.error_message, '')) like '%некоррект%'
+                                or lower(coalesce(e.error_message, '')) like '%не заполн%'
+                                or lower(coalesce(e.error_message, '')) like '%обязатель%'
+                                or lower(coalesce(e.error_message, '')) like '%валидац%'
+                            )
+                        )
+                    ))
+               )
+               and (
+                    :attributeCode is null
+                    or exists (
+                        select 1
+                          from analytics.event_attribute a
+                         where a.event_id = e.id
+                           and a.attribute_type_code = :attributeCode
+                           and (
+                                :attributeValue is null
+                                or lower(coalesce(a.attr_value, coalesce(a.attr_value_json, ''))) like lower(concat('%', :attributeValue, '%'))
+                           )
+                    )
+               )
+               and (
+                    :metricFilterEnabled = false
+                    or exists (
+                        select 1
+                          from analytics.stage s
+                          join analytics.stage_metric m on m.stage_id = s.id
+                         where s.event_id = e.id
+                           and (:metricTypeCode is null or m.metric_type_code = :metricTypeCode)
+                           and (:metricMinValue is null or m.metric_value_num >= :metricMinValue)
+                           and (:metricMaxValue is null or m.metric_value_num <= :metricMaxValue)
+                    )
+               )
+            """,
+        nativeQuery = true
+    )
+    Page<AnalyticsEvent> searchEventsScoped(
+        @Param("from") Instant from,
+        @Param("to") Instant to,
+        @Param("eventTypeCode") String eventTypeCode,
+        @Param("moduleCode") String moduleCode,
+        @Param("isError") Boolean isError,
+        @Param("errorClass") String errorClass,
+        @Param("minDurationMs") Integer minDurationMs,
+        @Param("requestPath") String requestPath,
+        @Param("attributeCode") String attributeCode,
+        @Param("attributeValue") String attributeValue,
+        @Param("metricFilterEnabled") boolean metricFilterEnabled,
+        @Param("metricTypeCode") String metricTypeCode,
+        @Param("metricMinValue") java.math.BigDecimal metricMinValue,
+        @Param("metricMaxValue") java.math.BigDecimal metricMaxValue,
+        @Param("systemEventsOnly") boolean systemEventsOnly,
+        @Param("sortBy") String sortBy,
+        @Param("ascending") boolean ascending,
+        Pageable pageable
+    );
 }
 
