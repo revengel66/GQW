@@ -82,6 +82,7 @@ public final class AnalyticsApiDto {
     }
 
     public record FilterOptionsResponse(
+        List<OptionDto> modules,
         List<OptionDto> eventTypes,
         List<OptionDto> attributeTypes,
         List<OptionDto> attributeValues
@@ -309,6 +310,17 @@ public final class AnalyticsApiDto {
     ) {
     }
 
+    public record CompareEventRow(
+        String eventTypeCode,
+        String eventTypeName,
+        KpiSnapshot baseline,
+        KpiSnapshot target,
+        KpiDelta delta,
+        long countDelta,
+        long errorCountDelta
+    ) {
+    }
+
     public record CompareResponse(
         Instant baselineFrom,
         Instant baselineTo,
@@ -316,7 +328,8 @@ public final class AnalyticsApiDto {
         Instant targetFrom,
         Instant targetTo,
         KpiSnapshot target,
-        KpiDelta delta
+        KpiDelta delta,
+        List<CompareEventRow> events
     ) {
     }
 
@@ -337,6 +350,102 @@ public final class AnalyticsApiDto {
     public record UniversalCompareResponse(
         UniversalResponse before,
         UniversalResponse after
+    ) {
+    }
+
+    public record UniversalAttributeBreakdownResponse(
+        String attributeCode,
+        long total,
+        long criticalTotal,
+        long warningTotal,
+        long normalTotal,
+        long problemEventCount,
+        List<UniversalAttributeBreakdownRowDto> rows
+    ) {
+    }
+
+    public record UniversalAttributeBreakdownRowDto(
+        String value,
+        long count,
+        BigDecimal share,
+        BigDecimal avgMs,
+        BigDecimal p95Ms,
+        BigDecimal errorRate,
+        String severityLevel
+    ) {
+    }
+
+    public record UniversalRootCauseResponse(
+        String attributeCode,
+        String attributeValue,
+        long problemEventCount,
+        long criticalValueCount,
+        long warningValueCount,
+        List<UniversalRootCauseFactorDto> factors
+    ) {
+    }
+
+    public record UniversalRootCauseFactorDto(
+        String attributeCode,
+        String value,
+        long count,
+        BigDecimal share,
+        BigDecimal avgMs,
+        BigDecimal p95Ms,
+        BigDecimal errorRate
+    ) {
+    }
+
+    public record UniversalErrorBreakdownResponse(
+        long total,
+        long criticalTotal,
+        long warningTotal,
+        long normalTotal,
+        long problemEventCount,
+        List<UniversalErrorBreakdownRowDto> rows
+    ) {
+    }
+
+    public record UniversalErrorBreakdownRowDto(
+        String errorKey,
+        String errorMessage,
+        boolean systemEvent,
+        String eventTypeCode,
+        long count,
+        BigDecimal share,
+        long eventCount,
+        BigDecimal avgMs,
+        BigDecimal p95Ms,
+        Instant lastSeen,
+        String severityLevel
+    ) {
+    }
+
+    public record UniversalModuleBreakdownResponse(
+        long total,
+        long criticalTotal,
+        long warningTotal,
+        long normalTotal,
+        long problemEventCount,
+        List<UniversalModuleBreakdownRowDto> rows
+    ) {
+    }
+
+    public record UniversalModuleBreakdownRowDto(
+        String moduleKey,
+        String moduleCode,
+        String moduleName,
+        String stageTypeCode,
+        String stageTypeName,
+        long count,
+        BigDecimal share,
+        long errorCount,
+        BigDecimal errorRate,
+        BigDecimal avgMs,
+        BigDecimal p95Ms,
+        long eventCount,
+        boolean systemEvent,
+        String severityLevel
     ) {
     }
 

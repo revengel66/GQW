@@ -13,15 +13,15 @@
             <a class="nav-link"
                th:href="@{/analytics-admin/dashboard(tab='universal')}"
                data-analytics-top-tab="universal"
-               th:classappend="${activeTab == 'universal'} ? ' active' : ''">Универсальный анализ</a>
+               th:classappend="${activeTab == 'universal'} ? ' active' : ''">Диагностика</a>
             <a class="nav-link"
                th:href="@{/analytics-admin/dashboard(tab='raw')}"
                data-analytics-top-tab="raw"
-               th:classappend="${activeTab == 'raw'} ? ' active' : ''">Raw события</a>
+               th:classappend="${activeTab == 'raw'} ? ' active' : ''">Журнал событий</a>
             <a class="nav-link"
-               th:href="@{/analytics-admin/dashboard(tab='metrics')}"
-               data-analytics-top-tab="metrics"
-               th:classappend="${activeTab == 'metrics'} ? ' active' : ''">Метрики</a>
+               th:href="@{/analytics-admin/dashboard(tab='system')}"
+               data-analytics-top-tab="system"
+               th:classappend="${activeTab == 'system'} ? ' active' : ''">Служебные события</a>
             <a class="nav-link"
                th:href="@{/analytics-admin/dashboard(tab='compare')}"
                data-analytics-top-tab="compare"
@@ -33,22 +33,39 @@
                th:href="@{/analytics-admin/dictionaries}">
                 Справочники
             </a>
+            <a class="analytics-admin-header-link"
+               th:classappend="${activeTab == 'instruction'} ? ' active' : ''"
+               th:href="@{/analytics-admin/instruction}"
+               target="_blank"
+               rel="noopener noreferrer">
+                Инструкция
+            </a>
 
             <th:block th:if="${authenticated}">
-                <div class="d-flex align-items-center gap-2">
+                <div class="d-flex align-items-center gap-2 analytics-admin-header-tools">
+                    <button class="btn btn-outline-dark btn-sm analytics-header-icon-btn analytics-help-mode-toggle"
+                            type="button"
+                            id="analytics-help-mode-toggle"
+                            aria-pressed="false"
+                            aria-label="Включить подсказки"
+                            title="Включить подсказки">
+                        <i class="bi bi-question-circle" aria-hidden="true"></i>
+                    </button>
                     <button th:if="${showSettingsButton}"
-                            class="btn btn-outline-secondary btn-sm analytics-runtime-settings-trigger"
+                            class="btn btn-dark btn-sm analytics-header-icon-btn analytics-runtime-settings-trigger"
                             type="button"
                             id="analytics-runtime-settings-open"
                             title="Настройки аналитики"
                             aria-label="Настройки аналитики">
-                        <i class="bi bi-gear"></i>
+                        <i class="bi bi-gear-fill" aria-hidden="true"></i>
                     </button>
                     <form method="post" th:action="@{/analytics-admin/logout}" class="m-0">
                         <input th:if="${_csrf != null}" type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-                        <button class="btn btn-outline-danger btn-sm" type="submit">
-                            <i class="bi bi-box-arrow-right"></i>
-                            Выйти
+                        <button class="btn btn-dark btn-sm analytics-header-icon-btn out-btn"
+                                type="submit"
+                                title="Logout"
+                                aria-label="Logout">
+                            <i class="bi bi-box-arrow-right" aria-hidden="true"></i>
                         </button>
                     </form>
                 </div>
@@ -59,7 +76,60 @@
             </th:block>
         </div>
     </div>
+    <script>
+    (function () {
+        var key = "analyticsHelpMode";
+
+        function readEnabled() {
+            try {
+                return window.localStorage.getItem(key) === "on";
+            } catch (error) {
+                return false;
+            }
+        }
+
+        function writeEnabled(enabled) {
+            try {
+                window.localStorage.setItem(key, enabled ? "on" : "off");
+            } catch (error) {
+                // localStorage can be unavailable in restricted modes; default remains off.
+            }
+        }
+
+        function apply(enabled) {
+            document.documentElement.classList.toggle("analytics-help-enabled", enabled);
+            document.documentElement.classList.toggle("analytics-help-disabled", !enabled);
+            var button = document.getElementById("analytics-help-mode-toggle");
+            if (!button) {
+                return;
+            }
+            button.setAttribute("aria-pressed", enabled ? "true" : "false");
+            var title = enabled ? "Выключить подсказки" : "Включить подсказки";
+            button.title = title;
+            button.setAttribute("aria-label", title);
+            button.classList.toggle("is-enabled", enabled);
+            button.classList.toggle("btn-dark", enabled);
+            button.classList.toggle("btn-outline-dark", !enabled);
+        }
+
+        function bindToggle() {
+            apply(readEnabled());
+            var button = document.getElementById("analytics-help-mode-toggle");
+            if (!button || button.dataset.helpToggleBound === "true") {
+                return;
+            }
+            button.dataset.helpToggleBound = "true";
+            button.addEventListener("click", function () {
+                var enabled = !document.documentElement.classList.contains("analytics-help-enabled");
+                writeEnabled(enabled);
+                apply(enabled);
+            });
+        }
+
+        bindToggle();
+        document.addEventListener("DOMContentLoaded", bindToggle);
+    })();
+    </script>
 </nav>
 </body>
 </html>
-

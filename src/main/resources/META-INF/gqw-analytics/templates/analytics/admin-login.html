@@ -13,8 +13,8 @@
 <body class="bg-light">
 <th:block th:replace="~{analytics/fragments/admin-header :: adminHeader(activeTab='login', showSettingsButton=${false}, authenticated=${false})}"></th:block>
 
-<main class="container py-5" style="max-width: 480px;">
-    <div class="card shadow-sm">
+<main class="container py-5 container-form-auth" style="max-width: 480px;">
+    <div class="card">
         <div class="card-body p-4">
             <h1 class="h4 mb-3">Вход в Analytics Admin</h1>
             <div th:if="${error}" class="alert alert-danger py-2" th:text="${error}"></div>

@@ -6,9 +6,12 @@ import com.example.gqw.analytics.aop.AnalyticsEventContextHolder;
 import com.example.gqw.analytics.service.AnalyticsTrackingApi;
 import com.example.gqw.config.TraceIdFilter;
 import java.lang.reflect.Method;
+import java.lang.reflect.Array;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.StringJoiner;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -42,15 +45,24 @@ public class AnalyticsMethodLoggingAspect {
     private final AnalyticsTrackingApi analyticsTrackingApi;
     private final List<AnalyticsOperationDescriptionResolver> operationDescriptionResolvers;
     private final String basePackage;
+    private final boolean controllerEnabled;
+    private final boolean serviceEnabled;
+    private final boolean repositoryEnabled;
 
     public AnalyticsMethodLoggingAspect(
         AnalyticsTrackingApi analyticsTrackingApi,
         List<AnalyticsOperationDescriptionResolver> operationDescriptionResolvers,
-        @Value("${app.analytics.method-logging.base-package:}") String basePackage
+        @Value("${app.analytics.method-logging.base-package:}") String basePackage,
+        @Value("${app.analytics.method-logging.controller-enabled:true}") boolean controllerEnabled,
+        @Value("${app.analytics.method-logging.service-enabled:true}") boolean serviceEnabled,
+        @Value("${app.analytics.method-logging.repository-enabled:false}") boolean repositoryEnabled
     ) {
         this.analyticsTrackingApi = analyticsTrackingApi;
         this.operationDescriptionResolvers = operationDescriptionResolvers;
         this.basePackage = basePackage == null ? "" : basePackage.trim();
+        this.controllerEnabled = controllerEnabled;
+        this.serviceEnabled = serviceEnabled;
+        this.repositoryEnabled = repositoryEnabled;
     }
 
     @Around(
@@ -73,6 +85,9 @@ public class AnalyticsMethodLoggingAspect {
         String className = signature.getDeclaringType().getSimpleName();
         String methodName = signature.getName();
         String layer = resolveLayer(signature.getDeclaringTypeName());
+        if (!isLayerEnabled(layer)) {
+            return joinPoint.proceed();
+        }
         String operation = resolveOperationDescription(joinPoint, signature, className, methodName, layer);
         String traceId = safeMdc(TraceIdFilter.TRACE_ID_MDC_KEY);
         String analyticsEventUid = safeMdc(AnalyticsEventAspect.ANALYTICS_EVENT_UID_MDC_KEY);
@@ -103,6 +118,15 @@ public class AnalyticsMethodLoggingAspect {
                 analyticsEventUid
             );
         }
+        log.info(
+            "Method started {}.{} (operation='{}', layer={}, traceId='{}', eventUid='{}').",
+            className,
+            methodName,
+            operation,
+            layer,
+            traceId,
+            analyticsEventUid
+        );
 
         try {
             Object result = joinPoint.proceed();
@@ -114,7 +138,7 @@ public class AnalyticsMethodLoggingAspect {
 
             if (isHttpError) {
                 log.warn(
-                    "HTTP error in {}.{}: operation='{}', layer={}, status={}, duration={} ms, traceId='{}', eventUid='{}', response='{}'.",
+                    "HTTP error in {}.{}: operation='{}', layer={}, status={}, durationMs={}, traceId='{}', eventUid='{}', response='{}'.",
                     className,
                     methodName,
                     operation,
@@ -127,7 +151,7 @@ public class AnalyticsMethodLoggingAspect {
                 );
             } else {
                 log.info(
-                    "Method finished successfully {}.{}: operation='{}', layer={}, duration={} ms, traceId='{}', eventUid='{}'.",
+                    "Method finished successfully {}.{}: operation='{}', layer={}, durationMs={}, traceId='{}', eventUid='{}'.",
                     className,
                     methodName,
                     operation,
@@ -147,7 +171,7 @@ public class AnalyticsMethodLoggingAspect {
             }
             if (durationMs >= warnThresholdForLayer(layer)) {
                 log.warn(
-                    "Slow execution {}.{}: operation='{}', layer={}, duration={} ms, traceId='{}', eventUid='{}'.",
+                    "Slow execution {}.{}: operation='{}', layer={}, durationMs={}, traceId='{}', eventUid='{}'.",
                     className,
                     methodName,
                     operation,
@@ -164,7 +188,7 @@ public class AnalyticsMethodLoggingAspect {
             Instant endedAt = Instant.now();
             long durationMs = Duration.between(startedAt, endedAt).toMillis();
             log.warn(
-                "Business error in {}.{}: operation='{}', layer={}, duration={} ms, traceId='{}', eventUid='{}', error='{}', cause='{}', args={}",
+                "Business error in {}.{}: operation='{}', layer={}, durationMs={}, traceId='{}', eventUid='{}', error='{}', cause='{}', args={}",
                 className,
                 methodName,
                 operation,
@@ -183,7 +207,7 @@ public class AnalyticsMethodLoggingAspect {
             Instant endedAt = Instant.now();
             long durationMs = Duration.between(startedAt, endedAt).toMillis();
             log.error(
-                "Technical error in {}.{}: operation='{}', layer={}, duration={} ms, traceId='{}', eventUid='{}', error='{}', cause='{}', args={}",
+                "Technical error in {}.{}: operation='{}', layer={}, durationMs={}, traceId='{}', eventUid='{}', error='{}', cause='{}', args={}",
                 className,
                 methodName,
                 operation,
@@ -254,6 +278,15 @@ public class AnalyticsMethodLoggingAspect {
         return value.isBlank() ? null : value;
     }
 
+    private boolean isLayerEnabled(String layer) {
+        return switch (layer) {
+            case "CONTROLLER" -> controllerEnabled;
+            case "SERVICE" -> serviceEnabled;
+            case "REPOSITORY" -> repositoryEnabled;
+            default -> false;
+        };
+    }
+
     private static Logger resolveLogger(ProceedingJoinPoint joinPoint) {
         String declaringTypeName = joinPoint.getSignature().getDeclaringTypeName();
         if (declaringTypeName != null && declaringTypeName.contains(".repository.")) {
@@ -319,6 +352,20 @@ public class AnalyticsMethodLoggingAspect {
             return "null";
         }
         String type = value.getClass().getSimpleName();
+        if (value instanceof Collection<?> collection) {
+            return type + "(size=" + collection.size() + ")";
+        }
+        if (value instanceof Map<?, ?> map) {
+            return type + "(size=" + map.size() + ")";
+        }
+        if (value.getClass().isArray()) {
+            return type + "(length=" + Array.getLength(value) + ")";
+        }
+        if (value instanceof ResponseEntity<?> responseEntity) {
+            Object body = responseEntity.getBody();
+            return type + "(status=" + responseEntity.getStatusCode().value()
+                + ", body=" + (body == null ? "null" : summarizeValue(body)) + ")";
+        }
         String text = String.valueOf(value);
         if (text.isBlank()) {
             return type;

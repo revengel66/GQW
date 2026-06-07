@@ -133,6 +133,21 @@ public class AnalyticsTimeRollupService {
     }
 
     @Transactional(readOnly = true)
+    public List<AggregatePoint> loadEventAggregatePoints(
+        Instant from,
+        Instant to,
+        String moduleCode,
+        Set<String> eventTypeCodes,
+        int targetBucketMinutes,
+        Boolean isError
+    ) {
+        if (isError == null) {
+            return loadEventAggregatePoints(from, to, moduleCode, eventTypeCodes, targetBucketMinutes);
+        }
+        return queryRawEventPoints(from, to, moduleCode, eventTypeCodes, targetBucketMinutes, isError);
+    }
+
+    @Transactional(readOnly = true)
     public List<AggregatePoint> loadStageAggregatePoints(
         Instant from,
         Instant to,
@@ -505,6 +520,17 @@ public class AnalyticsTimeRollupService {
         Set<String> eventTypeCodes,
         int targetBucketMinutes
     ) {
+        return queryRawEventPoints(from, to, moduleCode, eventTypeCodes, targetBucketMinutes, null);
+    }
+
+    private List<AggregatePoint> queryRawEventPoints(
+        Instant from,
+        Instant to,
+        String moduleCode,
+        Set<String> eventTypeCodes,
+        int targetBucketMinutes,
+        Boolean isError
+    ) {
         if (!to.isAfter(from)) {
             return List.of();
         }
@@ -514,7 +540,8 @@ public class AnalyticsTimeRollupService {
             .addValue("toTs", asTimestamp(to))
             .addValue("targetBucketMinutes", targetBucketMinutes)
             .addValue("originTs", asTimestamp(DATE_BIN_ORIGIN))
-            .addValue("moduleCode", moduleCode, Types.VARCHAR);
+            .addValue("moduleCode", moduleCode, Types.VARCHAR)
+            .addValue("isError", isError, Types.BOOLEAN);
 
         String eventTypeClause = "";
         if (eventTypeCodes != null && !eventTypeCodes.isEmpty()) {
@@ -541,6 +568,7 @@ public class AnalyticsTimeRollupService {
                 where e.started_at >= :fromTs
                   and e.started_at < :toTs
                   and (:moduleCode is null or e.module_code = :moduleCode)
+                  and (:isError is null or e.is_error = :isError)
                   and e.event_type_code is not null
             """
                 + eventTypeClause

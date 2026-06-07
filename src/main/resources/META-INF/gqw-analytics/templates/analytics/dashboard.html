@@ -4,13 +4,6 @@
 <body>
 <nav th:replace="~{fragments :: adminNavbar}"></nav>
 <main class="container container-wide py-4 analytics-page">
-    <nav class="admin-breadcrumb mb-3" aria-label="breadcrumb">
-        <ol class="breadcrumb mb-0">
-            <li class="breadcrumb-item"><a th:href="@{/admin}">Админка</a></li>
-            <li class="breadcrumb-item active" aria-current="page">Аналитика</li>
-        </ol>
-    </nav>
-
     <button class="btn btn-dark analytics-filter-fab" type="button" aria-label="Фильтры">
         <i class="bi bi-funnel"></i>
     </button>
@@ -35,7 +28,7 @@
                 </div>
                 <div class="analytics-filter-row analytics-filter-row-2">
                     <div class="analytics-filter-field">
-                        <label class="form-label mb-1">Бакет, мин</label>
+                        <label class="form-label mb-1">Интервал, мин</label>
                         <select class="form-select" id="analytics-bucket">
                             <option value="">Авто</option>
                             <option value="1">1</option>
@@ -173,7 +166,7 @@
         <div class="nav nav-pills analytics-subtabs" role="tablist" aria-label="Вкладки аналитики">
             <button class="nav-link active" type="button" id="analytics-tab-overview" data-analytics-tab="overview">Обзор</button>
             <button class="nav-link" type="button" id="analytics-tab-universal" data-analytics-tab="universal">Универсальный анализ</button>
-            <button class="nav-link" type="button" id="analytics-tab-raw" data-analytics-tab="raw">Raw события</button>
+            <button class="nav-link" type="button" id="analytics-tab-raw" data-analytics-tab="raw">Журнал событий</button>
         </div>
     </section>
 
@@ -240,14 +233,14 @@
                         </button>
                         <div class="analytics-universal-metrics-popup d-none" id="universal-series-metric-popup">
                             <select class="form-select" id="universal-series-metric-list" multiple size="8">
-                                <option value="count" selected>Count</option>
+                                <option value="count" selected>Количество</option>
                                 <option value="avg" selected>AVG</option>
                                 <option value="p95" selected>P95</option>
-                                <option value="error" selected>Error rate</option>
+                                <option value="error" selected>Доля ошибок</option>
                             </select>
                         </div>
                     </div>
-                    <label class="form-check"><input class="form-check-input" type="checkbox" data-universal-series="stages" checked><span class="form-check-label">Слои</span></label>
+                    <label class="form-check"><input class="form-check-input" type="checkbox" data-universal-series="stages" checked><span class="form-check-label">Этапы</span></label>
                 </div>
             </div>
             <div class="analytics-universal-range-row mt-2">
@@ -263,7 +256,7 @@
                     <input class="form-control" type="datetime-local" id="universal-to">
                 </div>
                 <div class="analytics-universal-field analytics-universal-field-bucket">
-                    <label class="form-label mb-1">Бакет, мин</label>
+                    <label class="form-label mb-1">Интервал, мин</label>
                     <select class="form-select" id="universal-bucket">
                         <option value="">Авто</option>
                         <option value="1">1</option>
@@ -319,7 +312,7 @@
                                 <select class="form-select" id="universal-stage-metric-list" multiple size="6">
                                     <option value="avg" selected>AVG</option>
                                     <option value="p95" selected>P95</option>
-                                    <option value="error">Error rate</option>
+                                    <option value="error">Доля ошибок</option>
                                 </select>
                             </div>
                         </div>
@@ -354,7 +347,7 @@
             <div class="analytics-kpi-value" id="kpi-p95-ms">0</div>
         </article>
         <article class="glass-card analytics-kpi-card p-3">
-            <div class="analytics-kpi-label">Error rate</div>
+            <div class="analytics-kpi-label">Доля ошибок</div>
             <div class="analytics-kpi-value" id="kpi-error-rate">0%</div>
         </article>
         <article class="glass-card analytics-kpi-card p-3">
@@ -379,7 +372,7 @@
         </article>
         <article class="glass-card analytics-panel p-3 p-lg-4">
             <div class="analytics-panel-head">
-                <div class="analytics-panel-title">Latency trend</div>
+                <div class="analytics-panel-title">Динамика производительности</div>
                 <div class="analytics-panel-sub">AVG / P95 / P99</div>
             </div>
             <div class="analytics-chart-wrap">
@@ -388,7 +381,7 @@
         </article>
         <article class="glass-card analytics-panel p-3 p-lg-4">
             <div class="analytics-panel-head">
-                <div class="analytics-panel-title">Error rate trend</div>
+                <div class="analytics-panel-title">Динамика ошибок</div>
                 <div class="analytics-panel-sub">Доля ошибок по времени</div>
             </div>
             <div class="analytics-chart-wrap">
@@ -398,7 +391,7 @@
         <article class="glass-card analytics-panel p-3 p-lg-4">
             <div class="analytics-panel-head">
                 <div class="analytics-panel-title">KPI по типам событий</div>
-                <div class="analytics-panel-sub">Count / P95 / Error rate</div>
+                <div class="analytics-panel-sub">Количество / P95 / Доля ошибок</div>
             </div>
             <div class="analytics-chart-wrap">
                 <canvas id="chart-event-kpi" height="130"></canvas>
@@ -409,7 +402,7 @@
     <section class="glass-card analytics-panel p-3 p-lg-4 mb-4" data-analytics-view="overview">
         <div class="analytics-panel-head mb-3">
             <div class="analytics-panel-title">Этапы выполнения</div>
-            <div class="analytics-panel-sub">Drill-down по CONTROLLER/SERVICE/DATABASE/FRONTEND</div>
+            <div class="analytics-panel-sub">Детализация по контроллеру, сервису, базе данных и фронтенду</div>
         </div>
         <div class="analytics-grid analytics-grid-2">
             <div>
@@ -424,18 +417,18 @@
             </div>
         </div>
         <div class="small text-muted mt-3 mb-1">
-            Сводка ниже всегда показывает общую статистику по верхним фильтрам (период, модуль, path, тип события), без учёта выбора событий в графиках этого блока.
+            Сводка ниже всегда показывает общую статистику по верхним фильтрам (период, модуль, внутренний маршрут, тип события), без учёта выбора событий в графиках этого блока.
         </div>
         <div class="table-responsive">
             <table class="table table-sm align-middle analytics-table" id="analytics-stage-table">
                 <thead>
                 <tr>
                     <th>Этап</th>
-                    <th class="text-end">Count</th>
+                    <th class="text-end">Количество</th>
                     <th class="text-end">AVG</th>
                     <th class="text-end">P95</th>
                     <th class="text-end">P99</th>
-                    <th class="text-end">Error rate</th>
+                    <th class="text-end">Доля ошибок</th>
                 </tr>
                 </thead>
                 <tbody></tbody>
@@ -627,8 +620,7 @@
 
     <section class="glass-card analytics-panel p-3 p-lg-4 mb-4" data-analytics-view="raw">
         <div class="analytics-panel-head mb-3">
-            <div class="analytics-panel-title">Raw события</div>
-            <div class="analytics-panel-sub">Фильтрация проблемных кейсов и переход к деталям</div>
+            <div class="analytics-panel-title">Журнал событий</div>
         </div>
         <form class="mb-3 analytics-events-form" id="analytics-events-form">
             <section class="analytics-filter-group mb-2">
@@ -691,8 +683,8 @@
                             <option value="durationMs">Длительность</option>
                             <option value="statusCode">HTTP</option>
                             <option value="eventTypeCode">Событие</option>
-                            <option value="traceId">Trace</option>
-                            <option value="requestPath">Path</option>
+                            <option value="traceId">Трассировка</option>
+                            <option value="requestPath">Внутренний маршрут</option>
                             <option value="isError">Статус</option>
                             <option value="metricValue">Значение метрики</option>
                         </select>
@@ -718,7 +710,7 @@
                     <div class="analytics-filter-group-title">Метрики</div>
                     <div class="analytics-events-inline-row analytics-events-inline-row-metrics">
                         <div class="analytics-events-field analytics-events-field-metric-type">
-                            <label class="form-label mb-1">Метрика этапа</label>
+                            <label class="form-label mb-1">Метрика</label>
                             <select class="form-select" id="events-metric-type">
                                 <option value="">Любая метрика</option>
                             </select>
@@ -763,8 +755,8 @@
                     <th>Событие</th>
                     <th class="text-end">ms</th>
                     <th class="text-end">HTTP</th>
-                    <th>Path</th>
-                    <th>Trace</th>
+                    <th>Внутренний маршрут</th>
+                    <th>Трассировка</th>
                     <th>Класс</th>
                     <th>Статус</th>
                     <th class="text-end"></th>
@@ -802,19 +794,19 @@
                 </select>
             </div>
             <div class="col-6 col-lg-3">
-                <label class="form-label mb-1">База: с</label>
+                <label class="form-label mb-1">До: с</label>
                 <input class="form-control" type="datetime-local" id="compare-baseline-from">
             </div>
             <div class="col-6 col-lg-3">
-                <label class="form-label mb-1">База: по</label>
+                <label class="form-label mb-1">До: по</label>
                 <input class="form-control" type="datetime-local" id="compare-baseline-to">
             </div>
             <div class="col-6 col-lg-3">
-                <label class="form-label mb-1">Текущий: с</label>
+                <label class="form-label mb-1">После: с</label>
                 <input class="form-control" type="datetime-local" id="compare-target-from">
             </div>
             <div class="col-6 col-lg-2">
-                <label class="form-label mb-1">Текущий: по</label>
+                <label class="form-label mb-1">После: по</label>
                 <input class="form-control" type="datetime-local" id="compare-target-to">
             </div>
             <div class="col-12 col-lg-1 d-grid">

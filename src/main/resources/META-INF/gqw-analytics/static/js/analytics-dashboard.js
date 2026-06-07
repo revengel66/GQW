@@ -85,7 +85,9 @@
         expandedIntervalSelectionEnabledBySource: {},
         expandedIntervalSelectionBySource: {},
         activeAnalysisInterval: null,
+        analysisIntervalHistory: [],
         submitMainFilters: null,
+        submitUniversalFilters: null,
         preserveChartUiStateDuringMainSubmit: false,
         globalLoadingDepth: 0,
         panelLoadingDepthByElement: new WeakMap(),
@@ -100,14 +102,79 @@
         universalAnalysisMode: "overall",
         universalMetricSelectionBeforeSingle: [],
         universalMetricSingleForced: false,
+        universalDiagnosticsDrilldownContext: null,
         universalPayloadCacheByKey: new Map(),
         universalPayloadPromiseByKey: new Map(),
+        universalTopEventRows: [],
+        universalTopEventVisibleCount: 50,
+        universalTopEventSortBy: "riskScore",
+        universalTopEventSortDir: "desc",
+        universalTopEventSeverityTotals: {critical: 0, warning: 0, normal: 0},
+        universalTopEventSelectedCode: "",
+        universalTopEventSearchQuery: "",
+        universalEventRootCauseRequestId: 0,
+        universalEventRootCauseAbortController: null,
+        universalAttributeRequestId: 0,
+        universalAttributeHintRequestId: 0,
+        universalAttributeTypes: [],
+        universalAttributeValueCounts: new Map(),
+        universalAttributeTopValues: new Map(),
+        universalAttributeCardHints: new Map(),
+        universalAttributePickerOpen: false,
+        universalAttributeUserSelected: false,
+        universalAttributePinnedRow: null,
+        universalAttributeSearchQuery: "",
+        universalAttributeValues: [],
+        universalAttributeRows: [],
+        universalAttributeVisibleCount: 50,
+        universalAttributeTotalRows: 0,
+        universalAttributeProblemEventCount: 0,
+        universalAttributeSeverityTotals: {critical: 0, warning: 0, normal: 0},
+        universalAttributeSortBy: "riskScore",
+        universalAttributeSortDir: "desc",
+        universalAttributeAbortController: null,
+        universalRootCauseRequestId: 0,
+        universalRootCauseAbortController: null,
+        universalRootCauseSelectedValue: "",
+        universalErrorRows: [],
+        universalErrorVisibleCount: 50,
+        universalErrorTotalRows: 0,
+        universalErrorProblemEventCount: 0,
+        universalErrorSeverityTotals: {critical: 0, warning: 0, normal: 0},
+        universalErrorSortBy: "riskScore",
+        universalErrorSortDir: "desc",
+        universalErrorSelectedKey: "",
+        universalErrorSelectedSystemEvent: false,
+        universalErrorSearchQuery: "",
+        universalErrorRequestId: 0,
+        universalErrorRootCauseRequestId: 0,
+        universalErrorRootCauseAbortController: null,
+        universalModuleRows: [],
+        universalModuleVisibleCount: 50,
+        universalModuleTotalRows: 0,
+        universalModuleProblemEventCount: 0,
+        universalModuleSeverityTotals: {critical: 0, warning: 0, normal: 0},
+        universalModuleSortBy: "riskScore",
+        universalModuleSortDir: "desc",
+        universalModuleSelectedKey: "",
+        universalModuleSearchQuery: "",
+        universalModuleRequestId: 0,
+        universalModuleRootCauseRequestId: 0,
+        universalModuleRootCauseAbortController: null,
+        eventsForcedErrorKey: "",
+        eventsForcedModuleCode: "",
+        eventsForcedStageTypeCode: "",
         eventKpiMiniLoadId: 0,
         eventKpiMiniRenderLoadId: 0,
         eventKpiMiniRenderPromise: null,
         eventKpiMiniRenderResolve: null,
         eventKpiFirstLoadCompleted: false,
         eventKpiMiniRowsSnapshot: null,
+        scenarioDetailRequestId: 0,
+        scenarioDetailDrilldownBySource: {},
+        scenarioDetailBeforeDrilldownBySource: {},
+        scenarioDetailSelectionBySource: {},
+        scenarioEventFilterBeforeBySource: {},
         universalZoomBaseByCanvas: {},
         universalAllTime: false,
         allTimeRange: null,
@@ -116,6 +183,24 @@
         eventsSize: 15,
         eventsHasMore: false,
         eventsRequestId: 0,
+        eventsLoading: false,
+        eventsForcedEventCodes: null,
+        eventsSortBy: "startedAt",
+        eventsSortDir: "desc",
+        eventDetailsRequestId: 0,
+        systemChartRequestId: 0,
+        systemMetricSelectionBeforeSingle: [],
+        systemMetricSingleForced: false,
+        systemEventsSortBy: "startedAt",
+        systemEventsSortDir: "desc",
+        systemIntervalSelectionEnabled: false,
+        systemIntervalSelection: null,
+        systemIntervalHistory: [],
+        systemActiveInterval: null,
+        systemChartLocalDirty: false,
+        syncingSystemChartFromMain: false,
+        compareFilterDirty: false,
+        compareLoaded: false,
         currentDashboardTab: "overview",
         eventsSystemOnly: false,
         cardLoaderHostsByScope: {},
@@ -125,6 +210,10 @@
         sectionLoaderBoundsByScope: {}
     };
     const MAX_CHART_POINTS = 220;
+    const UNIVERSAL_TABLE_PAGE_SIZE = 50;
+    const UNIVERSAL_DEFAULT_SOFT_LIMIT = 500;
+    const UNIVERSAL_DEFAULT_HARD_LIMIT = 2000;
+    const UNIVERSAL_ATTRIBUTE_TABLE_TIMEOUT_MS = 3000;
     const STAGE_METRIC_SERIES_CACHE_LIMIT = 200;
         const HELP_TEXTS = {
         "kpi-total-events": "Общее число событий за выбранный период. Рост при стабильной ошибке обычно означает рост нагрузки.",
@@ -135,17 +224,17 @@
         "kpi-errors": "Абсолютное число событий с ошибкой за период.",
         "chart-events-count": "График показывает интенсивность трафика по времени. Пики указывают на нагрузку или пользовательские всплески.",
         "chart-latency": "Линии AVG/P95/P99 отражают скорость обработки. Если P95/P99 растут быстрее AVG, есть деградация хвоста распределения.",
-        "chart-error-rate": "Доля ошибок по времени. Ищите всплески и сверяйте их с конкретными событиями в Raw.",
-        "chart-event-kpi": "Сравнение событий между собой: count, P95 и error rate. Помогает выявить самые рискованные типы событий.",
-        "chart-stage-latency": "Время по слоям (CONTROLLER/SERVICE/DATABASE). Показывает, где тратится основная часть времени.",
-        "chart-stage-errors": "Ошибки по слоям. Если растет DATABASE, чаще всего проблема в SQL/соединениях/таймаутах.",
-        "chart-stage-metric-series": "Временная динамика метрик этапа. При разных единицах график нормализуется в проценты от максимума по каждой метрике.",
+        "chart-error-rate": "Доля ошибок по времени. Ищите всплески и сверяйте их с конкретными сырыми событиями.",
+        "chart-event-kpi": "Сравнение событий между собой: количество, P95 и доля ошибок. Помогает выявить самые рискованные типы событий.",
+        "chart-stage-latency": "Время по этапам: контроллер, сервис и база данных. Показывает, где тратится основная часть времени.",
+        "chart-stage-errors": "Ошибки по этапам. Если растет база данных, чаще всего проблема в SQL, соединениях или таймаутах.",
+        "chart-stage-metric-series": "Временная динамика метрик. При разных единицах график нормализуется в проценты от максимума по каждой метрике.",
         "chart-stage-metric-text": "График показывает распределение выбранной текстовой метрики по наиболее частым значениям. Используйте его, чтобы увидеть, какие URL, HTTP-методы, статусы, traceId или другие текстовые признаки встречаются чаще всего. В режиме сравнения можно сопоставить распределение значений в периодах «До» и «После».",
-        "chart-stage-metric-top-values": "Для одной метрики показывает top значений, для нескольких — сравнение P95. Удобно искать аномалии относительно P95/AVG.",
-        "analytics-stage-table": "Сводка по этапам: count/avg/p95/p99/error rate. Приоритизируйте оптимизации по p95/p99 и error rate.",
-        "analytics-stage-metric-table": "Агрегированная статистика метрик этапов и top значений. Используйте для поиска аномалий на уровне инфраструктуры.",
-        "analytics-events-table": "Raw-события для расследования инцидентов: фильтруйте по ошибкам, path, атрибутам, trace и метрикам.",
-        "chart-compare-delta": "Сравнение до/после между двумя периодами. Отрицательная дельта по latency/error rate обычно означает улучшение."
+        "chart-stage-metric-top-values": "Для одной метрики показывает частые значения, для нескольких - сравнение P95. Удобно искать аномалии относительно P95/AVG.",
+        "analytics-stage-table": "Сводка по этапам: количество, среднее время, P95, P99 и доля ошибок. Приоритизируйте оптимизации по P95, P99 и доле ошибок.",
+        "analytics-stage-metric-table": "Агрегированная статистика метрик и частых значений. Используйте для поиска аномалий на уровне инфраструктуры.",
+        "analytics-events-table": "Сырые события для расследования инцидентов: фильтруйте по ошибкам, внутреннему маршруту, атрибутам, трассировке и метрикам.",
+        "chart-compare-delta": "Сравнение до/после между двумя периодами. Отрицательная дельта по времени отклика или доле ошибок обычно означает улучшение."
     };
     const CHART_HELP_TARGETS = new Set([
         "chart-events-count",
@@ -189,7 +278,9 @@
     ]);
     const EXPANDED_SINGLE_EVENT_FILTER_CHART_IDS = new Set([]);
     const NO_EXPAND_CHART_IDS = new Set([
-        "chart-universal-event-kpi"
+        "chart-universal-event-kpi",
+        "chart-system-events",
+        "chart-system-events-compare"
     ]);
     const METRIC_EXPANDED_CONTROLLESS_CHART_IDS = new Set([
         "chart-stage-metric-series",
@@ -218,6 +309,21 @@
     const UNIVERSAL_COMPARE_FOLLOWS_GLOBAL = true;
     const QUICK_RANGE_CUSTOM_LABEL = "—";
     const QUICK_RANGE_MATCH_TOLERANCE_MS = 60_000;
+    const UNIVERSAL_ANALYSIS_PRESET_VALUES = new Set([
+        "15m",
+        "30m",
+        "1h",
+        "3h",
+        "6h",
+        "12h",
+        "24h",
+        "1w",
+        "1mo",
+        "3mo",
+        "6mo",
+        "1y",
+        "all"
+    ]);
     const INLINE_COMPARE_PRESET_OPTIONS = [
         {value: "15m", label: "15м"},
         {value: "30m", label: "30м"},
@@ -244,7 +350,7 @@
                 id: "traffic_spike",
                 label: "Всплеск нагрузки",
                 description: "Ищет резкие пики количества событий и помогает сверить их с модулем, типом события и периодом.",
-                details: "Смотрите, появился ли пик одновременно на всех событиях или только на одном типе. Если пик локальный, дальше сузьте фильтр по event type и path."
+                details: "Смотрите, появился ли пик одновременно на всех событиях или только на одном типе. Если пик локальный, дальше сузьте фильтр по типу события и внутреннему маршруту."
             },
             {
                 id: "traffic_drop",
@@ -262,15 +368,15 @@
                 id: "event_mix_shift",
                 label: "Смена структуры событий",
                 description: "Помогает заметить, что нагрузка сместилась между типами событий или модулями.",
-                details: "После выбора сценария проверьте KPI по типам событий и Raw-события для доминирующих event type."
+                details: "После выбора сценария проверьте KPI по типам событий и сырые события для доминирующего типа события."
             }
         ],
         "chart-latency": [
             {
                 id: "tail_latency",
-                label: "Проблема хвоста latency",
+                label: "Проблема хвоста времени отклика",
                 description: "Фокус на P95/P99, когда редкие запросы становятся заметно тяжелее обычных.",
-                details: "Если P95/P99 растут быстрее AVG, ищите отдельные тяжелые trace и path, а не среднюю деградацию."
+                details: "Если P95/P99 растут быстрее AVG, ищите отдельные тяжелые трассировки и внутренние маршруты, а не среднюю деградацию."
             },
             {
                 id: "avg_p95_gap",
@@ -280,15 +386,15 @@
             },
             {
                 id: "release_latency",
-                label: "Latency после релиза",
+                label: "Время отклика после релиза",
                 description: "Сценарий для сравнения скорости до и после изменения.",
-                details: "Сравнивайте равные окна. Если latency выросла без роста count, вероятна регрессия обработки."
+                details: "Сравнивайте равные окна. Если время отклика выросло без роста количества, вероятна регрессия обработки."
             },
             {
                 id: "latency_spikes",
                 label: "Пики P95/P99",
                 description: "Ищет короткие выбросы задержек.",
-                details: "Для коротких пиков переходите в Raw по времени пика и сверяйте trace/error class."
+                details: "Для коротких пиков переходите в сырые события по времени пика и сверяйте трассировку и класс ошибки."
             }
         ],
         "chart-error-rate": [
@@ -296,13 +402,13 @@
                 id: "error_burst",
                 label: "Всплеск ошибок",
                 description: "Фокус на резком росте доли ошибок.",
-                details: "Сверьте error rate с count. Если count стабилен, а error rate растет, проблема вероятно локальная."
+                details: "Сверьте долю ошибок с количеством. Если количество стабильно, а доля ошибок растет, проблема вероятно локальная."
             },
             {
                 id: "errors_without_load",
                 label: "Ошибки без роста нагрузки",
                 description: "Показывает ошибки, которые не объясняются пиком трафика.",
-                details: "Проверьте error class, HTTP status и конкретный event type в Raw-событиях."
+                details: "Проверьте класс ошибки, HTTP-статус и конкретный тип события в сырых событиях."
             },
             {
                 id: "repeated_error_peaks",
@@ -313,52 +419,52 @@
             {
                 id: "event_module_errors",
                 label: "Ошибки по событиям/модулям",
-                description: "Помогает найти, какой модуль или event type дает основной вклад в ошибки.",
-                details: "Сузьте фильтр по модулю и типу события, затем проверьте Raw и trace."
+                description: "Помогает найти, какой модуль или тип события дает основной вклад в ошибки.",
+                details: "Сузьте фильтр по модулю и типу события, затем проверьте сырые события и трассировку."
             }
         ],
         "chart-event-kpi": [
             {
                 id: "top_load_events",
                 label: "События с максимумом нагрузки",
-                description: "Сравнивает event types по count.",
-                details: "Высокий count без ошибок может быть нормой. Высокий count вместе с error rate или P95 требует приоритета."
+                description: "Сравнивает типы событий по количеству.",
+                details: "Высокое количество без ошибок может быть нормой. Высокое количество вместе с долей ошибок или P95 требует приоритета."
             },
             {
                 id: "top_latency_events",
                 label: "События с высоким P95",
-                description: "Ищет типы событий с тяжелым хвостом latency.",
-                details: "Низкий count и высокий P95 часто указывают на редкий, но дорогой сценарий."
+                description: "Ищет типы событий с тяжелым хвостом времени отклика.",
+                details: "Низкое количество и высокий P95 часто указывают на редкий, но дорогой сценарий."
             },
             {
                 id: "top_error_events",
-                label: "События с высоким error rate",
-                description: "Выделяет event types, где доля ошибок выше остальных.",
-                details: "Проверьте, нет ли малого count: при малой выборке error rate может быть шумным."
+                label: "События с высокой долей ошибок",
+                description: "Выделяет типы событий, где доля ошибок выше остальных.",
+                details: "Проверьте, нет ли малой выборки: при малом количестве доля ошибок может быть шумной."
             },
             {
                 id: "event_compare_shift",
-                label: "Сравнение event types до/после",
+                label: "Сравнение типов событий до/после",
                 description: "Помогает увидеть, какие типы событий изменились между периодами.",
-                details: "Используйте режим наложения или раздельное сравнение, затем проверяйте конкретный event type."
+                details: "Используйте режим наложения или раздельное сравнение, затем проверяйте конкретный тип события."
             }
         ],
         "chart-stage-latency": [
             {
                 id: "layer_bottleneck",
                 label: "Узкое место по слоям",
-                description: "Сравнивает вклад CONTROLLER, SERVICE, DATABASE и frontend/network этапов.",
+                description: "Сравнивает вклад контроллера, сервиса, базы данных, фронтенда и сети.",
                 details: "Если один слой стабильно выше остальных, начинайте расследование с него."
             },
             {
                 id: "database_degradation",
-                label: "Деградация DATABASE",
+                label: "Деградация базы данных",
                 description: "Фокус на росте задержек слоя базы данных.",
-                details: "Сверьте с DB_QUERY_COUNT, размером ответа и Raw trace проблемных запросов."
+                details: "Сверьте с количеством SQL-запросов, размером ответа и логами трассировки проблемных запросов."
             },
             {
                 id: "service_degradation",
-                label: "Деградация SERVICE",
+                label: "Деградация сервиса",
                 description: "Проверяет рост времени бизнес-логики.",
                 details: "Ищите новые ветки логики, внешние вызовы и тяжелые операции после релиза."
             },
@@ -374,45 +480,45 @@
                 id: "stage_error_growth",
                 label: "Рост ошибок на этапе",
                 description: "Показывает, какой этап дает основной вклад в ошибки.",
-                details: "Сначала локализуйте этап, затем переходите в Raw по error class и trace."
+                details: "Сначала локализуйте этап, затем переходите в сырые события по классу ошибки и трассировке."
             },
             {
                 id: "database_errors",
-                label: "Ошибки DATABASE",
+                label: "Ошибки базы данных",
                 description: "Фокус на сбоях базы данных и запросов.",
                 details: "Проверьте timeout, connection pool, SQL и нагрузку в тот же период."
             },
             {
                 id: "frontend_network_errors",
-                label: "FRONTEND/NETWORK проблемы",
-                description: "Помогает отделить клиентские и сетевые сбои от backend-сбоев.",
-                details: "Сверьте user agent, client type, HTTP status и request path."
+                label: "Проблемы фронтенда и сети",
+                description: "Помогает отделить клиентские и сетевые сбои от серверных сбоев.",
+                details: "Сверьте клиентское ПО, тип клиента, HTTP-статус и внутренний маршрут."
             },
             {
                 id: "stage_drilldown",
-                label: "Drill-down по слоям",
-                description: "Сценарий для последовательного сужения от слоя к событию и trace.",
-                details: "Выберите проблемный слой, затем фильтруйте Raw по событию, path и error class."
+                label: "Детализация по этапам",
+                description: "Сценарий для последовательного сужения от этапа к событию и трассировке.",
+                details: "Выберите проблемный этап, затем фильтруйте сырые события по событию, внутреннему маршруту и классу ошибки."
             }
         ],
         "chart-stage-metric-series": [
             {
                 id: "db_query_growth",
                 label: "Рост SQL-запросов",
-                description: "Отслеживает увеличение DB query count во времени.",
-                details: "Рост SQL вместе с latency DATABASE обычно указывает на лишние запросы или тяжелые выборки."
+                description: "Отслеживает увеличение количества SQL-запросов во времени.",
+                details: "Рост SQL вместе со временем отклика базы данных обычно указывает на лишние запросы или тяжелые выборки."
             },
             {
                 id: "response_size_growth",
                 label: "Большой размер ответа",
-                description: "Проверяет, тянет ли размер ответа latency вверх.",
-                details: "Сравнивайте RESPONSE_SIZE/TRANSFER_SIZE с P95 и количеством элементов."
+                description: "Проверяет, тянет ли размер ответа время отклика вверх.",
+                details: "Сравнивайте размер ответа с P95 и количеством элементов."
             },
             {
                 id: "retry_growth",
                 label: "Рост повторов",
                 description: "Ищет увеличение retry/повторных операций.",
-                details: "Повторы часто маскируют внешние сбои и увеличивают хвост latency."
+                details: "Повторы часто маскируют внешние сбои и увеличивают хвост времени отклика."
             },
             {
                 id: "numeric_text_compare",
@@ -426,7 +532,7 @@
                 id: "problem_urls",
                 label: "Проблемные URL",
                 description: "Ищет URL, которые чаще попадают в проблемные события.",
-                details: "Сопоставьте URL с latency, error rate и HTTP status."
+                details: "Сопоставьте URL со временем отклика, долей ошибок и HTTP-статусом."
             },
             {
                 id: "http_methods",
@@ -437,14 +543,14 @@
             {
                 id: "error_codes",
                 label: "Коды ошибок",
-                description: "Группирует проблемные события по error code/status.",
+                description: "Группирует проблемные события по коду ошибки и статусу.",
                 details: "Один доминирующий код обычно дает более быстрый путь к первопричине."
             },
             {
                 id: "anomalous_sample",
                 label: "Аномальная выборка",
                 description: "Помогает найти нетипичные значения атрибутов в проблемном периоде.",
-                details: "Сравните top значений в обычном и проблемном окне."
+                details: "Сравните самые частые значения в обычном и проблемном окне."
             }
         ],
         "chart-universal-timeline": [
@@ -452,7 +558,7 @@
                 id: "universal_event_analysis",
                 label: "Анализ события",
                 description: "Фокус на динамике выбранного события во времени.",
-                details: "Используйте фильтр event type и смотрите count, P95 и error rate вместе."
+                details: "Используйте фильтр типа события и смотрите количество, P95 и долю ошибок вместе."
             },
             {
                 id: "universal_attr_slice",
@@ -462,9 +568,9 @@
             },
             {
                 id: "universal_correlation",
-                label: "Корреляция count/latency/error",
+                label: "Связь количества, времени отклика и ошибок",
                 description: "Помогает понять, связана ли деградация с нагрузкой.",
-                details: "Если latency/error растут без count, ищите регрессию или внешний bottleneck."
+                details: "Если время отклика или ошибки растут без роста количества, ищите регрессию или внешнее узкое место."
             },
             {
                 id: "universal_before_after",
@@ -476,20 +582,20 @@
         "chart-universal-stages": [
             {
                 id: "universal_layer_analysis",
-                label: "Анализ слоя",
-                description: "Показывает, какой слой влияет на выбранный срез universal.",
-                details: "Фильтруйте stage type и смотрите, меняется ли картина относительно общей timeline."
+                label: "Анализ этапа",
+                description: "Показывает, какой этап влияет на выбранный срез диагностики.",
+                details: "Фильтруйте тип этапа и смотрите, меняется ли картина относительно общей динамики."
             },
             {
                 id: "universal_layer_bottleneck",
-                label: "Узкое место слоя",
-                description: "Ищет слой, который объясняет P95 или ошибки.",
-                details: "Дальше переходите к метрикам этапов и Raw trace."
+                label: "Узкое место этапа",
+                description: "Ищет этап, который объясняет P95 или ошибки.",
+                details: "Дальше переходите к сырым событиям и логам трассировки."
             },
             {
                 id: "universal_stage_compare",
-                label: "Слои до/после",
-                description: "Сравнивает вклад слоев в двух периодах.",
+                label: "Этапы до/после",
+                description: "Сравнивает вклад этапов в двух периодах.",
                 details: "Удобно после релиза или изменения фильтра."
             }
         ],
@@ -497,18 +603,18 @@
             {
                 id: "universal_event_kpi",
                 label: "KPI событий в срезе",
-                description: "Сравнивает event types внутри выбранного universal-среза.",
-                details: "Ищите event type с высоким count, P95 или error rate внутри выбранного фильтра."
+                description: "Сравнивает типы событий внутри выбранного среза диагностики.",
+                details: "Ищите тип события с высоким количеством, P95 или долей ошибок внутри выбранного фильтра."
             },
             {
                 id: "universal_problem_event",
-                label: "Проблемный event type",
+                label: "Проблемный тип события",
                 description: "Помогает найти событие, которое портит общий срез.",
-                details: "После выбора события проверьте timeline и Raw."
+                details: "После выбора события проверьте динамику и сырые события."
             },
             {
                 id: "universal_event_shift",
-                label: "Смена структуры event types",
+                label: "Смена структуры типов событий",
                 description: "Показывает перекос нагрузки между событиями.",
                 details: "Полезно для анализа изменения поведения пользователей или маршрутизации."
             }
@@ -518,11 +624,11 @@
                 id: "release_delta",
                 label: "Дельта после релиза",
                 description: "Показывает изменение ключевых KPI между двумя периодами.",
-                details: "Положительная дельта latency/error rate обычно требует проверки Raw и stage breakdown."
+                details: "Положительная дельта времени отклика или доли ошибок обычно требует проверки сырых событий и разбора этапов."
             },
             {
                 id: "latency_delta",
-                label: "Дельта latency",
+                label: "Дельта времени отклика",
                 description: "Фокус на изменении AVG/P95/P99.",
                 details: "Сравнивайте только равные окна и одинаковые фильтры."
             },
@@ -530,7 +636,7 @@
                 id: "error_delta",
                 label: "Дельта ошибок",
                 description: "Показывает изменение ошибок между периодами.",
-                details: "Если count не вырос, а error rate вырос, вероятна регрессия качества."
+                details: "Если количество не выросло, а доля ошибок выросла, вероятна регрессия качества."
             }
         ]
     };
@@ -567,118 +673,118 @@
                 id: "traffic_spike",
                 label: "Пиковая нагрузка",
                 description: "Помогает найти резкий рост количества событий и понять, связан ли он с деградацией.",
-                details: "Используйте, когда на графике count появился выраженный пик. Сначала проверьте общий поток событий, затем KPI по типам событий, latency и error rate. Если растет только count, это может быть нормальный всплеск трафика; если вместе растут P95 или ошибки, нужен разбор Raw-событий и слоев.",
-                checklist: ["Сравнить count с P95 и error rate", "Проверить, один event type вырос или весь поток", "Открыть Raw за время пика"]
+                details: "Используйте, когда на графике количества появился выраженный пик. Сначала проверьте общий поток событий, затем KPI по типам событий, время отклика и долю ошибок. Если растет только количество, это может быть нормальный всплеск трафика; если вместе растут P95 или ошибки, нужен разбор сырых событий и этапов.",
+                checklist: ["Сравнить количество с P95 и долей ошибок", "Проверить, один тип события вырос или весь поток", "Открыть сырые события за время пика"]
             },
             {
                 id: "tail_latency",
-                label: "Проблема хвоста latency",
+                label: "Проблема хвоста времени отклика",
                 description: "Фокус на P95/P99, когда небольшая часть запросов становится заметно медленнее.",
-                details: "Подходит, если AVG почти стабилен, а P95/P99 растут. Смотрите latency trend, KPI по событиям, stage latency и Raw trace. Ложный вывод: считать проблему общей деградацией, хотя тормозит отдельный редкий сценарий.",
-                checklist: ["Сравнить AVG, P95 и P99", "Найти событие с высоким P95", "Проверить слой DATABASE/SERVICE/CONTROLLER"]
+                details: "Подходит, если AVG почти стабилен, а P95/P99 растут. Смотрите динамику производительности, KPI по событиям, длительность этапов и логи трассировки. Ложный вывод: считать проблему общей деградацией, хотя тормозит отдельный редкий сценарий.",
+                checklist: ["Сравнить AVG, P95 и P99", "Найти событие с высоким P95", "Проверить этап: база данных, сервис или контроллер"]
             },
             {
                 id: "error_burst",
                 label: "Всплеск ошибок",
-                description: "Ищет короткий или устойчивый рост error rate и абсолютного числа ошибок.",
-                details: "Используйте вместе с count: рост error rate без роста нагрузки чаще указывает на регрессию, а рост ошибок вместе с count может быть эффектом перегрузки. Дальше проверяйте error class, HTTP status, event type и Raw.",
-                checklist: ["Сравнить errors и error rate", "Проверить count", "Открыть Raw по error class/status"]
+                description: "Ищет короткий или устойчивый рост доли ошибок и абсолютного числа ошибок.",
+                details: "Используйте вместе с количеством: рост доли ошибок без роста нагрузки чаще указывает на регрессию, а рост ошибок вместе с количеством может быть эффектом перегрузки. Дальше проверяйте класс ошибки, HTTP-статус, тип события и сырые события.",
+                checklist: ["Сравнить количество ошибок и долю ошибок", "Проверить количество", "Открыть сырые события по классу ошибки и статусу"]
             },
             {
                 id: "release_compare",
                 label: "До/после релиза",
                 description: "Сценарий для сравнения равных окон до и после изменения.",
-                details: "Включайте compare overlay/split и сравнивайте count, P95, error rate, stage latency и состав событий. Важно использовать одинаковые фильтры и сопоставимые интервалы.",
-                checklist: ["Включить compare", "Сравнить P95/error rate", "Проверить изменение состава event types"]
+                details: "Включайте сравнение наложением или раздельно и сравнивайте количество, P95, долю ошибок, длительность этапов и состав событий. Важно использовать одинаковые фильтры и сопоставимые интервалы.",
+                checklist: ["Включить сравнение", "Сравнить P95 и долю ошибок", "Проверить изменение состава типов событий"]
             },
             {
                 id: "layer_bottleneck",
                 label: "Узкое место по слоям",
-                description: "Помогает понять, какой слой дает основной вклад в задержку или ошибки.",
-                details: "Смотрите stage latency/errors, затем stage metrics и Raw. Если DATABASE растет вместе с DB_QUERY_COUNT или RESPONSE_SIZE, вероятна проблема запроса или объема данных.",
-                checklist: ["Сравнить слои", "Проверить stage metrics", "Перейти к Raw trace"]
+                description: "Помогает понять, какой этап дает основной вклад во время отклика или ошибки.",
+                details: "Смотрите длительность этапов и ошибки по этапам, затем переходите к сырым событиям. Если база данных растет вместе с количеством SQL-запросов или размером ответа, вероятна проблема запроса или объема данных.",
+                checklist: ["Сравнить этапы", "Проверить сырые события", "Перейти к логам трассировки"]
             },
             {
                 id: "error_without_load",
                 label: "Ошибки без роста нагрузки",
                 description: "Ищет регрессию качества при стабильном количестве событий.",
-                details: "Если count стабилен, а error rate растет, причина часто в изменении логики, внешнем сервисе или данных. Проверьте error class, request path и конкретные события.",
-                checklist: ["Убедиться, что count стабилен", "Найти доминирующий error class", "Сравнить path/event type"]
+                details: "Если количество стабильно, а доля ошибок растет, причина часто в изменении логики, внешнем сервисе или данных. Проверьте класс ошибки, внутренний маршрут и конкретные события.",
+                checklist: ["Убедиться, что количество стабильно", "Найти доминирующий класс ошибки", "Сравнить внутренний маршрут и тип события"]
             }
         ],
         "chart-event-kpi": [
-            {id: "event_error_growth", label: "Рост ошибок по событию", description: "Выделяет event type, где error rate выше остальных.", details: "Смотрите не только процент, но и count. Малый count может давать шумный процент. Подтверждайте вывод Raw-событиями и error class."},
-            {id: "event_p95_degradation", label: "Деградация P95", description: "Ищет события с тяжелым хвостом latency.", details: "Высокий P95 у редкого события может быть важнее среднего AVG. Сопоставляйте с latency trend и stage latency."},
-            {id: "event_load_growth", label: "Рост нагрузки", description: "Показывает события, которые начали доминировать по count.", details: "Если count вырос без ошибок, это может быть нормальный спрос. Если вместе растут P95 или errors, переходите к Raw и слоям."},
-            {id: "event_mix_shift", label: "Смена состава событий", description: "Помогает увидеть, что структура нагрузки изменилась.", details: "Сравните текущий период с предыдущим и проверьте, какие event types появились, исчезли или поменяли долю."},
-            {id: "rare_slow_event", label: "Редкое медленное событие", description: "Находит низкий count с высоким P95.", details: "Такие события легко потерять в общей статистике, но они часто указывают на дорогую бизнес-операцию."}
+            {id: "event_error_growth", label: "Рост ошибок по событию", description: "Выделяет тип события, где доля ошибок выше остальных.", details: "Смотрите не только процент, но и количество. Малая выборка может давать шумный процент. Подтверждайте вывод сырыми событиями и классом ошибки."},
+            {id: "event_p95_degradation", label: "Деградация P95", description: "Ищет события с тяжелым хвостом времени отклика.", details: "Высокий P95 у редкого события может быть важнее среднего AVG. Сопоставляйте с динамикой производительности и длительностью этапов."},
+            {id: "event_load_growth", label: "Рост нагрузки", description: "Показывает события, которые начали доминировать по количеству.", details: "Если количество выросло без ошибок, это может быть нормальный спрос. Если вместе растут P95 или ошибки, переходите к сырым событиям и этапам."},
+            {id: "event_mix_shift", label: "Смена состава событий", description: "Помогает увидеть, что структура нагрузки изменилась.", details: "Сравните текущий период с предыдущим и проверьте, какие типы событий появились, исчезли или поменяли долю."},
+            {id: "rare_slow_event", label: "Редкое медленное событие", description: "Находит низкое количество с высоким P95.", details: "Такие события легко потерять в общей статистике, но они часто указывают на дорогую бизнес-операцию."}
         ],
         "chart-error-rate": [
-            {id: "error_growth", label: "Рост ошибок", description: "Фокус на устойчивом росте error rate.", details: "Сравните с count: если нагрузка не растет, вероятна регрессия. Дальше смотрите error class, HTTP status и Raw."},
-            {id: "error_spike", label: "Краткий всплеск", description: "Ищет короткий пик ошибок.", details: "Проверьте точное время пика, связанные trace и внешние зависимости."},
-            {id: "high_error_plateau", label: "Высокое плато", description: "Показывает период, где ошибки держатся стабильно высоко.", details: "Это чаще системная проблема, чем единичный сбой. Смотрите stage errors и повторяемость event types."},
-            {id: "errors_after_load", label: "Ошибки после роста нагрузки", description: "Проверяет, начались ли ошибки после увеличения count.", details: "Если рост ошибок следует за count, проверьте лимиты, connection pool и время DATABASE/SERVICE."},
+            {id: "error_growth", label: "Рост ошибок", description: "Фокус на устойчивом росте доли ошибок.", details: "Сравните с количеством: если нагрузка не растет, вероятна регрессия. Дальше смотрите класс ошибки, HTTP-статус и сырые события."},
+            {id: "error_spike", label: "Краткий всплеск", description: "Ищет короткий пик ошибок.", details: "Проверьте точное время пика, связанные трассировки и внешние зависимости."},
+            {id: "high_error_plateau", label: "Высокое плато", description: "Показывает период, где ошибки держатся стабильно высоко.", details: "Это чаще системная проблема, чем единичный сбой. Смотрите ошибки по этапам и повторяемость типов событий."},
+            {id: "errors_after_load", label: "Ошибки после роста нагрузки", description: "Проверяет, начались ли ошибки после увеличения количества.", details: "Если рост ошибок следует за количеством, проверьте лимиты, пул соединений и время базы данных или сервиса."},
             {id: "recovery_after_fix", label: "Снижение после исправления", description: "Оценивает, исчезли ли ошибки после изменения.", details: "Используйте compare до/после и проверьте, не изменился ли одновременно объем событий."}
         ],
         "chart-latency": [
-            {id: "p95_growth", label: "Рост P95", description: "Фокус на ухудшении пользовательского хвоста.", details: "Сравните AVG/P95/P99. Если растет только P95, ищите отдельные медленные trace и слои."},
-            {id: "single_spike", label: "Единичный spike", description: "Ищет короткий выброс latency.", details: "Проверьте Raw в окне spike и не делайте вывод по одному пику без повторяемости."},
-            {id: "stable_load_degradation", label: "Деградация при стабильной нагрузке", description: "Latency растет без роста count.", details: "Чаще всего это регрессия кода, внешняя зависимость или база данных."},
-            {id: "recovery_after_peak", label: "Восстановление после пика", description: "Показывает, вернулась ли latency к норме.", details: "Если восстановление неполное, сравните stage metrics и error rate."},
+            {id: "p95_growth", label: "Рост P95", description: "Фокус на ухудшении пользовательского хвоста.", details: "Сравните AVG/P95/P99. Если растет только P95, ищите отдельные медленные трассировки и этапы."},
+            {id: "single_spike", label: "Единичный всплеск", description: "Ищет короткий выброс времени отклика.", details: "Проверьте сырые события в окне всплеска и не делайте вывод по одному пику без повторяемости."},
+            {id: "stable_load_degradation", label: "Деградация при стабильной нагрузке", description: "Время отклика растет без роста количества.", details: "Чаще всего это регрессия кода, внешняя зависимость или база данных."},
+            {id: "recovery_after_peak", label: "Восстановление после пика", description: "Показывает, вернулось ли время отклика к норме.", details: "Если восстановление неполное, сравните длительность этапов и долю ошибок."},
             {id: "avg_p95_p99_gap", label: "Разрыв AVG/P95/P99", description: "Показывает неоднородность распределения.", details: "Большой разрыв означает, что среднее скрывает тяжелые случаи."}
         ],
         "chart-events-count": [
-            {id: "traffic_spike", label: "Всплеск нагрузки", description: "Резкий рост количества событий.", details: "Проверьте, растут ли одновременно latency и errors. Если нет, это может быть нормальный трафик."},
+            {id: "traffic_spike", label: "Всплеск нагрузки", description: "Резкий рост количества событий.", details: "Проверьте, растут ли одновременно время отклика и ошибки. Если нет, это может быть нормальный трафик."},
             {id: "traffic_drop", label: "Просадка потока", description: "Падение количества событий или нулевой поток.", details: "Проверьте трекинг, доступность модуля и фильтры периода."},
-            {id: "periodic_load", label: "Периодическая нагрузка", description: "Повторяющиеся пики count.", details: "Часто связаны с batch/cron или регулярным пользовательским поведением."},
-            {id: "event_mix_shift", label: "Смена состава событий", description: "Общий count стабилен, но меняется вклад event types.", details: "Смотрите KPI по типам событий и compare до/после."}
+            {id: "periodic_load", label: "Периодическая нагрузка", description: "Повторяющиеся пики количества.", details: "Часто связаны с фоновыми задачами или регулярным пользовательским поведением."},
+            {id: "event_mix_shift", label: "Смена состава событий", description: "Общее количество стабильно, но меняется вклад типов событий.", details: "Смотрите KPI по типам событий и сравнение до/после."}
         ],
         "chart-universal-timeline": [
-            {id: "universal_event_analysis", label: "Анализ выбранного события", description: "Фокусирует чтение Universal на выбранном event type.", details: "Сравните count, P95 и error rate в одном срезе. Если выбран атрибут, проверьте этот же период без атрибута."},
-            {id: "universal_attr_slice", label: "Анализ атрибута", description: "Показывает, как значение атрибута связано с метриками.", details: "Полезно для HTTP path/status/client type. Сравните с Raw и stage metrics."},
-            {id: "universal_anomaly_segment", label: "Аномальный сегмент", description: "Ищет сегмент, где метрики отличаются от общего фона.", details: "Сначала найдите отличие на timeline, затем сузьте event/stage/attribute."},
-            {id: "universal_before_after", label: "Сравнение до/после", description: "Сравнивает выбранный срез в двух окнах.", details: "Используйте overlay или split и держите фильтры одинаковыми."}
+            {id: "universal_event_analysis", label: "Анализ выбранного события", description: "Фокусирует диагностику на выбранном типе события.", details: "Сравните количество, P95 и долю ошибок в одном срезе. Если выбран атрибут, проверьте этот же период без атрибута."},
+            {id: "universal_attr_slice", label: "Анализ атрибута", description: "Показывает, как значение атрибута связано с метриками.", details: "Полезно для внутреннего маршрута, HTTP-статуса и типа клиента. Сравните с сырыми событиями."},
+            {id: "universal_anomaly_segment", label: "Аномальный сегмент", description: "Ищет сегмент, где метрики отличаются от общего фона.", details: "Сначала найдите отличие на динамике, затем сузьте событие, этап или атрибут."},
+            {id: "universal_before_after", label: "Сравнение до/после", description: "Сравнивает выбранный срез в двух окнах.", details: "Используйте наложение или раздельный режим и держите фильтры одинаковыми."}
         ],
         "chart-universal-stages": [
-            {id: "universal_layer_analysis", label: "Анализ выбранного слоя", description: "Показывает вклад слоя в выбранном Universal-срезе.", details: "Если слой доминирует, переходите в stage metrics и Raw trace."},
-            {id: "universal_layer_bottleneck", label: "Узкое место слоя", description: "Ищет слой, объясняющий P95 или ошибки.", details: "DATABASE проверяйте вместе с SQL count/response size, SERVICE - с бизнес-логикой."},
-            {id: "universal_stage_compare", label: "Слои до/после", description: "Сравнивает вклад слоев между периодами.", details: "Полезно после релиза или изменения фильтра."}
+            {id: "universal_layer_analysis", label: "Анализ выбранного этапа", description: "Показывает вклад этапа в выбранном срезе диагностики.", details: "Если этап доминирует, переходите в сырые события и логи трассировки."},
+            {id: "universal_layer_bottleneck", label: "Узкое место этапа", description: "Ищет этап, объясняющий P95 или ошибки.", details: "Базу данных проверяйте вместе с количеством SQL-запросов и размером ответа, сервис - с бизнес-логикой."},
+            {id: "universal_stage_compare", label: "Этапы до/после", description: "Сравнивает вклад этапов между периодами.", details: "Полезно после релиза или изменения фильтра."}
         ],
         "chart-universal-event-kpi": [
-            {id: "universal_event_kpi", label: "KPI событий в срезе", description: "Сравнивает события внутри текущего Universal-фильтра.", details: "Ищите высокий count, P95 или error rate и затем открывайте timeline/Raw."},
-            {id: "universal_problem_event", label: "Проблемный event type", description: "Находит событие, портящее выбранный срез.", details: "Проверьте, остается ли проблема без атрибутного фильтра."},
-            {id: "universal_event_shift", label: "Смена состава событий", description: "Показывает, как меняется структура event types.", details: "Используйте compare и стабильную сортировку, чтобы не принять перестановку за тренд."}
+            {id: "universal_event_kpi", label: "KPI событий в срезе", description: "Сравнивает события внутри текущего фильтра диагностики.", details: "Ищите высокое количество, P95 или долю ошибок и затем открывайте динамику или сырые события."},
+            {id: "universal_problem_event", label: "Проблемный тип события", description: "Находит событие, портящее выбранный срез.", details: "Проверьте, остается ли проблема без атрибутного фильтра."},
+            {id: "universal_event_shift", label: "Смена состава событий", description: "Показывает, как меняется структура типов событий.", details: "Используйте сравнение и стабильную сортировку, чтобы не принять перестановку за тренд."}
         ],
         "chart-stage-latency": [
-            {id: "layer_bottleneck", label: "Узкое место по слоям", description: "Сравнивает latency CONTROLLER/SERVICE/DATABASE.", details: "Смотрите P95/P99 и сопоставляйте со stage metrics и Raw trace."},
-            {id: "database_degradation", label: "Деградация DATABASE", description: "Фокус на росте времени базы.", details: "Проверьте DB query count, response size и конкретные SQL/репозитории."},
-            {id: "service_degradation", label: "Деградация SERVICE", description: "Рост времени бизнес-логики.", details: "Ищите новые ветки логики, внешние вызовы и рост ошибок."},
-            {id: "controller_overhead", label: "Накладные расходы CONTROLLER", description: "Проверяет рост времени обработки запроса на входе.", details: "Сопоставляйте с request path, body size и frontend/network признаками."}
+            {id: "layer_bottleneck", label: "Узкое место по этапам", description: "Сравнивает время отклика контроллера, сервиса и базы данных.", details: "Смотрите P95/P99 и сопоставляйте с сырыми событиями и логами трассировки."},
+            {id: "database_degradation", label: "Деградация базы данных", description: "Фокус на росте времени базы.", details: "Проверьте количество SQL-запросов, размер ответа и конкретные SQL/репозитории."},
+            {id: "service_degradation", label: "Деградация сервиса", description: "Рост времени бизнес-логики.", details: "Ищите новые ветки логики, внешние вызовы и рост ошибок."},
+            {id: "controller_overhead", label: "Накладные расходы контроллера", description: "Проверяет рост времени обработки запроса на входе.", details: "Сопоставляйте с внутренним маршрутом, размером тела ответа и признаками фронтенда или сети."}
         ],
         "chart-stage-errors": [
-            {id: "stage_error_growth", label: "Рост ошибок слоя", description: "Показывает, какой слой дает основной вклад в ошибки.", details: "Сначала локализуйте слой, затем переходите к Raw по error class/status."},
-            {id: "database_errors", label: "Ошибки DATABASE", description: "Фокус на сбоях запросов, таймаутах и соединениях.", details: "Смотрите SQL count, latency DATABASE и повторяемость path/event type."},
-            {id: "service_errors", label: "Ошибки SERVICE", description: "Фокус на бизнес-ошибках и внешних зависимостях.", details: "Проверяйте error class и trace проблемного события."}
+            {id: "stage_error_growth", label: "Рост ошибок этапа", description: "Показывает, какой этап дает основной вклад в ошибки.", details: "Сначала локализуйте этап, затем переходите к сырым событиям по классу ошибки и статусу."},
+            {id: "database_errors", label: "Ошибки базы данных", description: "Фокус на сбоях запросов, таймаутах и соединениях.", details: "Смотрите количество SQL-запросов, время отклика базы данных и повторяемость внутреннего маршрута или типа события."},
+            {id: "service_errors", label: "Ошибки сервиса", description: "Фокус на бизнес-ошибках и внешних зависимостях.", details: "Проверяйте класс ошибки и трассировку проблемного события."}
         ],
         "chart-stage-metric-series": [
-            {id: "numeric_metric_degradation", label: "Деградация числовой метрики", description: "Показывает рост DB_QUERY_COUNT, RESPONSE_SIZE или другой числовой метрики.", details: "Сравните пик метрики с latency слоя и count событий."},
-            {id: "metric_spike", label: "Всплеск значения", description: "Ищет резкий пик выбранной метрики.", details: "Проверьте, не связан ли пик с одним event type или request path."},
-            {id: "top_value_shift", label: "Смена top values", description: "Связывает числовой пик с изменением текстовых признаков.", details: "Откройте соседний текстовый график и Raw за тот же период."}
+            {id: "numeric_metric_degradation", label: "Деградация числовой метрики", description: "Показывает рост количества SQL-запросов, размера ответа или другой числовой метрики.", details: "Сравните пик метрики со временем отклика этапа и количеством событий."},
+            {id: "metric_spike", label: "Всплеск значения", description: "Ищет резкий пик выбранной метрики.", details: "Проверьте, не связан ли пик с одним типом события или внутренним маршрутом."},
+            {id: "top_value_shift", label: "Смена частых значений", description: "Связывает числовой пик с изменением текстовых признаков.", details: "Откройте соседний текстовый график и сырые события за тот же период."}
         ],
         "chart-stage-metric-text": [
-            {id: "text_distribution_shift", label: "Изменение распределения", description: "Показывает, какие текстовые значения стали чаще.", details: "Смотрите URL, HTTP status, method, error code и сопоставляйте с latency/errors."},
-            {id: "problem_urls", label: "Проблемные URL", description: "Находит path, который чаще встречается в проблемном окне.", details: "Сравните с requestPath-фильтром и Raw событиями."},
-            {id: "error_codes", label: "Коды ошибок", description: "Группирует события по error code/status.", details: "Один доминирующий код часто дает быстрый путь к причине."}
+            {id: "text_distribution_shift", label: "Изменение распределения", description: "Показывает, какие текстовые значения стали чаще.", details: "Смотрите URL, HTTP-статус, метод, код ошибки и сопоставляйте со временем отклика и ошибками."},
+            {id: "problem_urls", label: "Проблемные URL", description: "Находит внутренний маршрут, который чаще встречается в проблемном окне.", details: "Сравните с фильтром внутреннего маршрута и журналом событий."},
+            {id: "error_codes", label: "Коды ошибок", description: "Группирует события по коду ошибки и статусу.", details: "Один доминирующий код часто дает быстрый путь к причине."}
         ],
         "analytics-events-table": [
-            {id: "trace_investigation", label: "Проверка trace", description: "Разбор конкретной цепочки события.", details: "Откройте детали события, проверьте stages, attributes, metrics и связанные логи."},
-            {id: "fresh_raw_check", label: "Свежие события", description: "Проверяет события, которые еще не попали в агрегаты.", details: "Используйте Raw как источник истины для последних минут."},
-            {id: "error_search", label: "Поиск ошибки", description: "Фильтрует Raw по error class/status/path.", details: "После нахождения паттерна возвращайтесь к агрегатам, чтобы оценить масштаб."}
+            {id: "trace_investigation", label: "Проверка трассировки", description: "Разбор конкретной цепочки события.", details: "Откройте детали события, проверьте этапы, атрибуты, метрики и связанные логи."},
+            {id: "fresh_raw_check", label: "Свежие события", description: "Проверяет события, которые еще не попали в агрегаты.", details: "Используйте сырые события как источник истины для последних минут."},
+            {id: "error_search", label: "Поиск ошибки", description: "Фильтрует сырые события по классу ошибки, статусу и внутреннему маршруту.", details: "После нахождения паттерна возвращайтесь к агрегатам, чтобы оценить масштаб."}
         ],
         "chart-compare-delta": [
-            {id: "release_delta", label: "Дельта после релиза", description: "Сравнивает KPI между двумя периодами.", details: "Положительная дельта latency/error rate требует проверки Raw и stage breakdown."},
-            {id: "latency_delta", label: "Дельта latency", description: "Фокус на изменении AVG/P95/P99.", details: "Сравнивайте только равные окна и одинаковые фильтры."},
-            {id: "error_delta", label: "Дельта ошибок", description: "Показывает изменение ошибок между периодами.", details: "Проверьте count, чтобы не принять изменение объема за изменение качества."}
+            {id: "release_delta", label: "Дельта после релиза", description: "Сравнивает KPI между двумя периодами.", details: "Положительная дельта времени отклика или доли ошибок требует проверки сырых событий и разбора этапов."},
+            {id: "latency_delta", label: "Дельта времени отклика", description: "Фокус на изменении AVG/P95/P99.", details: "Сравнивайте только равные окна и одинаковые фильтры."},
+            {id: "error_delta", label: "Дельта ошибок", description: "Показывает изменение ошибок между периодами.", details: "Проверьте количество, чтобы не принять изменение объема за изменение качества."}
         ]
     };
 
@@ -686,212 +792,212 @@
         "chart-event-kpi": {
             title: "KPI по типам событий",
             shortDescription: "Сравнивает типы событий по количеству, P95 и доле ошибок.",
-            whatItShows: "График помогает понять, какие event types дают основной вклад в нагрузку, хвост latency и ошибки. Он полезен для приоритизации расследования: сначала смотрим события с большим count, высоким P95 или заметным error rate.",
-            howToRead: "Начинайте с count, затем смотрите P95 и error rate. Высокий P95 при малом count означает редкий, но дорогой сценарий. Высокий error rate при большом count обычно приоритетнее, чем единичная ошибка.",
+            whatItShows: "График помогает понять, какие типы событий дают основной вклад в нагрузку, хвост времени отклика и ошибки. Он полезен для приоритизации расследования: сначала смотрим события с большим количеством, высоким P95 или заметной долей ошибок.",
+            howToRead: "Начинайте с количества, затем смотрите P95 и долю ошибок. Высокий P95 при малой выборке означает редкий, но дорогой сценарий. Высокая доля ошибок при большом количестве обычно приоритетнее, чем единичная ошибка.",
             metrics: [
-                {name: "Count", description: "Сколько событий выбранного типа попало в период. Рост без роста ошибок может быть нормальной нагрузкой."},
+                {name: "Количество", description: "Сколько событий выбранного типа попало в период. Рост без роста ошибок может быть нормальной нагрузкой."},
                 {name: "P95", description: "Значение, быстрее которого обработано 95% событий. Показывает хвост, который плохо виден по AVG."},
-                {name: "Error rate", description: "Доля событий с ошибкой. Всегда проверяйте вместе с count, чтобы не переоценить малую выборку."}
+                {name: "Доля ошибок", description: "Доля событий с ошибкой. Всегда проверяйте вместе с количеством, чтобы не переоценить малую выборку."}
             ],
             trendPatterns: [
-                {icon: "volume_growth", title: "Рост нагрузки", description: "Count растет, latency и ошибки стабильны: чаще всего это нормальный рост трафика."},
-                {icon: "latency_growth", title: "Рост P95", description: "Событие становится медленнее; нужно смотреть stage latency и Raw trace."},
-                {icon: "error_growth", title: "Ошибки на одном event type", description: "Вероятна локальная регрессия или проблемные входные данные."},
-                {icon: "divergence", title: "Смена состава событий", description: "Одни event types растут, другие падают; общий count может скрывать проблему."},
-                {icon: "anomaly_point", title: "Редкое медленное событие", description: "Малый count, но высокий P95. Не игнорируйте, если это важная бизнес-операция."}
+                {icon: "volume_growth", title: "Рост нагрузки", description: "Количество растет, время отклика и ошибки стабильны: чаще всего это нормальный рост трафика."},
+                {icon: "latency_growth", title: "Рост P95", description: "Событие становится медленнее; нужно смотреть длительность этапов и логи трассировки."},
+                {icon: "error_growth", title: "Ошибки на одном типе события", description: "Вероятна локальная регрессия или проблемные входные данные."},
+                {icon: "divergence", title: "Смена состава событий", description: "Одни типы событий растут, другие падают; общее количество может скрывать проблему."},
+                {icon: "anomaly_point", title: "Редкое медленное событие", description: "Малая выборка, но высокий P95. Не игнорируйте, если это важная бизнес-операция."}
             ],
-            analysisMistakes: ["Сравнивать error rate без учета count.", "Считать высокий AVG общей проблемой без проверки P95.", "Не проверять Raw для редких событий.", "Игнорировать изменение состава event types."],
-            relatedCharts: ["Latency trend", "Error rate trend", "Stage latency", "Universal KPI", "Raw события"],
-            problemSignals: ["Высокий P95 у одного события", "Рост ошибок при стабильном count", "Резкая смена лидирующего event type", "Появление нового редкого тяжелого события"]
+            analysisMistakes: ["Сравнивать долю ошибок без учета количества.", "Считать высокий AVG общей проблемой без проверки P95.", "Не проверять сырые события для редких событий.", "Игнорировать изменение состава типов событий."],
+            relatedCharts: ["Динамика производительности", "Динамика ошибок", "Длительность этапов", "KPI диагностики", "Сырые события"],
+            problemSignals: ["Высокий P95 у одного события", "Рост ошибок при стабильном количестве", "Резкая смена лидирующего типа события", "Появление нового редкого тяжелого события"]
         },
         "chart-error-rate": {
-            title: "Error rate trend",
+            title: "Динамика ошибок",
             shortDescription: "Показывает долю ошибок во времени.",
             whatItShows: "График отвечает на вопрос, когда качество обработки ухудшилось и было ли это кратким всплеском или устойчивым состоянием.",
-            howToRead: "Смотрите форму линии и обязательно сравнивайте с count. Рост error rate без роста нагрузки чаще указывает на регрессию; рост вместе с count может быть перегрузкой.",
-            metrics: [{name: "Error rate, %", description: "Доля ошибочных событий в каждом временном bucket."}, {name: "Errors", description: "Абсолютное число ошибок полезно проверять рядом, чтобы оценить масштаб."}],
+            howToRead: "Смотрите форму линии и обязательно сравнивайте с количеством. Рост доли ошибок без роста нагрузки чаще указывает на регрессию; рост вместе с количеством может быть перегрузкой.",
+            metrics: [{name: "Доля ошибок, %", description: "Доля ошибочных событий в каждом временном интервале."}, {name: "Ошибки", description: "Абсолютное число ошибок полезно проверять рядом, чтобы оценить масштаб."}],
             trendPatterns: [
-                {icon: "error_growth", title: "Устойчивый рост", description: "Проблема держится несколько bucket подряд."},
-                {icon: "spike", title: "Краткий всплеск", description: "Нужен Raw за узкое окно времени."},
+                {icon: "error_growth", title: "Устойчивый рост", description: "Проблема держится несколько интервалов подряд."},
+                {icon: "spike", title: "Краткий всплеск", description: "Нужны сырые события за узкое окно времени."},
                 {icon: "plateau", title: "Высокое плато", description: "Вероятна системная деградация."},
-                {icon: "divergence", title: "Ошибки без нагрузки", description: "Count стабилен, error rate растет: вероятна регрессия качества."},
+                {icon: "divergence", title: "Ошибки без нагрузки", description: "Количество стабильно, доля ошибок растет: вероятна регрессия качества."},
                 {icon: "trend_down", title: "Восстановление", description: "Проверьте, вернулась ли доля ошибок к базовому уровню."}
             ],
-            analysisMistakes: ["Не учитывать абсолютное количество ошибок.", "Смешивать разные event types.", "Считать один spike устойчивой проблемой.", "Не проверять HTTP status/error class."],
-            relatedCharts: ["Events count", "KPI по типам событий", "Stage errors", "Raw события"],
-            problemSignals: ["Error rate растет при стабильном count", "Ошибки концентрируются в одном event type", "Плато после релиза", "Короткий spike с массовыми 5xx"]
+            analysisMistakes: ["Не учитывать абсолютное количество ошибок.", "Смешивать разные типы событий.", "Считать один всплеск устойчивой проблемой.", "Не проверять HTTP-статус и класс ошибки."],
+            relatedCharts: ["Поток событий", "KPI по типам событий", "Ошибки по этапам", "Сырые события"],
+            problemSignals: ["Доля ошибок растет при стабильном количестве", "Ошибки концентрируются в одном типе события", "Плато после релиза", "Короткий всплеск с массовыми 5xx"]
         },
         "chart-latency": {
-            title: "Latency trend",
+            title: "Динамика производительности",
             shortDescription: "Показывает AVG, P95 и P99 времени обработки.",
             whatItShows: "График показывает скорость обработки во времени и помогает отличить общую деградацию от проблемы хвоста.",
-            howToRead: "AVG показывает общий фон, P95 и P99 - тяжелые случаи. Если P95/P99 растут быстрее AVG, ищите отдельные медленные trace, path или event type.",
-            metrics: [{name: "AVG", description: "Среднее время. Чувствительно к общему фону, но скрывает хвост."}, {name: "P95", description: "Хвост пользовательского опыта. Главная метрика для деградаций."}, {name: "P99", description: "Редкие самые тяжелые случаи. Может быть шумной на малом count."}],
+            howToRead: "AVG показывает общий фон, P95 и P99 - тяжелые случаи. Если P95/P99 растут быстрее AVG, ищите отдельные медленные трассировки, внутренние маршруты или типы событий.",
+            metrics: [{name: "AVG", description: "Среднее время. Чувствительно к общему фону, но скрывает хвост."}, {name: "P95", description: "Хвост пользовательского опыта. Главная метрика для деградаций."}, {name: "P99", description: "Редкие самые тяжелые случаи. Может быть шумной на малой выборке."}],
             trendPatterns: [
                 {icon: "latency_growth", title: "Рост P95", description: "Хвост становится медленнее."},
-                {icon: "spike", title: "Единичный spike", description: "Проверяйте Raw в точном окне."},
+                {icon: "spike", title: "Единичный всплеск", description: "Проверяйте сырые события в точном окне."},
                 {icon: "divergence", title: "Разрыв AVG/P95", description: "Среднее выглядит нормально, но часть запросов страдает."},
                 {icon: "plateau", title: "Долгое плато", description: "Устойчивая деградация, часто после изменения."},
-                {icon: "trend_down", title: "Восстановление", description: "Latency снижается после пика или исправления."}
+                {icon: "trend_down", title: "Восстановление", description: "Время отклика снижается после пика или исправления."}
             ],
-            analysisMistakes: ["Оценивать только AVG.", "Сравнивать разные объемы трафика без count.", "Не отделять редкие события от массовых.", "Не проверять stage latency."],
-            relatedCharts: ["Events count", "Error rate", "Stage latency", "Universal timeline", "Raw события"],
-            problemSignals: ["P95 растет без роста count", "P99 резко выше P95", "Latency растет только после релиза", "Spike совпадает с ошибками DATABASE"]
+            analysisMistakes: ["Оценивать только AVG.", "Сравнивать разные объемы трафика без количества.", "Не отделять редкие события от массовых.", "Не проверять длительность этапов."],
+            relatedCharts: ["Поток событий", "Динамика ошибок", "Длительность этапов", "Динамика диагностики", "Сырые события"],
+            problemSignals: ["P95 растет без роста количества", "P99 резко выше P95", "Время отклика растет только после релиза", "Всплеск совпадает с ошибками базы данных"]
         },
         "chart-universal-timeline": {
-            title: "Universal KPI timeline",
-            shortDescription: "Показывает count, AVG/P95 и error rate для выбранного среза.",
-            whatItShows: "Universal timeline объединяет фильтры события, слоя, атрибута и значения. Он нужен, чтобы проверить гипотезу по конкретному сегменту, а не по всему потоку.",
-            howToRead: "Сначала убедитесь, какой срез выбран. Затем сравните count, latency и errors. Если фильтр атрибута сильно меняет картину, проверьте тот же период без фильтра.",
-            metrics: [{name: "Count", description: "Объем выбранного среза."}, {name: "AVG/P95", description: "Скорость обработки внутри среза."}, {name: "Error rate", description: "Доля ошибок внутри среза."}],
+            title: "Динамика диагностики",
+            shortDescription: "Показывает количество, AVG/P95 и долю ошибок для выбранного среза.",
+            whatItShows: "Динамика диагностики объединяет фильтры события, этапа, атрибута и значения. Она нужна, чтобы проверить гипотезу по конкретному сегменту, а не по всему потоку.",
+            howToRead: "Сначала убедитесь, какой срез выбран. Затем сравните количество, время отклика и ошибки. Если фильтр атрибута сильно меняет картину, проверьте тот же период без фильтра.",
+            metrics: [{name: "Количество", description: "Объем выбранного среза."}, {name: "AVG/P95", description: "Скорость обработки внутри среза."}, {name: "Доля ошибок", description: "Доля ошибок внутри среза."}],
             trendPatterns: [
                 {icon: "volume_growth", title: "Рост сегмента", description: "Срез стал чаще встречаться."},
                 {icon: "latency_growth", title: "Деградация сегмента", description: "P95 растет именно в выбранном срезе."},
                 {icon: "error_growth", title: "Ошибки сегмента", description: "Ошибка локализована фильтром."},
                 {icon: "overlay_before_after", title: "До/после", description: "Compare показывает изменение выбранного среза."},
-                {icon: "anomaly_point", title: "Аномальный bucket", description: "Один интервал резко отличается от соседних."}
+                {icon: "anomaly_point", title: "Аномальный интервал", description: "Один интервал резко отличается от соседних."}
             ],
-            analysisMistakes: ["Забыть, что включен фильтр атрибута.", "Сравнивать разные bucket size.", "Игнорировать event-scope при выбранных событиях.", "Принимать малый count за устойчивый тренд."],
-            relatedCharts: ["Universal stages", "Universal event KPI", "Stage metrics", "Raw события"],
-            problemSignals: ["Фильтр резко повышает error rate", "P95 растет только для одного path/status", "Compare показывает деградацию после изменения"]
+            analysisMistakes: ["Забыть, что включен фильтр атрибута.", "Сравнивать разные размеры интервала.", "Игнорировать выбранные события.", "Принимать малую выборку за устойчивый тренд."],
+            relatedCharts: ["Этапы диагностики", "KPI событий диагностики", "Сырые события"],
+            problemSignals: ["Фильтр резко повышает долю ошибок", "P95 растет только для одного внутреннего маршрута или статуса", "Сравнение показывает деградацию после изменения"]
         },
         "chart-stage-metric-series": {
             title: "Числовые метрики этапов",
-            shortDescription: "Показывает динамику числовых stage metrics во времени.",
-            whatItShows: "График помогает связать latency и ошибки с техническими признаками: количеством SQL-запросов, размером ответа, retry, длительностью внешнего вызова и другими метриками.",
-            howToRead: "Сравнивайте пики метрик с stage latency и error rate. При разных единицах график нормализуется, поэтому важнее форма тренда, чем абсолютная высота линий.",
-            metrics: [{name: "P95/AVG метрики", description: "Показывают типичный и хвостовой уровень выбранной числовой метрики."}, {name: "Top values", description: "Помогают понять, какие значения дают вклад в пик."}],
+            shortDescription: "Показывает динамику числовых метрик во времени.",
+            whatItShows: "График помогает связать время отклика и ошибки с техническими признаками: количеством SQL-запросов, размером ответа, повторами, длительностью внешнего вызова и другими метриками.",
+            howToRead: "Сравнивайте пики метрик с длительностью этапов и долей ошибок. При разных единицах график нормализуется, поэтому важнее форма тренда, чем абсолютная высота линий.",
+            metrics: [{name: "P95/AVG метрики", description: "Показывают типичный и хвостовой уровень выбранной числовой метрики."}, {name: "Частые значения", description: "Помогают понять, какие значения дают вклад в пик."}],
             trendPatterns: [
-                {icon: "spike", title: "Всплеск метрики", description: "Один bucket резко выделяется."},
+                {icon: "spike", title: "Всплеск метрики", description: "Один интервал резко выделяется."},
                 {icon: "trend_up", title: "Постепенный рост", description: "Метрика растет вместе с деградацией."},
-                {icon: "divergence", title: "Метрика растет без count", description: "Вероятно изменилась логика или размер данных."},
+                {icon: "divergence", title: "Метрика растет без количества", description: "Вероятно изменилась логика или размер данных."},
                 {icon: "plateau", title: "Высокое плато", description: "Постоянно дорогой режим работы."},
                 {icon: "overlay_before_after", title: "До/после", description: "Сравнение показывает изменение профиля метрик."}
             ],
-            analysisMistakes: ["Сравнивать разные единицы как абсолютные значения.", "Не сверять с выбранным stage type.", "Игнорировать текстовые метрики рядом.", "Делать вывод без Raw trace."],
-            relatedCharts: ["Stage latency", "Stage errors", "Stage metric text", "Raw события"],
-            problemSignals: ["DB_QUERY_COUNT растет вместе с DATABASE P95", "RESPONSE_SIZE растет вместе с latency", "Retry count совпадает с error spike"]
+            analysisMistakes: ["Сравнивать разные единицы как абсолютные значения.", "Не сверять с выбранным типом этапа.", "Игнорировать текстовые метрики рядом.", "Делать вывод без логов трассировки."],
+            relatedCharts: ["Длительность этапов", "Ошибки по этапам", "Текстовые метрики", "Сырые события"],
+            problemSignals: ["Количество SQL-запросов растет вместе с P95 базы данных", "Размер ответа растет вместе со временем отклика", "Количество повторов совпадает со всплеском ошибок"]
         },
         "analytics-events-table": {
-            title: "Raw события",
+            title: "Сырые события",
             shortDescription: "Таблица конкретных событий для расследования.",
-            whatItShows: "Raw показывает отдельные события, stages, атрибуты, метрики и trace. Это источник деталей, когда агрегаты показали подозрительный интервал.",
-            howToRead: "Фильтруйте по времени пика, event type, error class, path и metric value. Открывайте детали события и сверяйте длительности stages.",
-            metrics: [{name: "Duration", description: "Полная длительность события."}, {name: "Error class/status", description: "Тип ошибки или статус ответа."}, {name: "Trace/request id", description: "Связь с логами и стадиями."}],
+            whatItShows: "Сырые события показывают отдельные события, этапы, атрибуты, метрики и трассировки. Это источник деталей, когда агрегаты показали подозрительный интервал.",
+            howToRead: "Фильтруйте по времени пика, типу события, классу ошибки, внутреннему маршруту и значению метрики. Открывайте детали события и сверяйте длительности этапов.",
+            metrics: [{name: "Длительность", description: "Полная длительность события."}, {name: "Класс ошибки / статус", description: "Тип ошибки или статус ответа."}, {name: "Трассировка / идентификатор запроса", description: "Связь с логами и этапами."}],
             trendPatterns: [
-                {icon: "anomaly_point", title: "Конкретный trace", description: "Один пример для глубокого разбора."},
-                {icon: "error_growth", title: "Повторяемая ошибка", description: "Одинаковый error class встречается много раз."},
-                {icon: "volume_growth", title: "Свежий поток", description: "События последних минут еще не полностью отражены в rollup."}
+                {icon: "anomaly_point", title: "Конкретная трассировка", description: "Один пример для глубокого разбора."},
+                {icon: "error_growth", title: "Повторяемая ошибка", description: "Одинаковый класс ошибки встречается много раз."},
+                {icon: "volume_growth", title: "Свежий поток", description: "События последних минут еще не полностью отражены в подготовленных агрегатах."}
             ],
-            analysisMistakes: ["Делать общий вывод по одному trace.", "Не сверять фильтры с агрегатами.", "Игнорировать временную задержку rollup.", "Не смотреть stages внутри события."],
-            relatedCharts: ["Все агрегатные графики", "Stage metrics", "Logs/trace"],
-            problemSignals: ["Одинаковый error class повторяется", "Один path доминирует в ошибках", "Stage DATABASE/SERVICE сильно выделяется"]
+            analysisMistakes: ["Делать общий вывод по одной трассировке.", "Не сверять фильтры с агрегатами.", "Игнорировать временную задержку подготовленных агрегатов.", "Не смотреть этапы внутри события."],
+            relatedCharts: ["Все агрегатные графики", "Логи трассировки"],
+            problemSignals: ["Одинаковый класс ошибки повторяется", "Один внутренний маршрут доминирует в ошибках", "Этап базы данных или сервиса сильно выделяется"]
         }
     };
 
     ANALYTICS_CHART_HELP_REGISTRY["chart-events-count"] = {
         ...ANALYTICS_CHART_HELP_REGISTRY["chart-event-kpi"],
-        title: "Events count trend",
+        title: "Поток событий",
         shortDescription: "Показывает объем событий во времени.",
         whatItShows: "График показывает интенсивность потока и помогает отличить рост нагрузки от деградации качества.",
-        howToRead: "Смотрите пики и провалы count, затем сравнивайте с latency и error rate за те же интервалы."
+        howToRead: "Смотрите пики и провалы количества, затем сравнивайте со временем отклика и долей ошибок за те же интервалы."
     };
     ANALYTICS_CHART_HELP_REGISTRY["chart-stage-latency"] = {
         ...ANALYTICS_CHART_HELP_REGISTRY["chart-latency"],
-        title: "Latency по слоям",
-        shortDescription: "Показывает, какой слой отвечает за задержку.",
-        whatItShows: "График разделяет время обработки между CONTROLLER, SERVICE, DATABASE и другими этапами.",
-        howToRead: "Ищите слой, у которого P95/AVG растет сильнее остальных, затем переходите в stage metrics и Raw."
+        title: "Длительность этапов",
+        shortDescription: "Показывает, какой этап отвечает за задержку.",
+        whatItShows: "График разделяет время обработки между контроллером, сервисом, базой данных и другими этапами.",
+        howToRead: "Ищите этап, у которого P95/AVG растет сильнее остальных, затем переходите в сырые события и логи трассировки."
     };
     ANALYTICS_CHART_HELP_REGISTRY["chart-stage-errors"] = {
         ...ANALYTICS_CHART_HELP_REGISTRY["chart-error-rate"],
-        title: "Ошибки по слоям",
+        title: "Ошибки по этапам",
         shortDescription: "Показывает распределение ошибок между этапами.",
         whatItShows: "График помогает локализовать, где возникает ошибка: на входе, в бизнес-логике, базе или внешнем вызове.",
-        howToRead: "Смотрите слой с ростом ошибок и сверяйте с error class/status в Raw."
+        howToRead: "Смотрите этап с ростом ошибок и сверяйте с классом ошибки и статусом в сырых событиях."
     };
     ANALYTICS_CHART_HELP_REGISTRY["chart-universal-stages"] = ANALYTICS_CHART_HELP_REGISTRY["chart-stage-latency"];
     ANALYTICS_CHART_HELP_REGISTRY["chart-universal-event-kpi"] = ANALYTICS_CHART_HELP_REGISTRY["chart-event-kpi"];
     ANALYTICS_CHART_HELP_REGISTRY["chart-stage-metric-text"] = {
         ...ANALYTICS_CHART_HELP_REGISTRY["chart-stage-metric-series"],
         title: "Текстовые метрики этапов",
-        shortDescription: "Показывает распределение текстовых признаков: path, status, method, error code.",
+        shortDescription: "Показывает распределение текстовых признаков: внутренний маршрут, статус, метод и код ошибки.",
         whatItShows: "График помогает понять, какие текстовые значения чаще встречаются в выбранном периоде или проблемном окне.",
-        howToRead: "Сравнивайте top values с error rate, latency и Raw. Один доминирующий status/path часто ускоряет поиск причины."
+        howToRead: "Сравнивайте частые значения с долей ошибок, временем отклика и сырыми событиями. Один доминирующий статус или внутренний маршрут часто ускоряет поиск причины."
     };
     ANALYTICS_CHART_HELP_REGISTRY["analytics-stage-table"] = ANALYTICS_CHART_HELP_REGISTRY["chart-stage-latency"];
     ANALYTICS_CHART_HELP_REGISTRY["analytics-stage-metric-table"] = ANALYTICS_CHART_HELP_REGISTRY["chart-stage-metric-series"];
     ANALYTICS_CHART_HELP_REGISTRY["chart-compare-delta"] = {
         ...ANALYTICS_CHART_HELP_REGISTRY["chart-latency"],
-        title: "Compare delta",
+        title: "Дельта сравнения",
         shortDescription: "Показывает изменение KPI между периодами до и после.",
         whatItShows: "График показывает, какие показатели улучшились или ухудшились между двумя окнами.",
-        howToRead: "Сравнивайте только равные периоды и одинаковые фильтры. Положительная дельта latency/error rate обычно требует расследования."
+        howToRead: "Сравнивайте только равные периоды и одинаковые фильтры. Положительная дельта времени отклика или доли ошибок обычно требует расследования."
     };
 
     function applyHumanHelpCopy() {
         const metricBasics = [
-            {name: "Count", description: "Показывает, сколько раз событие произошло. Сначала проверьте именно Count: если событий мало, проценты ошибок и P95 могут прыгать из-за одного-двух случаев."},
+            {name: "Количество", description: "Показывает, сколько раз событие произошло. Сначала проверьте именно количество: если событий мало, проценты ошибок и P95 могут прыгать из-за одного-двух случаев."},
             {name: "AVG", description: "Среднее время дает общий фон, но сглаживает редкие медленные запросы. Если AVG спокойный, а P95 высокий, проблема касается не всех пользователей, а хвоста."},
             {name: "P95", description: "Это граница, быстрее которой завершились 95% событий. P95 помогает увидеть хвост: большинство запросов нормальные, но часть пользователей получает заметно более медленный ответ."},
-            {name: "P99", description: "Еще более крайний хвост. Он полезен для редких тяжелых проблем, но на маленькой выборке может быть шумным, поэтому всегда смотрите Count."},
-            {name: "Error rate", description: "Доля событий с ошибками. Не читайте ее отдельно от Count: 50% ошибок из двух событий и 5% из тысячи событий означают совершенно разный масштаб."}
+            {name: "P99", description: "Еще более крайний хвост. Он полезен для редких тяжелых проблем, но на маленькой выборке может быть шумным, поэтому всегда смотрите количество."},
+            {name: "Доля ошибок", description: "Доля событий с ошибками. Не читайте ее отдельно от количества: 50% ошибок из двух событий и 5% из тысячи событий означают совершенно разный масштаб."}
         ];
         const commonReadingMistakes = [
-            "Не делайте вывод по одному spike, если рядом нет повторения и Count маленький.",
+            "Не делайте вывод по одному всплеску, если рядом нет повторения и выборка маленькая.",
             "Не сравнивайте До/После, пока не проверили, что периоды сопоставимы по нагрузке и фильтрам.",
-            "Не оценивайте Error rate без Count: на маленькой выборке процент легко выглядит пугающим.",
-            "Не считайте рост Count дефектом, если P95 и Error rate остались стабильными."
+            "Не оценивайте долю ошибок без количества: на маленькой выборке процент легко выглядит пугающим.",
+            "Не считайте рост количества дефектом, если P95 и доля ошибок остались стабильными."
         ];
         const commonPatterns = [
             {
                 icon: "spike",
-                title: "Один резкий spike",
-                description: "Если один bucket резко выделился, это может быть реальный сбой, тестовый прогон или единичный тяжелый запрос.",
-                howToCheck: "Откройте Raw за точный интервал spike и проверьте Count, event type, path, status и Trace ID.",
-                falseAlarm: "Если событий было мало и соседние bucket нормальные, сначала считайте это кандидатом на шум, а не подтвержденным инцидентом."
+                title: "Один резкий всплеск",
+                description: "Если один интервал резко выделился, это может быть реальный сбой, тестовый прогон или единичный тяжелый запрос.",
+                howToCheck: "Откройте сырые события за точный интервал всплеска и проверьте количество, тип события, внутренний маршрут, статус и идентификатор трассировки.",
+                falseAlarm: "Если событий было мало и соседние интервалы нормальные, сначала считайте это кандидатом на шум, а не подтвержденным инцидентом."
             },
             {
                 icon: "plateau",
-                title: "Несколько плохих bucket подряд",
+                title: "Несколько плохих интервалов подряд",
                 description: "Если рост держится несколько интервалов, это больше похоже на устойчивую деградацию, чем на случайный выброс.",
-                howToCheck: "Сравните тот же период на latency, error rate и stage-графиках. Если проблема повторяется в одном слое, расследование можно сузить.",
+                howToCheck: "Сравните тот же период на динамике производительности, динамике ошибок и графиках этапов. Если проблема повторяется в одном этапе, расследование можно сузить.",
                 falseAlarm: "Проверьте, не сменился ли фильтр, период или состав тестовых сценариев."
             },
             {
                 icon: "divergence",
-                title: "P95 растет, Count не растет",
-                description: "Нагрузка вряд ли является главной причиной. Чаще это медленный слой, внешний вызов, база данных или изменение логики.",
-                howToCheck: "Сначала проверьте stage latency, затем stage metrics вроде DB_QUERY_COUNT и RESPONSE_SIZE, после этого откройте Raw trace.",
-                falseAlarm: "На маленьком Count P95 мог измениться из-за одного тяжелого события."
+                title: "P95 растет, количество не растет",
+                description: "Нагрузка вряд ли является главной причиной. Чаще это медленный этап, внешний вызов, база данных или изменение логики.",
+                howToCheck: "Сначала проверьте длительность этапов, затем откройте сырые события и логи трассировки.",
+                falseAlarm: "На маленькой выборке P95 мог измениться из-за одного тяжелого события."
             },
             {
                 icon: "error_growth",
-                title: "Error rate растет при стабильном Count",
+                title: "Доля ошибок растет при стабильном количестве",
                 description: "Это похоже на регрессию качества: событий столько же, но ошибок стало больше.",
-                howToCheck: "Откройте Raw за проблемный bucket и проверьте HTTP status, error code, path и повторяемость Trace ID.",
-                falseAlarm: "Если Count очень маленький, одна ошибка может дать высокий процент."
+                howToCheck: "Откройте сырые события за проблемный интервал и проверьте HTTP-статус, код ошибки, внутренний маршрут и повторяемость идентификатора трассировки.",
+                falseAlarm: "Если выборка очень маленькая, одна ошибка может дать высокий процент."
             },
             {
                 icon: "volume_growth",
-                title: "Count растет, P95 и ошибки стабильны",
+                title: "Количество растет, P95 и ошибки стабильны",
                 description: "Скорее всего, система просто обработала больше нагрузки без ухудшения качества.",
-                howToCheck: "Проверьте, не вырос ли один event type или path. Если latency и errors не изменились, это не первоочередная проблема.",
+                howToCheck: "Проверьте, не вырос ли один тип события или внутренний маршрут. Если время отклика и ошибки не изменились, это не первоочередная проблема.",
                 falseAlarm: "Не записывайте такой рост в дефекты без признаков деградации."
             },
             {
                 icon: "overlay_before_after",
                 title: "До/После стало хуже",
-                description: "Если после изменения вырос P95 или Error rate, это может быть регрессия, но сначала убедитесь, что сравниваются похожие окна.",
-                howToCheck: "Сравните Count и состав event types в обоих периодах. Затем проверьте stage-графики и Raw для ухудшившегося среза.",
+                description: "Если после изменения вырос P95 или доля ошибок, это может быть регрессия, но сначала убедитесь, что сравниваются похожие окна.",
+                howToCheck: "Сравните количество и состав типов событий в обоих периодах. Затем проверьте графики этапов и сырые события для ухудшившегося среза.",
                 falseAlarm: "Разная нагрузка или другой набор тестов легко создают ложную разницу До/После."
             }
         ];
         const relatedChartsHuman = [
-            "Raw события — откройте их, когда нужно увидеть конкретные запросы, статусы, path и Trace ID, из которых сложился пик.",
-            "Stage metrics — используйте, если нужно понять, какой технический признак вырос вместе с задержкой или ошибками.",
-            "Latency trend — помогает понять, проблема была короткой или держалась несколько интервалов подряд.",
-            "Error rate trend — нужен, чтобы отличить рост ошибок от роста задержек без ошибок."
+            "Сырые события - откройте их, когда нужно увидеть конкретные запросы, статусы, внутренний маршрут и идентификатор трассировки, из которых сложился пик.",
+            "Длительность этапов - используйте, если нужно понять, где выросло время отклика или появились ошибки.",
+            "Динамика производительности - помогает понять, проблема была короткой или держалась несколько интервалов подряд.",
+            "Динамика ошибок - нужна, чтобы отличить рост ошибок от роста задержек без ошибок."
         ];
         const enrich = (chartId, patch) => {
             ANALYTICS_CHART_HELP_REGISTRY[chartId] = {
@@ -902,74 +1008,74 @@
 
         enrich("chart-event-kpi", {
             whatItShows: "Этот график показывает, какие типы событий дают основной вклад в нагрузку, задержки и ошибки. Он помогает быстро понять, проблема связана с одним действием пользователя или распределена по всему приложению.",
-            howToRead: "Сначала посмотрите Count, чтобы понять размер выборки. Затем проверьте P95: нет ли события, которое стало заметно медленнее остальных. После этого смотрите Error rate и подтверждайте вывод Raw-событиями.",
+            howToRead: "Сначала посмотрите количество, чтобы понять размер выборки. Затем проверьте P95: нет ли события, которое стало заметно медленнее остальных. После этого смотрите долю ошибок и подтверждайте вывод сырыми событиями.",
             metrics: metricBasics,
             trendPatterns: commonPatterns,
-            actions: ["Начните с Count: достаточно ли событий, чтобы делать вывод.", "Если выделился один event type, отфильтруйте его и проверьте latency, error rate и Raw.", "Если несколько событий ухудшились одновременно, переходите к stages/layers.", "При До/После сначала сравните нагрузку."],
+            actions: ["Начните с количества: достаточно ли событий, чтобы делать вывод.", "Если выделился один тип события, отфильтруйте его и проверьте время отклика, долю ошибок и сырые события.", "Если несколько событий ухудшились одновременно, переходите к этапам.", "При До/После сначала сравните нагрузку."],
             analysisMistakes: commonReadingMistakes,
             relatedCharts: relatedChartsHuman
         });
         enrich("chart-events-count", {
             whatItShows: "График показывает поток событий во времени. Он нужен, чтобы отделить рост нагрузки от реальной деградации качества.",
-            howToRead: "Если Count вырос, сразу проверьте P95 и Error rate в тот же период. Рост Count без роста задержек и ошибок чаще означает нормальную нагрузку, а не дефект.",
+            howToRead: "Если количество выросло, сразу проверьте P95 и долю ошибок в тот же период. Рост количества без роста задержек и ошибок чаще означает нормальную нагрузку, а не дефект.",
             metrics: [metricBasics[0]],
             trendPatterns: commonPatterns,
-            actions: ["Найдите интервал пика или провала.", "Сравните этот интервал с latency и error rate.", "Проверьте, один event type изменился или весь поток.", "Если поток исчез, сначала проверьте фильтры, период и сбор аналитики."],
+            actions: ["Найдите интервал пика или провала.", "Сравните этот интервал со временем отклика и долей ошибок.", "Проверьте, один тип события изменился или весь поток.", "Если поток исчез, сначала проверьте фильтры, период и сбор аналитики."],
             analysisMistakes: commonReadingMistakes,
             relatedCharts: relatedChartsHuman
         });
         enrich("chart-latency", {
-            whatItShows: "Latency trend показывает, как менялась скорость обработки событий. Он помогает понять, деградация затронула все запросы или только хвост.",
-            howToRead: "Найдите момент роста задержек, затем сравните AVG и P95. Если P95 растет сильнее AVG, ищите медленные отдельные trace, path или слой, а не общую просадку всего приложения.",
-            metrics: metricBasics.filter((item) => ["AVG", "P95", "P99", "Count"].includes(item.name)),
+            whatItShows: "Динамика производительности показывает, как менялась скорость обработки событий. Она помогает понять, деградация затронула все запросы или только хвост.",
+            howToRead: "Найдите момент роста задержек, затем сравните AVG и P95. Если P95 растет сильнее AVG, ищите отдельные медленные трассировки, внутренние маршруты или этапы, а не общую просадку всего приложения.",
+            metrics: metricBasics.filter((item) => ["AVG", "P95", "P99", "Количество"].includes(item.name)),
             trendPatterns: commonPatterns,
-            actions: ["Найдите bucket, где задержки начали расти.", "Сравните AVG и P95.", "Откройте KPI по типам событий, чтобы найти вклад.", "Проверьте stages/layers, чтобы найти слой.", "Подтвердите причину Raw-событиями."],
+            actions: ["Найдите интервал, где задержки начали расти.", "Сравните AVG и P95.", "Откройте KPI по типам событий, чтобы найти вклад.", "Проверьте этапы, чтобы найти узкое место.", "Подтвердите причину сырыми событиями."],
             analysisMistakes: commonReadingMistakes,
             relatedCharts: relatedChartsHuman
         });
         enrich("chart-error-rate", {
-            whatItShows: "Error rate trend показывает, когда и насколько выросла доля событий с ошибками. Он нужен, чтобы отделить единичные сбои от устойчивой проблемы.",
-            howToRead: "Найдите bucket с ростом ошибок и сразу проверьте Count. Если Count маленький, процент может быть шумным. Если выборка нормальная, переходите в Raw и проверяйте status, error code, path и Trace ID.",
-            metrics: metricBasics.filter((item) => ["Count", "Error rate"].includes(item.name)),
+            whatItShows: "Динамика ошибок показывает, когда и насколько выросла доля событий с ошибками. Она нужна, чтобы отделить единичные сбои от устойчивой проблемы.",
+            howToRead: "Найдите интервал с ростом ошибок и сразу проверьте количество. Если выборка маленькая, процент может быть шумным. Если выборка нормальная, переходите в сырые события и проверяйте статус, код ошибки, внутренний маршрут и идентификатор трассировки.",
+            metrics: metricBasics.filter((item) => ["Количество", "Доля ошибок"].includes(item.name)),
             trendPatterns: commonPatterns,
-            actions: ["Найдите проблемный bucket.", "Проверьте Count в этом же bucket.", "Если Count достаточный, откройте Raw за этот период.", "Проверьте HTTP status, error code, path и Trace ID.", "Сверьте слой ошибки на stage-графиках."],
+            actions: ["Найдите проблемный интервал.", "Проверьте количество в этом же интервале.", "Если выборка достаточная, откройте сырые события за этот период.", "Проверьте HTTP-статус, код ошибки, внутренний маршрут и идентификатор трассировки.", "Сверьте этап ошибки на графиках этапов."],
             analysisMistakes: commonReadingMistakes,
             relatedCharts: relatedChartsHuman
         });
         enrich("chart-universal-timeline", {
-            whatItShows: "Universal timeline показывает динамику только для выбранного среза: события, слоя, атрибута или значения. Это удобно, когда нужно проверить конкретную гипотезу, а не весь поток.",
-            howToRead: "Сначала убедитесь, какие фильтры включены. Затем сравните Count, P95 и Error rate. Если включено До/После, проверьте, что периоды сопоставимы и фильтры одинаковые.",
+            whatItShows: "Динамика диагностики показывает данные только для выбранного среза: события, этапа, атрибута или значения. Это удобно, когда нужно проверить конкретную гипотезу, а не весь поток.",
+            howToRead: "Сначала убедитесь, какие фильтры включены. Затем сравните количество, P95 и долю ошибок. Если включено До/После, проверьте, что периоды сопоставимы и фильтры одинаковые.",
             metrics: metricBasics,
             trendPatterns: commonPatterns,
-            actions: ["Проверьте активные фильтры события, слоя и атрибута.", "Сравните срез с общей статистикой.", "Если проблема есть только в одном значении атрибута, откройте Raw с тем же фильтром.", "При compare сначала проверьте Count в обоих периодах."],
+            actions: ["Проверьте активные фильтры события, этапа и атрибута.", "Сравните срез с общей статистикой.", "Если проблема есть только в одном значении атрибута, откройте сырые события с тем же фильтром.", "При сравнении сначала проверьте количество в обоих периодах."],
             analysisMistakes: commonReadingMistakes,
             relatedCharts: relatedChartsHuman
         });
         enrich("chart-stage-metric-series", {
-            whatItShows: "Числовые метрики этапов показывают технические причины деградации: количество SQL-запросов, размер ответа, retry, длительность внешнего вызова и похожие признаки.",
-            howToRead: "Смотрите, какая метрика растет в тот же момент, что latency или errors. Если DB_QUERY_COUNT растет вместе с DATABASE P95, расследование стоит начинать с запросов и объема данных.",
-            metrics: [{name: "DB_QUERY_COUNT", description: "Показывает, не стало ли одно действие выполнять больше запросов к базе."}, {name: "RESPONSE_SIZE", description: "Помогает увидеть, что задержка связана с большим объемом данных."}, {name: "P95 метрики", description: "Показывает хвост значения: не только типичный случай, но и тяжелые запросы."}],
+            whatItShows: "Числовые метрики показывают технические причины деградации: количество SQL-запросов, размер ответа, повторы, длительность внешнего вызова и похожие признаки.",
+            howToRead: "Смотрите, какая метрика растет в тот же момент, что время отклика или ошибки. Если количество SQL-запросов растет вместе с P95 базы данных, расследование стоит начинать с запросов и объема данных.",
+            metrics: [{name: "Количество SQL-запросов", description: "Показывает, не стало ли одно действие выполнять больше запросов к базе."}, {name: "Размер ответа", description: "Помогает увидеть, что задержка связана с большим объемом данных."}, {name: "P95 метрики", description: "Показывает хвост значения: не только типичный случай, но и тяжелые запросы."}],
             trendPatterns: commonPatterns,
-            actions: ["Сравните пик метрики с stage latency.", "Проверьте выбранный stage type.", "Откройте текстовые метрики рядом: path, status, method или error code.", "Подтвердите конкретным Raw trace."],
+            actions: ["Сравните пик метрики с длительностью этапов.", "Проверьте выбранный тип этапа.", "Откройте текстовые метрики рядом: внутренний маршрут, статус, метод или код ошибки.", "Подтвердите конкретными логами трассировки."],
             analysisMistakes: commonReadingMistakes,
             relatedCharts: relatedChartsHuman
         });
         enrich("chart-stage-metric-text", {
-            whatItShows: "Текстовые метрики показывают top values: какие URL, HTTP-методы, статусы, error code или другие текстовые признаки чаще всего встречались в выбранном периоде.",
-            howToRead: "Смотрите не только первое значение, но и изменение состава. Появление нового status или error code может объяснить рост ошибок, а новый URL может объяснить рост задержек.",
-            metrics: [{name: "Top values", description: "Самые частые значения выбранной текстовой метрики. Они помогают понять, какой path, status, method или error code сформировал пик."}, {name: "Count значения", description: "Количество появлений значения. Редкое значение может быть важным, но вывод по нему нужно подтверждать Raw."}],
+            whatItShows: "Текстовые метрики показывают частые значения: какие URL, HTTP-методы, статусы, коды ошибок или другие текстовые признаки чаще всего встречались в выбранном периоде.",
+            howToRead: "Смотрите не только первое значение, но и изменение состава. Появление нового статуса или кода ошибки может объяснить рост ошибок, а новый URL может объяснить рост задержек.",
+            metrics: [{name: "Частые значения", description: "Самые частые значения выбранной текстовой метрики. Они помогают понять, какой внутренний маршрут, статус, метод или код ошибки сформировал пик."}, {name: "Количество значения", description: "Количество появлений значения. Редкое значение может быть важным, но вывод по нему нужно подтверждать сырыми событиями."}],
             trendPatterns: commonPatterns,
-            actions: ["Выберите текстовую метрику: URL, HTTP status, method или error code.", "Сравните top values До/После.", "Если появилось новое значение, откройте Raw с этим значением.", "Не делайте вывод по редкому значению без проверки Count."],
+            actions: ["Выберите текстовую метрику: URL, HTTP-статус, метод или код ошибки.", "Сравните частые значения До/После.", "Если появилось новое значение, откройте сырые события с этим значением.", "Не делайте вывод по редкому значению без проверки количества."],
             analysisMistakes: commonReadingMistakes,
             relatedCharts: relatedChartsHuman
         });
         enrich("analytics-events-table", {
-            whatItShows: "Raw-события показывают конкретные запросы, из которых собраны агрегаты: время, статус, path, stages, metrics и Trace ID.",
-            howToRead: "Переходите сюда после того, как агрегатный график показал подозрительный bucket. Фильтруйте тот же период и тот же event type, затем открывайте детали событий.",
-            metrics: [{name: "Trace ID", description: "Связь с логами и стадиями конкретного запроса."}, {name: "HTTP status / error code", description: "Быстро показывает, какой тип ошибки повторяется."}, {name: "Stages", description: "Помогают увидеть, где именно запрос потратил время или упал."}],
+            whatItShows: "Сырые события показывают конкретные запросы, из которых собраны агрегаты: время, статус, внутренний маршрут, этапы, метрики и идентификатор трассировки.",
+            howToRead: "Переходите сюда после того, как агрегатный график показал подозрительный интервал. Фильтруйте тот же период и тот же тип события, затем открывайте детали событий.",
+            metrics: [{name: "Идентификатор трассировки", description: "Связь с логами и этапами конкретного запроса."}, {name: "HTTP-статус / код ошибки", description: "Быстро показывает, какой тип ошибки повторяется."}, {name: "Этапы", description: "Помогают увидеть, где именно запрос потратил время или упал."}],
             trendPatterns: commonPatterns,
-            actions: ["Откройте Raw за точный интервал пика.", "Отфильтруйте event type, path, status или error code.", "Откройте несколько событий, а не одно.", "Вернитесь к агрегатам, чтобы оценить масштаб."],
-            analysisMistakes: ["Не делайте общий вывод по одному trace.", "Не меняйте фильтры относительно графика, который расследуете.", "Не забывайте, что свежие Raw могут появиться раньше rollup."],
+            actions: ["Откройте сырые события за точный интервал пика.", "Отфильтруйте тип события, внутренний маршрут, статус или код ошибки.", "Откройте несколько событий, а не одно.", "Вернитесь к агрегатам, чтобы оценить масштаб."],
+            analysisMistakes: ["Не делайте общий вывод по одной трассировке.", "Не меняйте фильтры относительно графика, который расследуете.", "Не забывайте, что свежие сырые события могут появиться раньше подготовленных агрегатов."],
             relatedCharts: relatedChartsHuman
         });
     }
@@ -981,6 +1087,50 @@
             CHART_SCENARIOS_BY_CANVAS[chartId] = scenarios;
         }
     });
+    const OVERVIEW_INVESTIGATION_SCENARIO_CHART_IDS = new Set([
+        "chart-events-count",
+        "chart-latency",
+        "chart-error-rate"
+    ]);
+    const OVERVIEW_INVESTIGATION_SCENARIOS_BY_CANVAS = {
+        "chart-events-count": [
+            {
+                id: "top_events_period",
+                label: "Топ событий за период",
+                description: "Показывает, какие типы событий сформировали поток событий в выбранном периоде или интервале.",
+                details: "Сценарий использует текущий период графика или применённый интервал анализа. Если выбран один тип события, фокус остаётся на нём; если выбрано несколько, сценарий помогает сравнить их по количеству.",
+                checklist: ["Проверьте текущий период или активный интервал анализа.", "Сравните вклад типа события по количеству.", "При необходимости сузьте выбор событий в раскрытом графике."]
+            }
+        ],
+        "chart-latency": [
+            {
+                id: "top_latency_events",
+                label: "Топ событий по задержке",
+                description: "Показывает, какие типы событий дали задержку в выбранном периоде или интервале.",
+                details: "Сценарий работает в рамках текущего периода или интервала анализа. В общей статистике помогает найти вклад событий в рост задержки; при выборе одного события оставляет AVG/P95/P99 по нему; при выборе нескольких сравнивает их по выбранной метрике времени отклика.",
+                checklist: ["Проверьте AVG, P95 и P99.", "Сопоставьте задержку с выбранными типами событий.", "При активном интервале анализа анализируйте только этот интервал."]
+            }
+        ],
+        "chart-error-rate": [
+            {
+                id: "top_error_events",
+                label: "Топ событий по ошибкам",
+                description: "Показывает, какие типы событий сформировали ошибочный участок графика.",
+                details: "Сценарий использует текущий период или интервал анализа. В общей статистике помогает найти вклад событий в рост доли ошибок; при выборе одного события оставляет детализацию по нему; при выборе нескольких сравнивает их по доле ошибок, количеству и доступным ошибочным событиям.",
+                checklist: ["Сравните долю ошибок и количество.", "Проверьте, какие типы событий дают основную долю ошибок.", "Если доступны статус или код ошибки, используйте их в сырых событиях без новых backend-запросов."]
+            }
+        ]
+    };
+    Object.entries(OVERVIEW_INVESTIGATION_SCENARIOS_BY_CANVAS).forEach(([chartId, scenarios]) => {
+        CHART_SCENARIOS_BY_CANVAS[chartId] = scenarios;
+    });
+    [
+        "chart-event-kpi",
+        "chart-stage-latency",
+        "chart-stage-errors"
+    ].forEach((chartId) => {
+        CHART_SCENARIOS_BY_CANVAS[chartId] = [];
+    });
     CHART_SCENARIOS_BY_CANVAS["chart-stage-metric-series-compare"] = CHART_SCENARIOS_BY_CANVAS["chart-stage-metric-series"];
     CHART_SCENARIOS_BY_CANVAS["chart-stage-metric-text-compare"] = CHART_SCENARIOS_BY_CANVAS["chart-stage-metric-text"];
     Object.entries(ANALYTICS_CHART_HELP_REGISTRY).forEach(([chartId, help]) => {
@@ -991,7 +1141,7 @@
         ENTITY_TYPE: "Тип сущности события (например, товар, категория, заказ). Нужен, чтобы быстро сузить анализ до конкретной бизнес-области.",
         ENTITY_ID: "Идентификатор конкретной сущности. Помогает расследовать один объект: один товар, одну категорию, один заказ.",
         HTTP_METHOD: "Метод HTTP-запроса (GET/POST/PUT/DELETE). Показывает, это чтение данных или изменение.",
-        HTTP_PATH: "Путь запроса. Используйте для анализа одного и того же endpoint без смешивания разных экранов.",
+        HTTP_PATH: "Внутренний маршрут запроса. Используйте для анализа одного и того же маршрута без смешивания разных экранов.",
         HTTP_STATUS: "HTTP-статус ответа. По нему видно, где штатные ответы, а где клиентские или серверные ошибки.",
         ERROR_CODE: "Код ошибки приложения. Нужен для точного поиска повторяющегося сбоя и связи с конкретной логикой.",
         ERROR_CLASS: "Класс ошибки (бизнесовая, системная, ошибка HTTP-запроса). Помогает быстро определить тип инцидента.",
@@ -1000,7 +1150,7 @@
         REFERRER: "Источник перехода пользователя. Помогает понять, из какого шага пользователь пришёл к проблемному действию.",
         SESSION_ID_HASH: "Анонимный идентификатор сессии. Позволяет собрать цепочку действий одного визита без персональных данных.",
         USER_ID_HASH: "Анонимный идентификатор пользователя. Нужен, чтобы проверить, повторяется ли проблема у одного и того же пользователя.",
-        REQUEST_ID: "Связывает пользовательский запрос с backend-логами и метриками этапов."
+        REQUEST_ID: "Связывает пользовательский запрос с серверными логами и метриками этапов."
     };
 
     const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -1020,199 +1170,199 @@
         period: {
             title: "Период анализа",
             shortDescription: "Определяет временное окно, из которого берутся события и метрики.",
-            whatItDoes: "Поля 'с' и 'по' ограничивают данные для всех расчетов: count, latency, ошибки, метрики этапов и raw-таблицу.",
+            whatItDoes: "Поля 'с' и 'по' ограничивают данные для всех расчетов: количество, время отклика, ошибки, метрики и таблицу сырых событий.",
             whenToUse: "Меняйте период, когда нужно сузить расследование до конкретного инцидента или сравнить поведение на длинном окне.",
             howToUse: ["Начинайте с быстрого пресета, если точное время неизвестно.", "Для инцидента выставляйте границы чуть шире подозрительного пика.", "При сравнении до/после используйте сопоставимые по длине окна."],
-            whatChangesOnChart: "Графики пересчитывают bucket, набор точек, KPI и таблицы под выбранное окно.",
-            commonMistakes: ["Слишком короткий период может показать случайный шум.", "Слишком длинный период сглаживает короткие сбои.", "Нельзя сравнивать окна разной нагрузки без проверки Count."],
-            examples: ["24 часа - быстрый обзор текущего состояния.", "1 неделя - поиск повторяющихся деградаций.", "Точный час инцидента - проверка raw-событий и trace."],
-            relatedControls: ["Быстрый период", "Бакет", "Режим сравнения"]
+            whatChangesOnChart: "Графики пересчитывают интервал, набор точек, KPI и таблицы под выбранное окно.",
+            commonMistakes: ["Слишком короткий период может показать случайный шум.", "Слишком длинный период сглаживает короткие сбои.", "Нельзя сравнивать окна разной нагрузки без проверки количества."],
+            examples: ["24 часа - быстрый обзор текущего состояния.", "1 неделя - поиск повторяющихся деградаций.", "Точный час инцидента - проверка сырых событий и трассировки."],
+            relatedControls: ["Быстрый период", "Интервал", "Режим сравнения"]
         },
         quickPeriod: {
             title: "Быстрый период",
             shortDescription: "Готовый пресет времени без ручного ввода дат.",
             whatItDoes: "Автоматически выставляет начало и конец периода относительно текущего времени.",
             whenToUse: "Используйте для регулярного просмотра: последние 24 часа, неделя, месяц или 3 месяца.",
-            howToUse: ["Выберите пресет.", "При необходимости поправьте даты вручную.", "Для больших периодов учитывайте, что часть графиков будет читать rollup, а raw-таблица может быть тяжелее."],
-            whatChangesOnChart: "Меняются все запросы, кэши считаются по новому range, графики перерисовываются.",
+            howToUse: ["Выберите пресет.", "При необходимости поправьте даты вручную.", "Для больших периодов учитывайте, что часть графиков будет читать подготовленные агрегаты, а таблица сырых событий может быть тяжелее."],
+            whatChangesOnChart: "Меняются все запросы, кэши считаются по новому периоду, графики перерисовываются.",
             commonMistakes: ["Не путайте быстрый период с режимом сравнения.", "После ручной правки даты пресет может уже не описывать точное окно."],
             examples: ["3 месяца - оценить долгий тренд.", "15 минут - проверить свежий сбой."],
-            relatedControls: ["Период анализа", "Бакет"]
+            relatedControls: ["Период анализа", "Интервал"]
         },
         bucket: {
-            title: "Бакет",
+            title: "Интервал",
             shortDescription: "Размер временного интервала, в который группируются точки графика.",
-            whatItDoes: "Чем больше bucket, тем меньше точек и тем сильнее сглаживание. Авто выбирает разумный шаг под длину периода.",
+            whatItDoes: "Чем больше интервал, тем меньше точек и тем сильнее сглаживание. Авто выбирает разумный шаг под длину периода.",
             whenToUse: "Меняйте вручную, если график слишком шумный или наоборот скрывает короткие пики.",
-            howToUse: ["Для коротких инцидентов выбирайте 1-5 минут.", "Для недель и месяцев оставляйте Авто или крупный bucket.", "При сравнении используйте одинаковый bucket для обоих периодов."],
-            whatChangesOnChart: "Меняется детализация timeline, latency/error графиков и сравнения.",
-            commonMistakes: ["Крупный bucket может скрыть короткий spike.", "Мелкий bucket на длинном периоде создает много точек и замедляет рендер."],
+            howToUse: ["Для коротких инцидентов выбирайте 1-5 минут.", "Для недель и месяцев оставляйте Авто или крупный интервал.", "При сравнении используйте одинаковый интервал для обоих периодов."],
+            whatChangesOnChart: "Меняется детализация динамики, графиков производительности, ошибок и сравнения.",
+            commonMistakes: ["Крупный интервал может скрыть короткий всплеск.", "Мелкий интервал на длинном периоде создает много точек и замедляет рендер."],
             examples: ["1 минута - точный разбор всплеска.", "60 минут - обзор недели."],
             relatedControls: ["Период анализа", "Метрики"]
         },
         globalContext: {
             title: "Контекст событий",
             shortDescription: "Главные фильтры, которые ограничивают все вкладки аналитики.",
-            whatItDoes: "Модуль и тип события задают общий срез для Overview, Universal, Metrics и Raw.",
+            whatItDoes: "Модуль и тип события задают общий срез для дашборда, диагностики и сырых событий.",
             whenToUse: "Выбирайте модуль или событие, когда нужно расследовать одну функциональную область, а не весь поток.",
             howToUse: ["Оставьте пусто для общей картины.", "Выберите модуль для анализа части приложения.", "Выберите тип события, если уже знаете проблемный сценарий."],
             whatChangesOnChart: "Все графики получают только события выбранного контекста.",
             commonMistakes: ["Забытый фильтр может создать впечатление, что часть событий исчезла.", "Локальные фильтры графиков не должны менять главный фильтр."],
             examples: ["SHOP + ORDER_CREATED - только создание заказов."],
-            relatedControls: ["Период анализа", "Общий сценарий анализа"]
+            relatedControls: ["Период анализа", "Тип события"]
         },
         globalScenario: {
             title: "Общий сценарий анализа",
             shortDescription: "Аналитический пресет, который помогает читать все графики в одном режиме расследования.",
             whatItDoes: "Меняет аналитические подсказки и сценарный фокус графиков, не создавая записи в БД.",
-            whenToUse: "Выберите сценарий, если расследование уже имеет цель: ошибки, latency, релиз до/после, нагрузка или слой.",
+            whenToUse: "Выберите сценарий, если расследование уже имеет цель: ошибки, время отклика, релиз до/после, нагрузка или этап.",
             howToUse: ["Выберите один сценарий.", "Смотрите рекомендуемые графики и сигналы.", "Локальные сценарии графиков можно сбросить обратно к глобальному."],
             whatChangesOnChart: "Графики показывают выбранный сценарный фокус и справку, локальные overrides сбрасываются при смене главного фильтра.",
             commonMistakes: ["Сценарий не заменяет проверку данных.", "Не делайте вывод только по одной метрике."],
-            examples: ["Проблема хвоста latency - смотрите P95/P99 и stages.", "Всплеск ошибок - сверяйте Error rate, Raw и error class."],
+            examples: ["Проблема хвоста времени отклика - смотрите P95/P99 и этапы.", "Всплеск ошибок - сверяйте долю ошибок, сырые события и класс ошибки."],
             relatedControls: ["Режим сравнения", "Тип события"]
         },
         compareMode: {
             title: "Режим сравнения",
             shortDescription: "Включает анализ До/После для одного и того же набора фильтров.",
-            whatItDoes: "Off показывает один период. Split рисует периоды раздельно. Overlay накладывает линии в одном графике.",
+            whatItDoes: "Выключено показывает один период. Раздельно рисует периоды отдельно. Наложение показывает линии в одном графике.",
             whenToUse: "Используйте после релиза, фикса или изменения нагрузки, когда нужно понять, стало лучше или хуже.",
-            howToUse: ["Сначала настройте текущий период.", "Выберите Split для подробного чтения двух графиков.", "Выберите Overlay для быстрого визуального сравнения формы линий."],
-            whatChangesOnChart: "Появляется baseline/before payload и визуальное сравнение с текущим after payload.",
-            commonMistakes: ["Разные по длине периоды дают ложную разницу.", "Сравнение без проверки Count может скрыть изменение нагрузки."],
-            examples: ["Overlay: быстро увидеть, вырос ли P95 после релиза.", "Split: отдельно проверить таблицы и KPI до/после."],
-            relatedControls: ["Период анализа", "Бакет"]
+            howToUse: ["Сначала настройте текущий период.", "Выберите Раздельно для подробного чтения двух графиков.", "Выберите Наложение для быстрого визуального сравнения формы линий."],
+            whatChangesOnChart: "Появляется базовый период и визуальное сравнение с текущим периодом.",
+            commonMistakes: ["Разные по длине периоды дают ложную разницу.", "Сравнение без проверки количества может скрыть изменение нагрузки."],
+            examples: ["Наложение: быстро увидеть, вырос ли P95 после релиза.", "Раздельно: отдельно проверить таблицы и KPI до/после."],
+            relatedControls: ["Период анализа", "Интервал"]
         },
         attributeFilter: {
             title: "Атрибут и значение",
             shortDescription: "Фильтр по системному или пользовательскому признаку события.",
             whatItDoes: "Оставляет только события с выбранным атрибутом или диапазоном значений.",
-            whenToUse: "Используйте для проверки одного path, HTTP status, клиента, entity id или другого признака.",
-            howToUse: ["Сначала выберите код атрибута.", "Затем выберите значение или диапазон.", "Проверьте Count: редкий атрибут может давать нестабильные проценты."],
-            whatChangesOnChart: "Все агрегаты и raw-таблица сужаются до выбранного значения.",
+            whenToUse: "Используйте для проверки одного внутреннего маршрута, HTTP-статуса, клиента, идентификатора сущности или другого признака.",
+            howToUse: ["Сначала выберите код атрибута.", "Затем выберите значение или диапазон.", "Проверьте количество: редкий атрибут может давать нестабильные проценты."],
+            whatChangesOnChart: "Все агрегаты и таблица сырых событий сужаются до выбранного значения.",
             commonMistakes: ["Фильтр по редкому значению нельзя обобщать на весь сервис.", "Пустое значение означает отсутствие фильтра, а не пустой атрибут."],
-            examples: ["HTTP_STATUS=500 - только серверные ошибки.", "HTTP_PATH=/orders - один endpoint."],
-            relatedControls: ["Raw атрибут", "Тип события"]
+            examples: ["HTTP_STATUS=500 - только серверные ошибки.", "HTTP_PATH=/orders - один внутренний маршрут."],
+            relatedControls: ["Атрибут сырых событий", "Тип события"]
         },
         universalMode: {
-            title: "Режим Universal",
-            shortDescription: "Определяет, что именно сравнивает вкладка Универсальный анализ.",
+            title: "Режим диагностики",
+            shortDescription: "Определяет, что именно сравнивает вкладка Диагностика.",
             whatItDoes: "Общая статистика смотрит весь поток. Одно событие фокусируется на одном типе. Сравнение событий сопоставляет несколько типов событий по одной метрике.",
             whenToUse: "Переключайте режим, когда меняется вопрос: общая картина, разбор одного события или сравнение нескольких событий.",
-            howToUse: ["Начните с Общей статистики.", "Если выделился event type, перейдите в одно событие.", "Для нескольких событий оставьте одну метрику сравнения."],
-            whatChangesOnChart: "Меняется event filter, допустимый набор метрик и подписи Universal-графиков.",
+            howToUse: ["Начните с Общей статистики.", "Если выделился тип события, перейдите в одно событие.", "Для нескольких событий оставьте одну метрику сравнения."],
+            whatChangesOnChart: "Меняется фильтр событий, допустимый набор метрик и подписи графиков диагностики.",
             commonMistakes: ["В режиме сравнения событий нельзя корректно читать несколько метрик одновременно.", "При возврате в Общую статистику выбранные события должны быть сброшены."],
-            examples: ["Сравнить ORDER_CREATED и ORDER_PAID по P95.", "Посмотреть все события по Count/Error rate."],
-            relatedControls: ["События Universal", "Метрики Universal", "Слой"]
+            examples: ["Сравнить ORDER_CREATED и ORDER_PAID по P95.", "Посмотреть все события по количеству и доле ошибок."],
+            relatedControls: ["События диагностики", "Метрики диагностики", "Этап"]
         },
         universalEvents: {
-            title: "События Universal",
-            shortDescription: "Выбор event type для Universal-графиков.",
-            whatItDoes: "Общая статистика не фильтрует event type. Один выбранный event дает детальный разбор. Несколько event types включают режим сравнения событий.",
+            title: "События диагностики",
+            shortDescription: "Выбор типа события для графиков диагностики.",
+            whatItDoes: "Общая статистика не фильтрует тип события. Одно выбранное событие дает детальный разбор. Несколько типов событий включают режим сравнения событий.",
             whenToUse: "Используйте после того, как KPI или timeline показали подозрительный тип события.",
-            howToUse: ["Оставьте Общую статистику для всей картины.", "Выберите один event для глубокого анализа.", "Выберите несколько event types только если хотите сравнивать их между собой."],
-            whatChangesOnChart: "Timeline, layers и KPI получают другой набор строк; в multi-event метрика становится single-select.",
-            commonMistakes: ["Забытый выбранный event делает график похожим на общий, но данные будут только по нему.", "Нельзя сравнивать редкий event с частым без проверки Count."],
+            howToUse: ["Оставьте Общую статистику для всей картины.", "Выберите одно событие для глубокого анализа.", "Выберите несколько типов событий только если хотите сравнивать их между собой."],
+            whatChangesOnChart: "Динамика, этапы и KPI получают другой набор строк; при нескольких событиях метрика становится одиночным выбором.",
+            commonMistakes: ["Забытое выбранное событие делает график похожим на общий, но данные будут только по нему.", "Нельзя сравнивать редкое событие с частым без проверки количества."],
             examples: ["ORDER_CREATED - только создание заказов.", "ORDER_CREATED + ORDER_PAID - сравнение пути заказа."],
-            relatedControls: ["Режим Universal", "Метрики Universal"]
+            relatedControls: ["Режим диагностики", "Метрики диагностики"]
         },
         universalMetrics: {
-            title: "Метрики Universal",
-            shortDescription: "Выбор показателей для timeline и layers во вкладке Universal.",
+            title: "Метрики диагностики",
+            shortDescription: "Выбор показателей для динамики и этапов во вкладке Диагностика.",
             whatItDoes: "Для общей статистики и одного события можно читать несколько метрик. Для сравнения нескольких событий используется одна метрика.",
-            whenToUse: "Count показывает объем, AVG/P95 - задержки, Error rate - долю ошибок.",
-            howToUse: ["Для одного набора событий включайте 2-4 метрики.", "Для multi-event выберите одну метрику, чтобы линии были сопоставимы.", "Начинайте с Count, затем проверяйте P95 и Error rate."],
-            whatChangesOnChart: "Меняются datasets на timeline и stage/layer графиках.",
-            commonMistakes: ["Сравнение разных метрик на одной шкале может выглядеть убедительно, но быть неверным.", "Высокий Error rate при маленьком Count может быть шумом."],
-            examples: ["P95 - поиск хвоста latency.", "Error rate - поиск деградации качества."],
-            relatedControls: ["События Universal", "Слой"]
+            whenToUse: "Количество показывает объем, AVG/P95 - задержки, доля ошибок - качество.",
+            howToUse: ["Для одного набора событий включайте 2-4 метрики.", "Для нескольких событий выберите одну метрику, чтобы линии были сопоставимы.", "Начинайте с количества, затем проверяйте P95 и долю ошибок."],
+            whatChangesOnChart: "Меняются наборы данных на графиках динамики и этапов.",
+            commonMistakes: ["Сравнение разных метрик на одной шкале может выглядеть убедительно, но быть неверным.", "Высокая доля ошибок при маленькой выборке может быть шумом."],
+            examples: ["P95 - поиск хвоста времени отклика.", "Доля ошибок - поиск деградации качества."],
+            relatedControls: ["События диагностики", "Этап"]
         },
         universalLayer: {
-            title: "Слой Universal",
+            title: "Этап диагностики",
             shortDescription: "Ограничивает анализ конкретным этапом обработки.",
-            whatItDoes: "Фильтрует или группирует данные по слоям вроде CONTROLLER, SERVICE, DATABASE.",
+            whatItDoes: "Фильтрует или группирует данные по этапам вроде контроллера, сервиса и базы данных.",
             whenToUse: "Используйте, когда нужно понять, где именно возникает задержка или ошибка.",
-            howToUse: ["Сначала смотрите все слои.", "Если один слой выделяется, выберите его.", "Проверьте тот же слой в Stage Metrics и Raw."],
-            whatChangesOnChart: "Timeline и stage-график показывают выбранный слой или распределение по слоям.",
-            commonMistakes: ["Выбранный слой не доказывает первопричину без raw/trace.", "Проблема в одном слое может быть следствием другого слоя."],
-            examples: ["DATABASE - проверить SQL count и длительность.", "CONTROLLER - проверить HTTP status/path."],
-            relatedControls: ["Метрики этапов", "Raw события"]
+            howToUse: ["Сначала смотрите все этапы.", "Если один этап выделяется, выберите его.", "Проверьте тот же этап в сырых событиях и логах трассировки."],
+            whatChangesOnChart: "Динамика и график этапов показывают выбранный этап или распределение по этапам.",
+            commonMistakes: ["Выбранный этап не доказывает первопричину без сырых событий и логов трассировки.", "Проблема в одном этапе может быть следствием другого этапа."],
+            examples: ["База данных - проверить количество SQL-запросов и длительность.", "Контроллер - проверить HTTP-статус и внутренний маршрут."],
+            relatedControls: ["Метрики", "Сырые события"]
         },
         universalStageMetrics: {
-            title: "Метрики слоёв Universal",
-            shortDescription: "Определяет, какие показатели рисовать на графике слоёв.",
-            whatItDoes: "AVG/P95 показывают задержки этапов, Error rate показывает долю ошибочных событий в слое.",
-            whenToUse: "Используйте, когда график слоёв нужен не только как распределение, но и как диагностика latency/error.",
-            howToUse: ["Для производительности выберите AVG и P95.", "Для качества включите Error rate.", "Сверяйте с Count, чтобы не принять редкий выброс за системную проблему."],
-            whatChangesOnChart: "Меняется набор линий или столбцов на Universal layers.",
-            commonMistakes: ["P95 на малом количестве событий может быть нестабилен.", "Error rate без Count легко переоценить."],
-            examples: ["P95 по DATABASE - поиск медленных SQL.", "Error rate по SERVICE - проверка бизнес-ошибок."],
-            relatedControls: ["Слой Universal", "Метрики Universal"]
+            title: "Метрики этапов диагностики",
+            shortDescription: "Определяет, какие показатели рисовать на графике этапов.",
+            whatItDoes: "AVG/P95 показывают задержки этапов, доля ошибок показывает долю ошибочных событий в этапе.",
+            whenToUse: "Используйте, когда график этапов нужен не только как распределение, но и как диагностика времени отклика и ошибок.",
+            howToUse: ["Для производительности выберите AVG и P95.", "Для качества включите долю ошибок.", "Сверяйте с количеством, чтобы не принять редкий выброс за системную проблему."],
+            whatChangesOnChart: "Меняется набор линий или столбцов на графике этапов диагностики.",
+            commonMistakes: ["P95 на малом количестве событий может быть нестабилен.", "Долю ошибок без количества легко переоценить."],
+            examples: ["P95 по базе данных - поиск медленных SQL.", "Доля ошибок по сервису - проверка бизнес-ошибок."],
+            relatedControls: ["Этап диагностики", "Метрики диагностики"]
         },
         stageType: {
             title: "Этап",
             shortDescription: "Фильтр по этапу обработки события.",
-            whatItDoes: "Оставляет метрики только выбранного stage type или показывает все этапы.",
-            whenToUse: "Используйте, когда Overview/Universal указали на проблемный слой.",
+            whatItDoes: "Оставляет метрики только выбранного типа этапа или показывает все этапы.",
+            whenToUse: "Используйте, когда Дашборд или Диагностика указали на проблемный этап.",
             howToUse: ["Оставьте Все этапы для первичного обзора.", "Выберите конкретный этап для детального расследования.", "Сверяйте числовые и текстовые метрики одного этапа."],
-            whatChangesOnChart: "Числовые и текстовые метрики этапов пересчитываются под выбранный stage.",
+            whatChangesOnChart: "Числовые и текстовые метрики пересчитываются под выбранный этап.",
             commonMistakes: ["Не сравнивайте разные этапы как одинаковые операции.", "Один медленный этап может быть следствием входного объема."],
-            examples: ["DATABASE - SQL-запросы и размер ответа.", "CONTROLLER - HTTP path/status."],
+            examples: ["База данных - SQL-запросы и размер ответа.", "Контроллер - HTTP-маршрут и статус."],
             relatedControls: ["Текстовая метрика", "Режим сравнения"]
         },
         stageTextMetric: {
             title: "Текстовая метрика",
-            shortDescription: "Выбирает, какие top values показывать для этапов.",
-            whatItDoes: "Показывает распределение значений вроде URL страницы, HTTP method, HTTP status, error code или пользовательского атрибута.",
-            whenToUse: "Используйте, чтобы найти повторяющийся path, status, error code или другое значение, связанное с проблемой.",
-            howToUse: ["Выберите одну текстовую метрику.", "Смотрите top values и Count.", "Откройте Raw с тем же значением для проверки конкретных событий."],
-            whatChangesOnChart: "Меняется top-N график и таблица текстовых значений.",
-            commonMistakes: ["Top value не всегда является причиной, он может быть просто самым частым.", "Редкое значение с высоким процентом ошибок требует проверки raw-событий."],
-            examples: ["HTTP_STATUS - найти 500/404.", "HTTP_PATH - найти проблемный endpoint."],
-            relatedControls: ["Этап", "Raw атрибут"]
+            shortDescription: "Выбирает, какие частые значения показывать для этапов.",
+            whatItDoes: "Показывает распределение значений вроде URL страницы, HTTP-метода, HTTP-статуса, кода ошибки или пользовательского атрибута.",
+            whenToUse: "Используйте, чтобы найти повторяющийся внутренний маршрут, статус, код ошибки или другое значение, связанное с проблемой.",
+            howToUse: ["Выберите одну текстовую метрику.", "Смотрите частые значения и количество.", "Откройте сырые события с тем же значением для проверки конкретных событий."],
+            whatChangesOnChart: "Меняется график частых значений и таблица текстовых значений.",
+            commonMistakes: ["Частое значение не всегда является причиной, оно может быть просто самым частым.", "Редкое значение с высоким процентом ошибок требует проверки сырых событий."],
+            examples: ["HTTP_STATUS - найти 500/404.", "HTTP_PATH - найти проблемный внутренний маршрут."],
+            relatedControls: ["Этап", "Атрибут сырых событий"]
         },
         rawStatus: {
-            title: "Статус Raw событий",
+            title: "Статус сырых событий",
             shortDescription: "Фильтрует таблицу сырых событий по ошибкам и успешным событиям.",
             whatItDoes: "Позволяет быстро оставить все события, только ошибки или только успешные записи.",
-            whenToUse: "Используйте после того, как агрегаты показали рост error rate.",
-            howToUse: ["Выберите Только ошибки для расследования сбоя.", "Сверьте HTTP status, error class и trace.", "Верните Все, если нужно оценить масштаб на фоне успешных событий."],
-            whatChangesOnChart: "Меняется только raw-таблица и ее пагинация.",
-            commonMistakes: ["Только ошибки не показывает denominator для error rate.", "Один trace не описывает всю проблему."],
+            whenToUse: "Используйте после того, как агрегаты показали рост доли ошибок.",
+            howToUse: ["Выберите Только ошибки для расследования сбоя.", "Сверьте HTTP-статус, класс ошибки и трассировку.", "Верните Все, если нужно оценить масштаб на фоне успешных событий."],
+            whatChangesOnChart: "Меняется только таблица сырых событий и ее пагинация.",
+            commonMistakes: ["Только ошибки не показывает общий объем для расчета доли ошибок.", "Одна трассировка не описывает всю проблему."],
             examples: ["Только ошибки + HTTP_STATUS=500.", "Все события для проверки доли ошибок."],
-            relatedControls: ["Класс ошибки", "Тип события Raw"]
+            relatedControls: ["Класс ошибки", "Тип события сырых событий"]
         },
         rawEvent: {
-            title: "Тип события Raw",
-            shortDescription: "Показывает сырые записи только выбранного event type.",
-            whatItDoes: "Сужает raw-таблицу до конкретного действия или системного события.",
-            whenToUse: "Используйте, когда агрегаты уже выделили подозрительный event type.",
-            howToUse: ["Выберите event type.", "Проверьте несколько строк, а не одну.", "Сравните path/status/stages внутри выбранного события."],
-            whatChangesOnChart: "Raw-таблица перезагружается с eventTypeCode в query.",
-            commonMistakes: ["Фильтр Raw не меняет автоматически главный фильтр.", "Не делайте вывод по первой строке таблицы."],
+            title: "Тип события сырых событий",
+            shortDescription: "Показывает сырые записи только выбранного типа события.",
+            whatItDoes: "Сужает таблицу сырых событий до конкретного действия или системного события.",
+            whenToUse: "Используйте, когда агрегаты уже выделили подозрительный тип события.",
+            howToUse: ["Выберите тип события.", "Проверьте несколько строк, а не одну.", "Сравните внутренний маршрут, статус и этапы внутри выбранного события."],
+            whatChangesOnChart: "Таблица сырых событий перезагружается с выбранным типом события в запросе.",
+            commonMistakes: ["Фильтр сырых событий не меняет автоматически главный фильтр.", "Не делайте вывод по первой строке таблицы."],
             examples: ["ORDER_CREATED - изучить конкретные запросы создания заказа."],
-            relatedControls: ["Период Raw", "Статус Raw событий"]
+            relatedControls: ["Период сырых событий", "Статус сырых событий"]
         },
         rawAdvanced: {
-            title: "Дополнительные Raw фильтры",
+            title: "Дополнительные фильтры сырых событий",
             shortDescription: "Точные условия для поиска конкретных событий.",
-            whatItDoes: "Фильтрует raw-события по метрикам, длительности, атрибутам, path, status и сортировке.",
-            whenToUse: "Используйте после первичного narrowing, когда нужно найти конкретные trace или примеры проблемы.",
-            howToUse: ["Задавайте один-два фильтра за раз.", "Проверяйте, что таблица не стала пустой из-за слишком узких условий.", "Для latency используйте минимальную длительность."],
-            whatChangesOnChart: "Меняется только raw query, агрегаты на других вкладках не перестраиваются.",
+            whatItDoes: "Фильтрует сырые события по метрикам, длительности, атрибутам, внутреннему маршруту, статусу и сортировке.",
+            whenToUse: "Используйте после первичного сужения, когда нужно найти конкретные трассировки или примеры проблемы.",
+            howToUse: ["Задавайте один-два фильтра за раз.", "Проверяйте, что таблица не стала пустой из-за слишком узких условий.", "Для времени отклика используйте минимальную длительность."],
+            whatChangesOnChart: "Меняется только запрос сырых событий, агрегаты на других вкладках не перестраиваются.",
             commonMistakes: ["Слишком много условий легко скрывают проблему.", "Сортировка по длительности не равна фильтру по ошибкам."],
-            examples: ["duration >= 1000 ms - медленные события.", "attribute HTTP_PATH=/orders - один endpoint."],
-            relatedControls: ["Raw статус", "Raw тип события"]
+            examples: ["duration >= 1000 ms - медленные события.", "attribute HTTP_PATH=/orders - один внутренний маршрут."],
+            relatedControls: ["Статус сырых событий", "Тип события сырых событий"]
         },
         expandedPeriod: {
             title: "Параметры увеличенного графика",
             shortDescription: "Локальные настройки только для раскрытого графика.",
-            whatItDoes: "Позволяет изменить период, bucket, compare mode или метрику увеличенного графика без изменения главного фильтра.",
+            whatItDoes: "Позволяет изменить период, интервал, режим сравнения или метрику увеличенного графика без изменения главного фильтра.",
             whenToUse: "Используйте для детального чтения одного графика, когда весь дашборд перестраивать не нужно.",
-            howToUse: ["Выберите пресет или ручной период.", "При необходимости включите split/overlay.", "Сброс возвращает настройки к верхнему фильтру."],
-            whatChangesOnChart: "Перерисовывается только expanded-график и связанные inline compare области.",
-            commonMistakes: ["Локальный период expanded не означает, что остальные графики смотрят тот же range.", "При сравнении проверяйте одинаковую длину before/after."],
-            examples: ["Увеличить latency и посмотреть только час пика.", "Overlay для одного KPI без перестройки всего Overview."],
+            howToUse: ["Выберите пресет или ручной период.", "При необходимости включите раздельное сравнение или наложение.", "Сброс возвращает настройки к верхнему фильтру."],
+            whatChangesOnChart: "Перерисовывается только увеличенный график и связанные области сравнения.",
+            commonMistakes: ["Локальный период увеличенного графика не означает, что остальные графики смотрят тот же период.", "При сравнении проверяйте одинаковую длину периодов До/После."],
+            examples: ["Увеличить динамику производительности и посмотреть только час пика.", "Наложение для одного KPI без перестройки всего Дашборда."],
             relatedControls: ["Период анализа", "Режим сравнения"]
         }
     };
@@ -1225,20 +1375,10 @@
         {selector: "#analytics-analysis-scenario", helpCode: "globalScenario"},
         {selector: ".analytics-compare-mode-radios, #stage-metric-compare-mode, #stage-text-compare-mode", helpCode: "compareMode"},
         {selector: "#analytics-global-attr-code, #analytics-global-attr-value-select, #analytics-global-attr-min, #analytics-global-attr-max", helpCode: "attributeFilter"},
-        {selector: "#universal-event-type-toggle, #universal-event-type-list, #universal-event-overall", helpCode: "universalEvents"},
-        {selector: "#universal-stage-type", helpCode: "universalLayer"},
-        {selector: "#universal-series-metric-toggle, #universal-series-metric-list", helpCode: "universalMetrics"},
-        {selector: "#universal-stage-metric-toggle, #universal-stage-metric-list", helpCode: "universalStageMetrics", placement: "before"},
-        {selector: "[data-universal-mode], [data-universal-analysis-mode]", helpCode: "universalMode"},
         {selector: "#stage-metric-stage-type, #stage-text-stage-type", helpCode: "stageType"},
         {selector: "#stage-metric-quick-range, #stage-text-quick-range", helpCode: "quickPeriod"},
         {selector: "#stage-metric-from-a, #stage-metric-to-a, #stage-text-from-a, #stage-text-to-a", helpCode: "period"},
-        {selector: "#stage-text-metric-type", helpCode: "stageTextMetric"},
-        {selector: "#events-from, #events-to", helpCode: "period"},
-        {selector: "#events-quick-range", helpCode: "quickPeriod"},
-        {selector: "#events-is-error, #events-error-class", helpCode: "rawStatus"},
-        {selector: "#events-event-type", helpCode: "rawEvent"},
-        {selector: "#events-metric-type, #events-metric-min, #events-metric-max, #events-min-duration, #events-attribute-code, #events-attribute-value, #events-sort-by, #events-sort-dir, #events-advanced-toggle", helpCode: "rawAdvanced"}
+        {selector: "#stage-text-metric-type", helpCode: "stageTextMetric"}
     ];
 
     const refs = {};
@@ -1249,7 +1389,7 @@
         ensureParameterHelpButtons();
         bindEvents();
         initDashboardViewMode();
-        initDefaultCompareRange();
+        syncCompareRangeFromMain();
         void initDashboard();
     });
 
@@ -1279,7 +1419,6 @@
         refs.globalCompareModeSplit = document.getElementById("analytics-global-compare-mode-split");
         refs.globalCompareModeOverlay = document.getElementById("analytics-global-compare-mode-overlay");
         refs.analysisScenario = document.getElementById("analytics-analysis-scenario");
-        refs.analysisScenarioHelp = document.getElementById("analytics-analysis-scenario-help");
         refs.globalComparePreset = document.getElementById("analytics-global-compare-preset");
         refs.globalBeforeSummary = document.getElementById("analytics-global-before-summary");
         refs.globalCompareGhost = document.getElementById("analytics-global-compare-ghost");
@@ -1316,6 +1455,7 @@
         refs.analyticsUniversalSections = document.querySelectorAll("[data-analytics-view='universal']");
         refs.analyticsMetricsSections = document.querySelectorAll("[data-analytics-view='metrics']");
         refs.analyticsRawSections = document.querySelectorAll("[data-analytics-view='raw']");
+        refs.analyticsSystemSections = document.querySelectorAll("[data-analytics-view='system']");
         refs.analyticsCompareSections = document.querySelectorAll("[data-analytics-view='compare']");
         refs.universalForm = document.getElementById("analytics-universal-form");
         refs.universalEventTypeToggle = document.getElementById("universal-event-type-toggle");
@@ -1323,6 +1463,11 @@
         refs.universalEventTypeList = document.getElementById("universal-event-type-list");
         refs.universalEventOverall = document.getElementById("universal-event-overall");
         refs.universalStageType = document.getElementById("universal-stage-type");
+        refs.universalStageToggle = document.getElementById("universal-stage-toggle");
+        refs.universalStagePopup = document.getElementById("universal-stage-popup");
+        refs.universalStageAll = document.getElementById("universal-stage-all");
+        refs.universalStageList = document.getElementById("universal-stage-list");
+        refs.universalFilterReset = document.getElementById("universal-filter-reset");
         refs.universalAttrCode = document.getElementById("universal-attr-code");
         refs.universalAttrValue = document.getElementById("universal-attr-value");
         refs.universalScenario = document.getElementById("universal-scenario");
@@ -1354,6 +1499,67 @@
         refs.universalGrid = document.getElementById("analytics-universal-grid");
         refs.universalTimelineCard = document.getElementById("analytics-universal-timeline-card");
         refs.universalStagesCard = document.getElementById("analytics-universal-stages-card");
+        refs.universalKpiCount = document.getElementById("universal-kpi-count");
+        refs.universalKpiAvg = document.getElementById("universal-kpi-avg");
+        refs.universalKpiP95 = document.getElementById("universal-kpi-p95");
+        refs.universalKpiP99 = document.getElementById("universal-kpi-p99");
+        refs.universalKpiErrorRate = document.getElementById("universal-kpi-error-rate");
+        refs.universalAnalysisPreset = document.getElementById("universal-analysis-preset");
+        refs.universalPeriodFromInput = document.getElementById("universal-period-from-input");
+        refs.universalPeriodToInput = document.getElementById("universal-period-to-input");
+        refs.universalKpiCard = document.getElementById("analytics-universal-kpi-card");
+        refs.universalTopEventsCard = document.getElementById("analytics-universal-top-events-card");
+        refs.universalAttributesCard = document.getElementById("analytics-universal-attributes-card");
+        refs.universalTopEventsBody = document.getElementById("universal-top-events-body");
+        refs.universalTopEventsMore = document.getElementById("universal-top-events-more");
+        refs.universalTopEventsCollapse = document.getElementById("universal-top-events-collapse");
+        refs.universalTopEventsCount = document.getElementById("universal-top-events-count");
+        refs.universalTopEventsSeverity = document.getElementById("universal-top-events-severity");
+        refs.universalTopSearchForm = document.getElementById("universal-top-search-form");
+        refs.universalTopSearchInput = document.getElementById("universal-top-search-input");
+        refs.universalEventAnalysis = document.getElementById("universal-event-analysis");
+        refs.universalEventRootCausePanel = document.getElementById("universal-event-root-cause-panel");
+        refs.universalEventRootCauseBody = document.getElementById("universal-event-root-cause-body");
+        refs.universalEventRootCauseTitle = document.getElementById("universal-event-root-cause-title");
+        refs.universalAttributeSelect = document.getElementById("universal-attribute-select");
+        refs.universalAttributeSearchForm = document.getElementById("universal-attribute-search-form");
+        refs.universalAttributeSearchInput = document.getElementById("universal-attribute-search-input");
+        refs.universalAttributeSearchMessage = document.getElementById("universal-attribute-search-message");
+        refs.universalAttributeLoader = document.getElementById("universal-attribute-loader");
+        refs.universalAttributeError = document.getElementById("universal-attribute-error");
+        refs.universalAttributePickerToggle = document.getElementById("universal-attribute-picker-toggle");
+        refs.universalAttributeSummary = document.getElementById("universal-attribute-summary");
+        refs.universalAttributeCards = document.getElementById("universal-attribute-cards");
+        refs.universalAttributeValuesBody = document.getElementById("universal-attribute-values-body");
+        refs.universalAttributeMore = document.getElementById("universal-attribute-more");
+        refs.universalAttributeCollapse = document.getElementById("universal-attribute-collapse");
+        refs.universalAttributeCount = document.getElementById("universal-attribute-count");
+        refs.universalAttributeSeverity = document.getElementById("universal-attribute-severity");
+        refs.universalRootCausePanel = document.getElementById("universal-root-cause-panel");
+        refs.universalRootCauseTitle = document.getElementById("universal-root-cause-title");
+        refs.universalRootCauseBody = document.getElementById("universal-root-cause-body");
+        refs.universalErrorsCard = document.getElementById("analytics-universal-errors-card");
+        refs.universalErrorAnalysis = document.getElementById("universal-error-analysis");
+        refs.universalErrorsBody = document.getElementById("universal-errors-body");
+        refs.universalErrorsMore = document.getElementById("universal-errors-more");
+        refs.universalErrorsCollapse = document.getElementById("universal-errors-collapse");
+        refs.universalErrorsCount = document.getElementById("universal-errors-count");
+        refs.universalErrorsSeverity = document.getElementById("universal-errors-severity");
+        refs.universalErrorSearchForm = document.getElementById("universal-error-search-form");
+        refs.universalErrorSearchInput = document.getElementById("universal-error-search-input");
+        refs.universalErrorRootCausePanel = document.getElementById("universal-error-root-cause-panel");
+        refs.universalErrorRootCauseTitle = document.getElementById("universal-error-root-cause-title");
+        refs.universalErrorRootCauseBody = document.getElementById("universal-error-root-cause-body");
+        refs.universalModulesCard = document.getElementById("analytics-universal-modules-card");
+        refs.universalModulesBody = document.getElementById("universal-modules-body");
+        refs.universalModulesMore = document.getElementById("universal-modules-more");
+        refs.universalModulesCollapse = document.getElementById("universal-modules-collapse");
+        refs.universalModulesCount = document.getElementById("universal-modules-count");
+        refs.universalModulesSeverity = document.getElementById("universal-modules-severity");
+        refs.universalModuleSearchForm = document.getElementById("universal-module-search-form");
+        refs.universalModuleSearchInput = document.getElementById("universal-module-search-input");
+        refs.universalModuleRootCauseTitle = document.getElementById("universal-module-root-cause-title");
+        refs.universalModuleRootCauseBody = document.getElementById("universal-module-root-cause-body");
         refs.universalPanel = refs.universalForm?.closest("section.analytics-panel") || null;
 
         refs.kpiTotalEvents = document.getElementById("kpi-total-events");
@@ -1417,9 +1623,39 @@
         refs.eventsAdvancedToggle = document.getElementById("events-advanced-toggle");
         refs.eventsSortBy = document.getElementById("events-sort-by");
         refs.eventsSortDir = document.getElementById("events-sort-dir");
+        refs.eventsTable = document.getElementById("analytics-events-table");
         refs.eventsTableBody = document.querySelector("#analytics-events-table tbody");
         refs.eventsLoadMore = document.getElementById("events-load-more");
         refs.eventsPanel = refs.eventsForm?.closest("section.analytics-panel") || null;
+        initEventsSortHeaders();
+
+        refs.systemChartForm = document.getElementById("analytics-system-chart-form");
+        refs.systemChartFrom = document.getElementById("system-chart-from");
+        refs.systemChartTo = document.getElementById("system-chart-to");
+        refs.systemChartPreset = document.getElementById("system-chart-preset");
+        refs.systemChartCompare = document.getElementById("system-chart-compare");
+        refs.systemChartBucket = document.getElementById("system-chart-bucket");
+        refs.systemChartMetric = document.getElementById("system-chart-metric");
+        refs.systemChartMetricToggle = document.getElementById("system-chart-metric-toggle");
+        refs.systemChartMetricPopup = document.getElementById("system-chart-metric-popup");
+        refs.systemChartMetricOptions = document.getElementById("system-chart-metric-options");
+        refs.systemChartEventsToggle = document.getElementById("system-chart-events-toggle");
+        refs.systemChartEventsPopup = document.getElementById("system-chart-events-popup");
+        refs.systemChartEventsAll = document.getElementById("system-chart-events-all");
+        refs.systemChartEventsList = document.getElementById("system-chart-events-list");
+        refs.systemChartIsError = document.getElementById("system-chart-is-error");
+        refs.systemChartIntervalToggle = document.getElementById("system-chart-interval-toggle");
+        refs.systemChartIntervalUndo = document.getElementById("system-chart-interval-undo");
+        refs.systemChartResetMain = document.getElementById("system-chart-reset-main");
+        refs.systemChartHelp = document.getElementById("system-chart-help");
+        refs.systemChartCompareWrap = document.getElementById("system-chart-compare-wrap");
+        refs.systemChartStatus = document.getElementById("system-chart-status");
+        refs.systemEventsTableActions = document.getElementById("system-events-table-actions");
+        refs.systemEventsTableHelp = document.getElementById("system-events-table-help");
+        refs.systemEventsSortToggle = document.getElementById("system-events-sort-toggle");
+        refs.systemEventsSortPopup = document.getElementById("system-events-sort-popup");
+        refs.systemEventsSortBy = document.getElementById("system-events-sort-by");
+        refs.systemEventsSortDir = document.getElementById("system-events-sort-dir");
 
         refs.compareForm = document.getElementById("analytics-compare-form");
         refs.compareBaselineFrom = document.getElementById("compare-baseline-from");
@@ -1427,7 +1663,13 @@
         refs.compareTargetFrom = document.getElementById("compare-target-from");
         refs.compareTargetTo = document.getElementById("compare-target-to");
         refs.compareQuickRange = document.getElementById("compare-quick-range");
+        refs.compareReset = document.getElementById("compare-reset");
         refs.compareCards = document.getElementById("compare-kpi-cards");
+        refs.compareSummaryCard = document.getElementById("compare-summary-card");
+        refs.compareDegradedTable = document.getElementById("compare-degraded-table");
+        refs.compareImprovedTable = document.getElementById("compare-improved-table");
+        refs.compareLoadTable = document.getElementById("compare-load-table");
+        refs.compareErrorsTable = document.getElementById("compare-errors-table");
 
         refs.eventModalEl = document.getElementById("analytics-event-modal");
         refs.eventModalBody = document.getElementById("analytics-event-modal-body");
@@ -1450,10 +1692,13 @@
             }
             const preserveChartUiState = !!state.preserveChartUiStateDuringMainSubmit;
             if (!preserveChartUiState) {
+                state.universalDiagnosticsDrilldownContext = null;
                 clearAllChartLocalOverrides();
                 resetInlineComparePresetsFromTopFilter();
             }
-            state.expandedRangesBySource = {};
+            if (!preserveChartUiState) {
+                state.expandedRangesBySource = {};
+            }
             if (!preserveChartUiState) {
                 state.expandedBucketBySource = {};
             }
@@ -1463,10 +1708,18 @@
             syncStageTextRangesFromMain(true);
             syncEventsRangeFromMain(true);
             syncUniversalRangeFromMain(true);
+            await syncSystemChartFiltersFromMain({refreshOptions: true});
             await refreshScopedOptionsSafe();
             applyGlobalMetricToEventsFilter();
             state.eventsPage = 0;
             await reloadAll();
+            if (state.currentDashboardTab === "system") {
+                await loadSystemEventsChart();
+            }
+            const compareSynced = syncCompareRangeFromMain();
+            if (shouldRefreshCompareAfterMainSync(compareSynced)) {
+                await loadCompare();
+            }
             if (state.globalCompareEnabled) {
                 await applyGlobalCompareToAllCharts();
             }
@@ -1496,6 +1749,11 @@
         };
         const submitEventsFilters = async () => {
             state.eventsPage = 0;
+            state.eventsForcedEventCodes = null;
+            state.eventsForcedErrorKey = "";
+            state.eventsForcedModuleCode = "";
+            state.eventsForcedStageTypeCode = "";
+            await refreshRawEventTypeOptionsForMode(refs.eventsEventType?.value || "");
             await loadEvents(true);
         };
         const submitUniversalFilters = async (options = {}) => {
@@ -1510,6 +1768,7 @@
                 {action}
             );
         };
+        state.submitUniversalFilters = submitUniversalFilters;
         const submitCompareFilters = async () => {
             await loadCompare();
         };
@@ -1573,6 +1832,7 @@
             setGlobalCompareMode("off");
             state.globalCompareBeforeCustom = false;
             clearAllChartLocalOverrides();
+            resetDiagnosticsStateForGlobalReset();
             if (refs.quickRangePresetSelect) {
                 refs.quickRangePresetSelect.value = "24h";
                 await applyQuickRangePreset("24h");
@@ -1600,6 +1860,36 @@
                 return;
             }
             await applyQuickRangePreset(quickRange);
+        });
+        [refs.universalPeriodFromInput, refs.universalPeriodToInput].filter(Boolean).forEach((control) => {
+            control.addEventListener("change", () => {
+                state.universalDiagnosticsDrilldownContext = null;
+                if (refs.universalFrom) {
+                    refs.universalFrom.value = refs.universalPeriodFromInput?.value || "";
+                }
+                if (refs.universalTo) {
+                    refs.universalTo.value = refs.universalPeriodToInput?.value || "";
+                }
+                state.universalAllTime = false;
+                syncUniversalQuickRangeFromInputs();
+                syncUniversalBeforeRangeFromAfter();
+                updateUniversalCompareUi();
+                updateUniversalFilterResetVisibility();
+                showUniversalChartLoaders();
+                void submitUniversalFilters({action: "diagnostics_period_change"});
+            });
+        });
+        refs.universalAnalysisPreset?.addEventListener("change", async () => {
+            state.universalDiagnosticsDrilldownContext = null;
+            const preset = refs.universalAnalysisPreset?.value || "";
+            if (!preset) {
+                renderUniversalAnalysisPeriod();
+                return;
+            }
+            await applyUniversalQuickRangePreset(preset);
+            syncUniversalQuickRangeFromInputs();
+            updateUniversalFilterResetVisibility();
+            void submitUniversalFilters({action: "diagnostics_preset_change"});
         });
         [refs.globalCompareModeOff, refs.globalCompareModeSplit, refs.globalCompareModeOverlay]
             .filter(Boolean)
@@ -1718,12 +2008,174 @@
         });
 
         refs.eventsLoadMore?.addEventListener("click", async () => {
-            if (!state.eventsHasMore) {
+            if (!state.eventsHasMore || state.eventsLoading) {
                 return;
             }
             state.eventsPage += 1;
             await loadEvents(false);
         });
+        refs.eventsTable?.addEventListener("click", async (event) => {
+            const button = event.target?.closest?.("[data-events-sort]");
+            if (!button) {
+                return;
+            }
+            event.preventDefault();
+            const sortBy = String(button.getAttribute("data-events-sort") || "").trim();
+            if (!sortBy) {
+                return;
+            }
+            if (state.eventsSystemOnly) {
+                if (state.systemEventsSortBy === sortBy) {
+                    state.systemEventsSortDir = state.systemEventsSortDir === "asc" ? "desc" : "asc";
+                } else {
+                    state.systemEventsSortBy = sortBy;
+                    state.systemEventsSortDir = "asc";
+                }
+                if (refs.systemEventsSortBy) {
+                    refs.systemEventsSortBy.value = state.systemEventsSortBy;
+                }
+                if (refs.systemEventsSortDir) {
+                    refs.systemEventsSortDir.value = state.systemEventsSortDir;
+                }
+            } else {
+                if (state.eventsSortBy === sortBy) {
+                    state.eventsSortDir = state.eventsSortDir === "asc" ? "desc" : "asc";
+                } else {
+                    state.eventsSortBy = sortBy;
+                    state.eventsSortDir = "asc";
+                }
+                if (refs.eventsSortBy) {
+                    refs.eventsSortBy.value = state.eventsSortBy;
+                }
+                if (refs.eventsSortDir) {
+                    refs.eventsSortDir.value = state.eventsSortDir;
+                }
+            }
+            updateEventsSortHeaders();
+            await loadEvents(true);
+        });
+
+        const debouncedSystemFilterSubmit = debounce(() => {
+            void submitSystemFilters({refreshOptions: true});
+        }, 260);
+        refs.systemChartForm?.addEventListener("submit", (event) => {
+            event.preventDefault();
+            markSystemChartLocalDirty();
+            void submitSystemFilters({refreshOptions: true});
+        });
+        [refs.systemChartFrom, refs.systemChartTo].forEach((control) => {
+            control?.addEventListener("change", () => {
+                markSystemChartLocalDirty();
+                syncQuickRangeSelectFromRange(
+                    refs.systemChartPreset,
+                    refs.systemChartFrom?.value || "",
+                    refs.systemChartTo?.value || ""
+                );
+                debouncedSystemFilterSubmit();
+            });
+            control?.addEventListener("input", () => {
+                markSystemChartLocalDirty();
+                debouncedSystemFilterSubmit();
+            });
+        });
+        [refs.systemChartCompare].forEach((control) => {
+            control?.addEventListener("change", () => {
+                markSystemChartLocalDirty();
+                void loadSystemEventsChart();
+            });
+        });
+        refs.systemChartBucket?.addEventListener("change", () => {
+            markSystemChartLocalDirty();
+            void loadSystemEventsChart();
+        });
+        refs.systemChartPreset?.addEventListener("change", async () => {
+            markSystemChartLocalDirty();
+            await applySystemChartPreset(refs.systemChartPreset?.value || "");
+            await submitSystemFilters({refreshOptions: true});
+        });
+        refs.systemChartIsError?.addEventListener("change", () => {
+            markSystemChartLocalDirty();
+            void submitSystemFilters();
+        });
+        refs.systemChartResetMain?.addEventListener("click", () => {
+            void resetSystemChartToMain();
+        });
+        refs.systemChartIntervalUndo?.addEventListener("click", () => {
+            void undoSystemChartInterval();
+        });
+        refs.systemChartMetricToggle?.addEventListener("click", (event) => {
+            event.preventDefault();
+            toggleSystemPopup(refs.systemChartMetricPopup, refs.systemChartMetricToggle);
+        });
+        refs.systemChartMetricOptions?.addEventListener("click", (event) => {
+            const button = event.target.closest("[data-system-metric-option]");
+            if (!button) {
+                return;
+            }
+            event.preventDefault();
+            selectSystemChartMetric(button.getAttribute("data-system-metric-option") || "");
+        });
+        refs.systemChartEventsToggle?.addEventListener("click", (event) => {
+            event.preventDefault();
+            const isOpen = !refs.systemChartEventsPopup?.classList.contains("d-none");
+            refs.systemChartEventsPopup?.classList.toggle("d-none", isOpen);
+            refs.systemChartEventsToggle?.setAttribute("aria-expanded", isOpen ? "false" : "true");
+        });
+        refs.systemChartEventsAll?.addEventListener("change", () => {
+            markSystemChartLocalDirty();
+            if (refs.systemChartEventsAll?.checked) {
+                Array.from(refs.systemChartEventsList?.options || []).forEach((option) => {
+                    option.selected = false;
+                });
+            } else if (!Array.from(refs.systemChartEventsList?.selectedOptions || []).length) {
+                refs.systemChartEventsAll.checked = true;
+            }
+            updateSystemChartEventsLabel();
+            syncSystemChartMetricMode();
+            void submitSystemFilters();
+        });
+        refs.systemChartEventsList?.addEventListener("change", () => {
+            markSystemChartLocalDirty();
+            const selectedCount = Array.from(refs.systemChartEventsList?.selectedOptions || []).length;
+            if (refs.systemChartEventsAll) {
+                refs.systemChartEventsAll.checked = selectedCount === 0;
+            }
+            updateSystemChartEventsLabel();
+            syncSystemChartMetricMode();
+            void submitSystemFilters();
+        });
+        refs.systemEventsSortToggle?.addEventListener("click", (event) => {
+            event.preventDefault();
+            toggleSystemPopup(refs.systemEventsSortPopup, refs.systemEventsSortToggle);
+        });
+        [refs.systemEventsSortBy, refs.systemEventsSortDir].forEach((control) => {
+            control?.addEventListener("change", async () => {
+                syncSystemSortToEventsRefs();
+                await loadEvents(true);
+            });
+        });
+        refs.systemEventsTableHelp?.addEventListener("click", () => {
+            if (refs.eventsPanelTitle) {
+                openHelpModal("analytics-events-table", refs.eventsPanelTitle);
+            }
+        });
+        refs.systemChartHelp?.addEventListener("click", () => {
+            openSystemChartHelp();
+        });
+        document.addEventListener("click", (event) => {
+            if (!event.target.closest(".analytics-system-events-inline")) {
+                refs.systemChartEventsPopup?.classList.add("d-none");
+                refs.systemChartEventsToggle?.setAttribute("aria-expanded", "false");
+            }
+            if (!event.target.closest(".analytics-system-metrics-inline")) {
+                closeSystemPopup(refs.systemChartMetricPopup, refs.systemChartMetricToggle);
+            }
+            if (!event.target.closest(".analytics-system-sort-inline")) {
+                closeSystemPopup(refs.systemEventsSortPopup, refs.systemEventsSortToggle);
+            }
+        });
+        renderSystemChartMetricOptions();
+        setupSystemChartIntervalSelection();
 
         refs.eventsTableBody?.addEventListener("click", async (event) => {
             const button = event.target.closest("[data-event-uid], [data-event-id]");
@@ -1768,23 +2220,43 @@
                 await copyRawLogRow(copyRawButton);
             }
         });
+        refs.eventModalEl?.addEventListener("hidden.bs.modal", () => {
+            state.eventDetailsRequestId += 1;
+        });
 
         refs.compareForm?.addEventListener("submit", async (event) => {
             event.preventDefault();
-            await submitCompareFilters();
         });
         refs.compareQuickRange?.addEventListener("change", async () => {
             await applyCompareQuickRangePreset();
+            markCompareFilterDirty();
             await submitCompareFilters();
+        });
+        [refs.compareTargetFrom, refs.compareTargetTo].forEach((control) => {
+            control?.addEventListener("change", async () => {
+                syncCompareBaselineFromTarget();
+                syncCompareQuickRangeByCurrentWindow();
+                markCompareFilterDirty();
+                await submitCompareFilters();
+            });
+        });
+        [refs.compareBaselineFrom, refs.compareBaselineTo].forEach((control) => {
+            control?.addEventListener("change", async () => {
+                markCompareFilterDirty();
+                await submitCompareFilters();
+            });
+        });
+        refs.compareReset?.addEventListener("click", async () => {
+            await resetCompareToMainRange();
         });
 
         const syncMainQuickRangeFromInputs = () => {
             syncQuickRangeSelectFromRange(refs.quickRangePresetSelect, refs.from?.value || "", refs.to?.value || "");
         };
-        refs.from?.addEventListener("change", initDefaultCompareRange);
-        refs.to?.addEventListener("change", initDefaultCompareRange);
-        refs.from?.addEventListener("input", initDefaultCompareRange);
-        refs.to?.addEventListener("input", initDefaultCompareRange);
+        refs.from?.addEventListener("change", () => syncCompareRangeFromMain());
+        refs.to?.addEventListener("change", () => syncCompareRangeFromMain());
+        refs.from?.addEventListener("input", () => syncCompareRangeFromMain());
+        refs.to?.addEventListener("input", () => syncCompareRangeFromMain());
         refs.from?.addEventListener("change", syncMainQuickRangeFromInputs);
         refs.to?.addEventListener("change", syncMainQuickRangeFromInputs);
         refs.from?.addEventListener("input", syncMainQuickRangeFromInputs);
@@ -1799,10 +2271,16 @@
             await submitMainFilters();
         });
 
-        [refs.eventType, refs.bucket, refs.from, refs.to, refs.analyticsRequestPath].forEach((control) => {
+        [refs.eventType, refs.from, refs.to, refs.analyticsRequestPath].forEach((control) => {
             control?.addEventListener("change", () => {
                 void submitMainFilters();
             });
+        });
+        refs.bucket?.addEventListener("change", () => {
+            setGlobalBucketFromChart(refs.bucket?.value || "");
+            void (state.expandedChart.sourceCanvasId
+                ? submitMainFiltersPreservingExpandedUiState()
+                : submitMainFilters());
         });
         refs.analyticsRequestPath?.addEventListener("input", debouncedMainFilters);
 
@@ -1958,9 +2436,10 @@
             await submitStageMetricTextFilters();
         });
 
-        [refs.eventsIsError, refs.eventsErrorClass, refs.eventsEventType, refs.eventsMetricType, refs.eventsAttributeCode, refs.eventsSortBy, refs.eventsSortDir]
+        [refs.eventsIsError, refs.eventsErrorClass, refs.eventsEventType, refs.eventsMetricType, refs.eventsAttributeCode]
             .forEach((control) => {
                 control?.addEventListener("change", () => {
+                    state.eventsForcedEventCodes = null;
                     void submitEventsFilters();
                 });
             });
@@ -1968,9 +2447,13 @@
         [refs.eventsMetricMin, refs.eventsMetricMax, refs.eventsMinDuration, refs.eventsRequestPath, refs.eventsAttributeValue]
             .forEach((control) => {
                 control?.addEventListener("change", () => {
+                    state.eventsForcedEventCodes = null;
                     void submitEventsFilters();
                 });
                 control?.addEventListener("input", debouncedEventsFilters);
+                control?.addEventListener("input", () => {
+                    state.eventsForcedEventCodes = null;
+                });
             });
         const debouncedEventsRangeFilters = debounce(() => {
             void submitEventsFilters();
@@ -2052,16 +2535,29 @@
         refs.universalEventTypeToggle?.addEventListener("click", (event) => {
             event.preventDefault();
             syncUniversalFilterModeUi();
-            if (resolveUniversalEventMetricMode() === "overall") {
-                refs.universalEventTypePopup?.classList.add("d-none");
-                refs.universalEventTypeToggle?.setAttribute("aria-expanded", "false");
-                return;
-            }
             const isOpen = !refs.universalEventTypePopup?.classList.contains("d-none");
             refs.universalEventTypePopup?.classList.toggle("d-none", isOpen);
             refs.universalEventTypeToggle?.setAttribute("aria-expanded", isOpen ? "false" : "true");
         });
+        refs.universalFilterReset?.addEventListener("click", () => {
+            state.universalDiagnosticsDrilldownContext = null;
+            if (refs.universalEventOverall) {
+                refs.universalEventOverall.checked = true;
+            }
+            if (refs.universalEventTypeList) {
+                Array.from(refs.universalEventTypeList.options || []).forEach((option) => {
+                    option.selected = false;
+                });
+            }
+            state.universalAnalysisMode = "overall";
+            setSelectedUniversalStages([]);
+            syncUniversalRangeFromMain(true);
+            syncUniversalFilterModeUi();
+            showUniversalChartLoaders();
+            void submitUniversalFilters({action: "diagnostics_filter_reset"});
+        });
         refs.universalEventOverall?.addEventListener("change", () => {
+            state.universalDiagnosticsDrilldownContext = null;
             showUniversalChartLoaders();
             const previousMode = resolveUniversalEventMetricMode();
             if (refs.universalEventOverall?.checked && refs.universalEventTypeList) {
@@ -2082,6 +2578,7 @@
             });
         });
         refs.universalEventTypeList?.addEventListener("change", () => {
+            state.universalDiagnosticsDrilldownContext = null;
             showUniversalChartLoaders();
             const selectedCount = selectedUniversalEventCodes().size;
             if (state.universalAnalysisMode === "overall" && selectedCount > 0) {
@@ -2092,6 +2589,401 @@
             }
             enforceUniversalEventMetricDependency("events");
             syncUniversalFilterModeUi();
+            void submitUniversalFilters();
+        });
+        refs.universalTopSearchForm?.addEventListener("submit", (event) => {
+            event.preventDefault();
+            state.universalTopEventSearchQuery = String(refs.universalTopSearchInput?.value || "").trim();
+            state.universalTopEventVisibleCount = UNIVERSAL_TABLE_PAGE_SIZE;
+            renderUniversalTopEventsVisibleRows();
+        });
+        refs.universalTopEventsMore?.addEventListener("click", () => {
+            state.universalTopEventVisibleCount = Math.min(
+                filteredUniversalTopEventRows().length,
+                Math.max(UNIVERSAL_TABLE_PAGE_SIZE, Number(state.universalTopEventVisibleCount || UNIVERSAL_TABLE_PAGE_SIZE)) + UNIVERSAL_TABLE_PAGE_SIZE
+            );
+            renderUniversalTopEventsVisibleRows();
+        });
+        refs.universalTopEventsCollapse?.addEventListener("click", () => {
+            state.universalTopEventVisibleCount = UNIVERSAL_TABLE_PAGE_SIZE;
+            renderUniversalTopEventsVisibleRows({scrollToTop: true});
+        });
+        refs.universalTopEventsCard?.addEventListener("click", (event) => {
+            const groupToggle = event.target?.closest?.("[data-universal-rca-group-toggle]");
+            if (groupToggle) {
+                event.preventDefault();
+                toggleUniversalRootCauseGroup(groupToggle);
+                return;
+            }
+            const rawButton = event.target?.closest?.("[data-universal-top-raw]");
+            if (rawButton) {
+                event.preventDefault();
+                event.stopPropagation();
+                const eventCode = String(rawButton.getAttribute("data-universal-top-raw") || "").trim();
+                void openUniversalRawEvents({eventCode});
+                return;
+            }
+            const eventRootRawButton = event.target?.closest?.("[data-universal-event-root-raw]");
+            if (eventRootRawButton) {
+                event.preventDefault();
+                event.stopPropagation();
+                const eventCode = String(eventRootRawButton.getAttribute("data-universal-event-root-raw") || state.universalTopEventSelectedCode || "").trim();
+                void openUniversalRawEvents({eventCode});
+                return;
+            }
+            const eventRow = event.target?.closest?.("[data-universal-top-row]");
+            if (eventRow) {
+                const eventCode = String(eventRow.getAttribute("data-universal-top-row") || "").trim();
+                if (!eventCode) {
+                    return;
+                }
+                state.universalTopEventSelectedCode = state.universalTopEventSelectedCode === eventCode ? "" : eventCode;
+                renderUniversalTopEventsVisibleRows();
+                void loadUniversalEventRootCause(state.universalTopEventSelectedCode);
+                return;
+            }
+            const resetButton = event.target?.closest?.("[data-universal-top-sort-reset]");
+            if (resetButton) {
+                state.universalTopEventSortBy = "riskScore";
+                state.universalTopEventSortDir = "desc";
+                state.universalTopEventSelectedCode = "";
+                state.universalTopEventSearchQuery = "";
+                if (refs.universalTopSearchInput) {
+                    refs.universalTopSearchInput.value = "";
+                }
+                sortUniversalTopEventRows();
+                state.universalTopEventSeverityTotals = universalTopEventSeverityTotals(state.universalTopEventRows);
+                state.universalTopEventVisibleCount = universalDefaultVisibleCount(state.universalTopEventRows, state.universalTopEventSeverityTotals);
+                renderUniversalTopEventsVisibleRows({scrollToTop: true});
+                void loadUniversalEventRootCause("");
+                return;
+            }
+            const sortButton = event.target?.closest?.("[data-universal-top-sort]");
+            if (!sortButton) {
+                return;
+            }
+            const sortBy = String(sortButton.getAttribute("data-universal-top-sort") || "").trim();
+            if (!sortBy) {
+                return;
+            }
+            if (state.universalTopEventSortBy === sortBy) {
+                state.universalTopEventSortDir = state.universalTopEventSortDir === "asc" ? "desc" : "asc";
+            } else {
+                state.universalTopEventSortBy = sortBy;
+                state.universalTopEventSortDir = sortBy === "event" ? "asc" : "desc";
+            }
+            state.universalTopEventVisibleCount = UNIVERSAL_TABLE_PAGE_SIZE;
+            sortUniversalTopEventRows();
+            renderUniversalTopEventsVisibleRows();
+        });
+        refs.universalAttributeSelect?.addEventListener("change", () => {
+            state.universalAttributeUserSelected = true;
+            state.universalAttributeSearchQuery = "";
+            state.universalAttributePinnedRow = null;
+            state.universalRootCauseSelectedValue = "";
+            setUniversalAttributeSearchMessage("");
+            ensureUniversalAttributeGroupVisible(refs.universalAttributeSelect.value);
+            renderUniversalAttributeCards();
+            void loadUniversalAttributeRows({reset: true});
+        });
+        refs.universalAttributeSearchForm?.addEventListener("submit", (event) => {
+            event.preventDefault();
+            void runUniversalAttributeSearch();
+        });
+        refs.universalAttributePickerToggle?.addEventListener("click", () => {
+            state.universalAttributePickerOpen = !state.universalAttributePickerOpen;
+            renderUniversalAttributeCards();
+        });
+        refs.universalAttributeCards?.addEventListener("click", (event) => {
+            const card = event.target?.closest?.("[data-universal-attribute-card]");
+            if (!card || !refs.universalAttributeSelect) {
+                return;
+            }
+            const code = String(card.getAttribute("data-universal-attribute-card") || "").trim();
+            if (!code || refs.universalAttributeSelect.value === code) {
+                state.universalAttributePickerOpen = false;
+                renderUniversalAttributeCards();
+                return;
+            }
+            state.universalAttributeUserSelected = true;
+            state.universalAttributePickerOpen = false;
+            void selectUniversalAttribute(code);
+        });
+        refs.universalAttributeMore?.addEventListener("click", () => {
+            const currentRows = Array.isArray(state.universalAttributeRows) ? state.universalAttributeRows.length : 0;
+            const totalRows = Math.max(currentRows + UNIVERSAL_TABLE_PAGE_SIZE, toNumber(state.universalAttributeTotalRows));
+            state.universalAttributeVisibleCount = Math.min(
+                totalRows,
+                Math.max(UNIVERSAL_TABLE_PAGE_SIZE, Number(state.universalAttributeVisibleCount || UNIVERSAL_TABLE_PAGE_SIZE)) + UNIVERSAL_TABLE_PAGE_SIZE
+            );
+            void loadUniversalAttributeRows();
+        });
+        refs.universalAttributeCollapse?.addEventListener("click", () => {
+            state.universalAttributeVisibleCount = UNIVERSAL_TABLE_PAGE_SIZE;
+            renderUniversalAttributeRows();
+            refs.universalAttributeValuesBody?.closest(".analytics-universal-attributes-card")?.scrollIntoView({
+                behavior: "smooth",
+                block: "start"
+            });
+        });
+        refs.universalAttributesCard?.addEventListener("click", (event) => {
+            const groupToggle = event.target?.closest?.("[data-universal-rca-group-toggle]");
+            if (groupToggle) {
+                event.preventDefault();
+                toggleUniversalRootCauseGroup(groupToggle);
+                return;
+            }
+            const rawButton = event.target?.closest?.("[data-universal-attribute-raw]");
+            if (rawButton) {
+                event.preventDefault();
+                event.stopPropagation();
+                const attributeCode = String(rawButton.getAttribute("data-universal-attribute-code") || "").trim();
+                const attributeValue = String(rawButton.getAttribute("data-universal-attribute-value") || "").trim();
+                void openUniversalRawEvents({attributeCode, attributeValue});
+                return;
+            }
+            const clearRootCauseButton = event.target?.closest?.("[data-universal-root-cause-clear]");
+            if (clearRootCauseButton) {
+                event.preventDefault();
+                state.universalRootCauseSelectedValue = "";
+                renderUniversalAttributeRows();
+                void loadUniversalRootCause(refs.universalAttributeSelect?.value || "");
+                return;
+            }
+            const attributeRow = event.target?.closest?.("[data-universal-attribute-row]");
+            if (attributeRow) {
+                const attributeValue = String(attributeRow.getAttribute("data-universal-attribute-value") || "").trim();
+                if (!attributeValue) {
+                    return;
+                }
+                state.universalRootCauseSelectedValue = state.universalRootCauseSelectedValue === attributeValue
+                    ? ""
+                    : attributeValue;
+                renderUniversalAttributeRows();
+                void loadUniversalRootCause(refs.universalAttributeSelect?.value || "", state.universalRootCauseSelectedValue);
+                return;
+            }
+            const resetButton = event.target?.closest?.("[data-universal-attribute-sort-reset]");
+            if (resetButton) {
+                state.universalAttributeSortBy = "riskScore";
+                state.universalAttributeSortDir = "desc";
+                state.universalAttributeSearchQuery = "";
+                state.universalAttributePinnedRow = null;
+                state.universalRootCauseSelectedValue = "";
+                if (refs.universalAttributeSearchInput) {
+                    refs.universalAttributeSearchInput.value = "";
+                }
+                setUniversalAttributeSearchMessage("");
+                state.universalAttributeVisibleCount = UNIVERSAL_TABLE_PAGE_SIZE;
+                void loadUniversalAttributeRows({reset: true, keepSort: true});
+                void loadUniversalRootCause(refs.universalAttributeSelect?.value || "");
+                return;
+            }
+            const sortButton = event.target?.closest?.("[data-universal-attribute-sort]");
+            if (!sortButton) {
+                return;
+            }
+            const sortBy = String(sortButton.getAttribute("data-universal-attribute-sort") || "").trim();
+            if (!sortBy) {
+                return;
+            }
+            if (state.universalAttributeSortBy === sortBy) {
+                state.universalAttributeSortDir = state.universalAttributeSortDir === "asc" ? "desc" : "asc";
+            } else {
+                state.universalAttributeSortBy = sortBy;
+                state.universalAttributeSortDir = sortBy === "value" ? "asc" : "desc";
+            }
+            void loadUniversalAttributeRows({reset: true, keepSort: true});
+        });
+        refs.universalErrorsMore?.addEventListener("click", () => {
+            const currentRows = filteredUniversalErrorRows().length;
+            const totalRows = Math.max(currentRows + UNIVERSAL_TABLE_PAGE_SIZE, toNumber(state.universalErrorTotalRows));
+            state.universalErrorVisibleCount = Math.min(
+                totalRows,
+                Math.max(UNIVERSAL_TABLE_PAGE_SIZE, Number(state.universalErrorVisibleCount || UNIVERSAL_TABLE_PAGE_SIZE)) + UNIVERSAL_TABLE_PAGE_SIZE
+            );
+            void loadUniversalErrorRows();
+        });
+        refs.universalErrorSearchForm?.addEventListener("submit", (event) => {
+            event.preventDefault();
+            state.universalErrorSearchQuery = String(refs.universalErrorSearchInput?.value || "").trim();
+            state.universalErrorVisibleCount = UNIVERSAL_TABLE_PAGE_SIZE;
+            renderUniversalErrorRows();
+        });
+        refs.universalErrorsCollapse?.addEventListener("click", () => {
+            state.universalErrorVisibleCount = UNIVERSAL_TABLE_PAGE_SIZE;
+            renderUniversalErrorRows();
+            refs.universalErrorsBody?.closest(".analytics-universal-errors-card")?.scrollIntoView({
+                behavior: "smooth",
+                block: "start"
+            });
+        });
+        refs.universalErrorsCard?.addEventListener("click", (event) => {
+            const groupToggle = event.target?.closest?.("[data-universal-rca-group-toggle]");
+            if (groupToggle) {
+                event.preventDefault();
+                toggleUniversalRootCauseGroup(groupToggle);
+                return;
+            }
+            const rawButton = event.target?.closest?.("[data-universal-error-raw]");
+            if (rawButton) {
+                event.preventDefault();
+                event.stopPropagation();
+                const errorKey = String(rawButton.getAttribute("data-universal-error-raw") || "").trim();
+                const systemEvent = rawButton.getAttribute("data-universal-error-system") === "true";
+                const eventCode = String(rawButton.getAttribute("data-universal-error-event-code") || "").trim();
+                void openUniversalRawEvents({errorKey, errorsOnly: true, systemEvent, eventCode});
+                return;
+            }
+            const errorRootRawButton = event.target?.closest?.("[data-universal-error-root-raw]");
+            if (errorRootRawButton) {
+                event.preventDefault();
+                event.stopPropagation();
+                const errorKey = String(errorRootRawButton.getAttribute("data-universal-error-root-raw") || state.universalErrorSelectedKey || "").trim();
+                const systemEvent = errorRootRawButton.getAttribute("data-universal-error-system") === "true";
+                const eventCode = String(errorRootRawButton.getAttribute("data-universal-error-event-code") || "").trim();
+                void openUniversalRawEvents({errorKey, errorsOnly: true, systemEvent, eventCode});
+                return;
+            }
+            const errorRow = event.target?.closest?.("[data-universal-error-row]");
+            if (errorRow) {
+                const errorKey = String(errorRow.getAttribute("data-universal-error-row") || "").trim();
+                if (!errorKey) {
+                    return;
+                }
+                const systemEvent = errorRow.getAttribute("data-universal-error-system") === "true";
+                const isSameRow = state.universalErrorSelectedKey === errorKey
+                    && state.universalErrorSelectedSystemEvent === systemEvent;
+                state.universalErrorSelectedKey = isSameRow ? "" : errorKey;
+                state.universalErrorSelectedSystemEvent = isSameRow ? false : systemEvent;
+                renderUniversalErrorRows();
+                void loadUniversalErrorRootCause(state.universalErrorSelectedKey, state.universalErrorSelectedSystemEvent);
+                return;
+            }
+            const resetButton = event.target?.closest?.("[data-universal-error-sort-reset]");
+            if (resetButton) {
+                state.universalErrorSortBy = "riskScore";
+                state.universalErrorSortDir = "desc";
+                state.universalErrorSelectedKey = "";
+                state.universalErrorSelectedSystemEvent = false;
+                state.universalErrorSearchQuery = "";
+                if (refs.universalErrorSearchInput) {
+                    refs.universalErrorSearchInput.value = "";
+                }
+                state.universalErrorVisibleCount = UNIVERSAL_TABLE_PAGE_SIZE;
+                void loadUniversalErrorRows({reset: true});
+                return;
+            }
+            const sortButton = event.target?.closest?.("[data-universal-error-sort]");
+            if (!sortButton) {
+                return;
+            }
+            const sortBy = String(sortButton.getAttribute("data-universal-error-sort") || "").trim();
+            if (!sortBy) {
+                return;
+            }
+            if (state.universalErrorSortBy === sortBy) {
+                state.universalErrorSortDir = state.universalErrorSortDir === "asc" ? "desc" : "asc";
+            } else {
+                state.universalErrorSortBy = sortBy;
+                state.universalErrorSortDir = sortBy === "error" ? "asc" : "desc";
+            }
+            state.universalErrorVisibleCount = UNIVERSAL_TABLE_PAGE_SIZE;
+            void loadUniversalErrorRows({reset: true});
+        });
+        refs.universalModulesMore?.addEventListener("click", () => {
+            const currentRows = filteredUniversalModuleRows().length;
+            const totalRows = Math.max(currentRows + UNIVERSAL_TABLE_PAGE_SIZE, toNumber(state.universalModuleTotalRows));
+            state.universalModuleVisibleCount = Math.min(
+                totalRows,
+                Math.max(UNIVERSAL_TABLE_PAGE_SIZE, Number(state.universalModuleVisibleCount || UNIVERSAL_TABLE_PAGE_SIZE)) + UNIVERSAL_TABLE_PAGE_SIZE
+            );
+            void loadUniversalModuleRows();
+        });
+        refs.universalModuleSearchForm?.addEventListener("submit", (event) => {
+            event.preventDefault();
+            state.universalModuleSearchQuery = String(refs.universalModuleSearchInput?.value || "").trim();
+            state.universalModuleVisibleCount = UNIVERSAL_TABLE_PAGE_SIZE;
+            renderUniversalModuleRows();
+        });
+        refs.universalModulesCollapse?.addEventListener("click", () => {
+            state.universalModuleVisibleCount = UNIVERSAL_TABLE_PAGE_SIZE;
+            renderUniversalModuleRows();
+        });
+        refs.universalModulesCard?.addEventListener("click", (event) => {
+            const groupToggle = event.target?.closest?.("[data-universal-rca-group-toggle]");
+            if (groupToggle) {
+                event.preventDefault();
+                toggleUniversalRootCauseGroup(groupToggle);
+                return;
+            }
+            const rawButton = event.target?.closest?.("[data-universal-module-raw]");
+            if (rawButton) {
+                event.preventDefault();
+                event.stopPropagation();
+                void openUniversalRawEvents({
+                    moduleCode: rawButton.getAttribute("data-universal-module-code") || "",
+                    stageTypeCode: rawButton.getAttribute("data-universal-module-stage") || "",
+                    systemEvent: rawButton.getAttribute("data-universal-module-system") === "true",
+                    errorsOnly: rawButton.getAttribute("data-universal-module-errors") === "true"
+                });
+                return;
+            }
+            const row = event.target?.closest?.("[data-universal-module-row]");
+            if (row) {
+                const key = String(row.getAttribute("data-universal-module-row") || "").trim();
+                state.universalModuleSelectedKey = state.universalModuleSelectedKey === key ? "" : key;
+                renderUniversalModuleRows();
+                void loadUniversalModuleRootCause(state.universalModuleSelectedKey);
+                return;
+            }
+            if (event.target?.closest?.("[data-universal-module-sort-reset]")) {
+                state.universalModuleSortBy = "riskScore";
+                state.universalModuleSortDir = "desc";
+                state.universalModuleSelectedKey = "";
+                state.universalModuleSearchQuery = "";
+                if (refs.universalModuleSearchInput) {
+                    refs.universalModuleSearchInput.value = "";
+                }
+                state.universalModuleVisibleCount = UNIVERSAL_TABLE_PAGE_SIZE;
+                void loadUniversalModuleRows({reset: true});
+                return;
+            }
+            const sortButton = event.target?.closest?.("[data-universal-module-sort]");
+            if (!sortButton) {
+                return;
+            }
+            const sortBy = String(sortButton.getAttribute("data-universal-module-sort") || "").trim();
+            if (state.universalModuleSortBy === sortBy) {
+                state.universalModuleSortDir = state.universalModuleSortDir === "asc" ? "desc" : "asc";
+            } else {
+                state.universalModuleSortBy = sortBy;
+                state.universalModuleSortDir = sortBy === "module" ? "asc" : "desc";
+            }
+            state.universalModuleVisibleCount = UNIVERSAL_TABLE_PAGE_SIZE;
+            void loadUniversalModuleRows({reset: true});
+        });
+        refs.universalStageToggle?.addEventListener("click", (event) => {
+            event.preventDefault();
+            const isOpen = !refs.universalStagePopup?.classList.contains("d-none");
+            refs.universalStagePopup?.classList.toggle("d-none", isOpen);
+            refs.universalStageToggle?.setAttribute("aria-expanded", isOpen ? "false" : "true");
+        });
+        refs.universalStageAll?.addEventListener("change", () => {
+            if (refs.universalStageAll?.checked) {
+                setSelectedUniversalStages([]);
+            } else {
+                syncUniversalStageControls();
+            }
+            showUniversalChartLoaders();
+            void submitUniversalFilters();
+        });
+        refs.universalStageList?.addEventListener("change", (event) => {
+            if (!event.target?.matches?.("[data-universal-stage-option]")) {
+                return;
+            }
+            syncUniversalStageSelectFromCards();
+            showUniversalChartLoaders();
             void submitUniversalFilters();
         });
         refs.universalScenario?.addEventListener("change", () => {
@@ -2141,6 +3033,11 @@
             if (!eventHost) {
                 refs.universalEventTypePopup?.classList.add("d-none");
                 refs.universalEventTypeToggle?.setAttribute("aria-expanded", "false");
+            }
+            const universalStageHost = event.target.closest(".analytics-universal-stage-inline");
+            if (!universalStageHost) {
+                refs.universalStagePopup?.classList.add("d-none");
+                refs.universalStageToggle?.setAttribute("aria-expanded", "false");
             }
         });
         [refs.universalSeriesMetricPopup].forEach(() => {
@@ -2210,7 +3107,11 @@
             } catch (error) {
                 console.error("Event-type options bootstrap failed, continue", error);
             }
+            await syncSystemChartFiltersFromMain({force: true, refreshOptions: true});
             await reloadAll();
+            if (state.currentDashboardTab === "system") {
+                await loadSystemEventsChart();
+            }
             await loadCompare();
             applyUniversalChartZoom("chart-universal-timeline", refs.universalTimelineZoomX?.value, refs.universalTimelineZoomY?.value);
             applyUniversalChartZoom("chart-universal-stages", refs.universalStagesZoomX?.value, refs.universalStagesZoomY?.value);
@@ -2341,10 +3242,11 @@
     }
 
     async function refreshScopedOptionsSafe() {
+        syncExpandedScenarioDetailLayout();
         try {
             await refreshEventTypeOptionsByScope();
         } catch (error) {
-            console.error("Scoped event-type refresh failed", error);
+            console.error("Scoped module/event refresh failed", error);
         }
         try {
             await refreshGlobalMetricBlock();
@@ -2587,6 +3489,9 @@
         refs.analyticsRawSections?.forEach((section) => {
             section.hidden = normalized !== "raw" && normalized !== "system";
         });
+        refs.analyticsSystemSections?.forEach((section) => {
+            section.hidden = normalized !== "system";
+        });
         refs.analyticsCompareSections?.forEach((section) => {
             section.hidden = normalized !== "compare";
         });
@@ -2609,6 +3514,11 @@
         syncEventsPanelMode();
         if (previousSystemOnly !== state.eventsSystemOnly) {
             void refreshEventsScopeForMode();
+        } else if (normalized === "system") {
+            void loadSystemEventsChart();
+        }
+        if (normalized === "compare") {
+            void loadCompare();
         }
 
         if (!shouldPushState) {
@@ -2627,6 +3537,8 @@
         if (!refs.eventsPanelTitle && !refs.eventsPanelSub) {
             return;
         }
+        refs.eventsPanel?.classList.toggle("is-system-events-mode", state.eventsSystemOnly);
+        refs.systemEventsTableActions?.classList.toggle("d-none", !state.eventsSystemOnly);
         if (state.eventsSystemOnly) {
             if (refs.eventsPanelTitle) {
                 refs.eventsPanelTitle.textContent = "\u0421\u043b\u0443\u0436\u0435\u0431\u043d\u044b\u0435 \u0441\u043e\u0431\u044b\u0442\u0438\u044f";
@@ -2634,21 +3546,30 @@
             if (refs.eventsPanelSub) {
                 refs.eventsPanelSub.textContent = "\u0421\u0438\u0441\u0442\u0435\u043c\u043d\u044b\u0435 HTTP/asset/technical \u0441\u043e\u0431\u044b\u0442\u0438\u044f, \u0438\u0441\u043a\u043b\u044e\u0447\u0451\u043d\u043d\u044b\u0435 \u0438\u0437 \u043e\u0441\u043d\u043e\u0432\u043d\u043e\u0439 \u0430\u043d\u0430\u043b\u0438\u0442\u0438\u043a\u0438";
             }
+            syncSystemSortFromEventsRefs();
+            updateEventsSortHeaders();
             return;
         }
         if (refs.eventsPanelTitle) {
-            refs.eventsPanelTitle.textContent = "Raw \u0441\u043e\u0431\u044b\u0442\u0438\u044f";
+            refs.eventsPanelTitle.textContent = "Сырые события";
         }
         if (refs.eventsPanelSub) {
             refs.eventsPanelSub.textContent = "\u0424\u0438\u043b\u044c\u0442\u0440\u0430\u0446\u0438\u044f \u043f\u0440\u043e\u0431\u043b\u0435\u043c\u043d\u044b\u0445 \u043a\u0435\u0439\u0441\u043e\u0432 \u0438 \u043f\u0435\u0440\u0435\u0445\u043e\u0434 \u043a \u0434\u0435\u0442\u0430\u043b\u044f\u043c";
         }
+        updateEventsSortHeaders();
     }
 
     async function refreshEventsScopeForMode() {
         try {
-            await loadDictionaries();
+            await refreshScopedOptionsSafe();
+            await refreshRawEventTypeOptionsForMode(refs.eventsEventType?.value || "");
             state.eventsPage = 0;
-            await loadEvents(true);
+            const tasks = [loadEvents(true)];
+            if (state.eventsSystemOnly) {
+                await syncSystemChartFiltersFromMain({refreshOptions: true});
+                tasks.push(loadSystemEventsChart());
+            }
+            await Promise.all(tasks);
         } catch (error) {
             console.error("Events scope refresh failed", error);
         }
@@ -2692,7 +3613,7 @@
             void withUniversalChartLoaders(() => loadUniversal(mainReloadRequestId))
                 .catch((error) => console.error("Universal background refresh failed", error));
             void withStageMetricLoaders("all", () => loadStageMetrics())
-                .catch((error) => console.error("Stage metrics background refresh failed", error));
+                .catch((error) => console.error("Фоновое обновление метрик не удалось", error));
             void runPanelBackgroundRefresh(refs.eventsPanel, () => loadEvents(true), "Events background refresh failed");
         }
     }
@@ -2718,8 +3639,20 @@
         if (!controls) {
             return;
         }
-        state.expandedChart.customRangeActive = false;
-        const ranges = state.globalCompareEnabled ? resolveGlobalBeforeRange() : expandedRangesFromTopFilter(canvasId);
+        const preserveChartUiState = !!state.preserveChartUiStateDuringMainSubmit;
+        const storedRanges = state.expandedRangesBySource?.[canvasId];
+        const hasStoredRanges = !!storedRanges?.afterFrom && !!storedRanges?.afterTo;
+        if (!preserveChartUiState) {
+            state.expandedChart.customRangeActive = false;
+        }
+        const ranges = preserveChartUiState && hasStoredRanges
+            ? normalizeCompareRangesByAfter(
+                storedRanges.afterFrom,
+                storedRanges.afterTo,
+                storedRanges.beforeFrom,
+                storedRanges.beforeTo
+            )
+            : (state.globalCompareEnabled ? resolveGlobalBeforeRange() : expandedRangesFromTopFilter(canvasId));
         const beforeFrom = controls.querySelector("[data-range='before-from']");
         const beforeTo = controls.querySelector("[data-range='before-to']");
         const afterFrom = controls.querySelector("[data-range='after-from']");
@@ -2728,6 +3661,10 @@
         const beforeToCompare = controls.querySelector("[data-range='before-to-compare']");
         const afterFromCompare = controls.querySelector("[data-range='after-from-compare']");
         const afterToCompare = controls.querySelector("[data-range='after-to-compare']");
+        const bucketEl = controls.querySelector("[data-expanded-bucket]");
+        const compareModeEl = controls.querySelector("[data-expanded-compare-mode]");
+        const latencyMetricEl = controls.querySelector("[data-expanded-latency-metric]");
+        const stageLatencyMetricEl = controls.querySelector("[data-expanded-stage-latency-event-metric]");
         if (beforeFrom) beforeFrom.value = ranges.beforeFrom;
         if (beforeTo) beforeTo.value = ranges.beforeTo;
         if (afterFrom) afterFrom.value = ranges.afterFrom;
@@ -2736,11 +3673,19 @@
         if (beforeToCompare) beforeToCompare.value = ranges.beforeTo;
         if (afterFromCompare) afterFromCompare.value = ranges.afterFrom;
         if (afterToCompare) afterToCompare.value = ranges.afterTo;
+        if (bucketEl) bucketEl.value = resolveExpandedBucket(canvasId);
+        if (compareModeEl) compareModeEl.value = resolveExpandedCompareMode(canvasId);
+        if (latencyMetricEl) latencyMetricEl.value = getExpandedLatencyMetricMode(canvasId);
+        if (stageLatencyMetricEl) stageLatencyMetricEl.value = getExpandedStageLatencyEventMetricMode(canvasId);
         state.expandedRangesBySource[canvasId] = {...ranges};
-        if (canvasId !== "chart-event-kpi") {
-            await applyStoredExpandedRangesToCharts(canvasId);
+        syncExpandedEventFilterControls(canvasId);
+        await renderExpandedChartByRanges(canvasId, ranges, {
+            ...getExpandedEventRenderOptions(canvasId),
+            skipScenarioDetailRefresh: preserveChartUiState
+        });
+        if (resolveChartScenario(canvasId) && !preserveChartUiState) {
+            await refreshExpandedScenarioDetailPanel();
         }
-        renderExpandedChartClone(canvasId);
     }
 
     function expandedRangesFromTopFilter(canvasId) {
@@ -2874,6 +3819,7 @@
         fillSelect(refs.stageMetricStageType, data.stageTypes, "Все этапы", true);
         fillSelect(refs.stageTextStageType, data.stageTypes, "Все этапы", true);
         fillSelect(refs.universalStageType, data.stageTypes, "Все этапы", true);
+        renderUniversalStageOptions(data.stageTypes || []);
         fillSelect(refs.universalAttrCode, data.eventAttributeTypes, "Без фильтра", true);
         fillSelect(refs.eventsAttributeCode, data.eventAttributeTypes, "Без фильтра", true);
         fillSelect(refs.globalMetricCode, data.eventAttributeTypes, "Не выбран", true, refs.globalMetricCode?.value || "");
@@ -2883,23 +3829,29 @@
     }
 
     async function refreshRawEventTypeOptionsForMode(selectedCode) {
-        if (!refs.eventsEventType || !state.eventsSystemOnly) {
+        if (!refs.eventsEventType) {
             return;
         }
         const selectedModule = refs.moduleType?.value?.trim() || "";
         const selectedEventsEventType = String(selectedCode || refs.eventsEventType?.value || "").trim();
-        const params = new URLSearchParams();
-        params.set("systemEventsOnly", "true");
-        if (selectedModule) {
-            params.set("moduleCode", selectedModule);
-        }
-        const data = await fetchJson(`${api("/dictionaries")}?${params.toString()}`);
+        const data = await fetchPeriodFilterOptions({
+            fromValue: refs.eventsFrom?.value || refs.from?.value || "",
+            toValue: refs.eventsTo?.value || refs.to?.value || "",
+            moduleCode: selectedModule,
+            systemEventsOnly: !!state.eventsSystemOnly
+        });
+        const available = normalizeOptionList(data?.eventTypes);
+        const nextSelected = available.some((item) => item.code === selectedEventsEventType)
+            ? selectedEventsEventType
+            : "";
         fillSelect(
             refs.eventsEventType,
-            data.eventTypes || [],
-            "\u0412\u0441\u0435 \u0441\u043b\u0443\u0436\u0435\u0431\u043d\u044b\u0435",
+            available,
+            state.eventsSystemOnly
+                ? "\u0412\u0441\u0435 \u0441\u043b\u0443\u0436\u0435\u0431\u043d\u044b\u0435"
+                : "\u0412\u0441\u0435 \u0441\u043e\u0431\u044b\u0442\u0438\u044f",
             true,
-            selectedEventsEventType
+            nextSelected
         );
     }
 
@@ -3151,15 +4103,21 @@
             params.set("moduleCode", moduleCode);
         }
         params.set("analysisMode", "overall");
-        const attrCode = (refs.universalAttrCode?.value || "").trim();
+        const attrCode = options.attributeCode != null
+            ? String(options.attributeCode || "").trim()
+            : (refs.universalAttrCode?.value || "").trim();
         if (attrCode) {
             params.set("attributeCode", attrCode);
         }
-        const attrValue = (refs.universalAttrValue?.value || "").trim();
+        const attrValue = options.attributeValue != null
+            ? String(options.attributeValue || "").trim()
+            : (refs.universalAttrValue?.value || "").trim();
         if (attrValue) {
             params.set("attributeValue", attrValue);
         }
-        const stageType = (refs.universalStageType?.value || "").trim();
+        const stageType = options.stageTypeCode != null
+            ? String(options.stageTypeCode || "").trim()
+            : (selectedUniversalStageCodes().length === 1 ? selectedUniversalStageCodes()[0] : "");
         if (stageType) {
             params.set("stageTypeCode", stageType);
         }
@@ -3277,7 +4235,7 @@
         const selectedMetrics = selectedUniversalTimelineMetrics();
         const datasets = [];
         if (selectedMetrics.has("count")) {
-            datasets.push({label: "Count", data: (universal?.series || []).map((point) => point.count || 0), borderColor: colors.primary, tension: 0.25, pointRadius: 1.1});
+            datasets.push({label: "Количество", data: (universal?.series || []).map((point) => point.count || 0), borderColor: colors.primary, tension: 0.25, pointRadius: 1.1});
         }
         if (selectedMetrics.has("avg")) {
             datasets.push({label: "AVG", data: (universal?.series || []).map((point) => point.avgMs || 0), borderColor: colors.teal, tension: 0.25, pointRadius: 1.1});
@@ -3286,11 +4244,11 @@
             datasets.push({label: "P95", data: (universal?.series || []).map((point) => point.p95Ms || 0), borderColor: colors.amber, tension: 0.25, pointRadius: 1.1});
         }
         if (selectedMetrics.has("error")) {
-            datasets.push({label: "Error rate, %", data: (universal?.series || []).map((point) => toPercentNumber(point.errorRate)), borderColor: colors.red, tension: 0.25, pointRadius: 1.1});
+            datasets.push({label: "Доля ошибок, %", data: (universal?.series || []).map((point) => toPercentNumber(point.errorRate)), borderColor: colors.red, tension: 0.25, pointRadius: 1.1});
         }
         if (baseline && universalGhostEnabled) {
             if (selectedMetrics.has("count")) {
-                datasets.push({label: "Count (Before)", data: (baseline.series || []).map((point) => point.count || 0), borderColor: "rgba(109,40,217,0.45)", borderDash: [6, 4], tension: 0.25, pointRadius: 0.8});
+                datasets.push({label: "Количество (До)", data: (baseline.series || []).map((point) => point.count || 0), borderColor: "rgba(109,40,217,0.45)", borderDash: [6, 4], tension: 0.25, pointRadius: 0.8});
             }
             if (selectedMetrics.has("avg")) {
                 datasets.push({label: "AVG (Before)", data: (baseline.series || []).map((point) => point.avgMs || 0), borderColor: "rgba(15,118,110,0.5)", borderDash: [6, 4], tension: 0.25, pointRadius: 0.8});
@@ -3299,7 +4257,7 @@
                 datasets.push({label: "P95 (Before)", data: (baseline.series || []).map((point) => point.p95Ms || 0), borderColor: "rgba(180,83,9,0.5)", borderDash: [6, 4], tension: 0.25, pointRadius: 0.8});
             }
             if (selectedMetrics.has("error")) {
-                datasets.push({label: "Error rate, % (Before)", data: (baseline.series || []).map((point) => toPercentNumber(point.errorRate)), borderColor: "rgba(185,28,28,0.5)", borderDash: [6, 4], tension: 0.25, pointRadius: 0.8});
+                datasets.push({label: "Доля ошибок, % (До)", data: (baseline.series || []).map((point) => toPercentNumber(point.errorRate)), borderColor: "rgba(185,28,28,0.5)", borderDash: [6, 4], tension: 0.25, pointRadius: 0.8});
             }
         }
         upsertChart("chart-universal-timeline", {
@@ -3310,10 +4268,10 @@
         if (universalSplitEnabled && baseline) {
             const beforeLabels = (baseline.series || []).map((point) => formatTime(point.time));
             const beforeDatasets = [];
-            if (selectedMetrics.has("count")) beforeDatasets.push({label: "Count", data: (baseline.series || []).map((point) => point.count || 0), borderColor: colors.primary, tension: 0.25, pointRadius: 1.1});
+            if (selectedMetrics.has("count")) beforeDatasets.push({label: "Количество", data: (baseline.series || []).map((point) => point.count || 0), borderColor: colors.primary, tension: 0.25, pointRadius: 1.1});
             if (selectedMetrics.has("avg")) beforeDatasets.push({label: "AVG", data: (baseline.series || []).map((point) => point.avgMs || 0), borderColor: colors.teal, tension: 0.25, pointRadius: 1.1});
             if (selectedMetrics.has("p95")) beforeDatasets.push({label: "P95", data: (baseline.series || []).map((point) => point.p95Ms || 0), borderColor: colors.amber, tension: 0.25, pointRadius: 1.1});
-            if (selectedMetrics.has("error")) beforeDatasets.push({label: "Error rate, %", data: (baseline.series || []).map((point) => toPercentNumber(point.errorRate)), borderColor: colors.red, tension: 0.25, pointRadius: 1.1});
+            if (selectedMetrics.has("error")) beforeDatasets.push({label: "Доля ошибок, %", data: (baseline.series || []).map((point) => toPercentNumber(point.errorRate)), borderColor: colors.red, tension: 0.25, pointRadius: 1.1});
             upsertChart(timelineCompareCanvasId, {
                 type: "line",
                 data: {labels: beforeLabels, datasets: beforeDatasets},
@@ -3343,16 +4301,16 @@
                 if (metricCode === "p95") {
                     return {label: "P95, ms", data: rows.map((row) => row.p95Ms || 0), backgroundColor: "rgba(124,58,237,0.72)", borderRadius: 8, yAxisID: "y"};
                 }
-                return {label: "Error rate, %", data: rows.map((row) => toPercentNumber(row.errorRate)), backgroundColor: "rgba(185,28,28,0.72)", borderRadius: 8, yAxisID: "y1"};
+                return {label: "Доля ошибок, %", data: rows.map((row) => toPercentNumber(row.errorRate)), backgroundColor: "rgba(185,28,28,0.72)", borderRadius: 8, yAxisID: "y1"};
             });
             if (baseline && universalGhostEnabled) {
                 stageSelectedMetrics.forEach((metricCode) => {
                     if (metricCode === "avg") {
-                        stageDatasets.push({label: "AVG, ms (Р”Рѕ)", data: rows.map((row) => baselineStageByCode.get(row.stageTypeCode)?.avgMs || 0), backgroundColor: "rgba(15,118,110,0.35)", borderColor: "rgba(15,118,110,0.72)", borderWidth: 1, borderRadius: 8, yAxisID: "y"});
+                        stageDatasets.push({label: "AVG, ms (До)", data: rows.map((row) => baselineStageByCode.get(row.stageTypeCode)?.avgMs || 0), backgroundColor: "rgba(15,118,110,0.35)", borderColor: "rgba(15,118,110,0.72)", borderWidth: 1, borderRadius: 8, yAxisID: "y"});
                     } else if (metricCode === "p95") {
-                        stageDatasets.push({label: "P95, ms (Р”Рѕ)", data: rows.map((row) => baselineStageByCode.get(row.stageTypeCode)?.p95Ms || 0), backgroundColor: "rgba(124,58,237,0.35)", borderColor: "rgba(124,58,237,0.72)", borderWidth: 1, borderRadius: 8, yAxisID: "y"});
+                        stageDatasets.push({label: "P95, ms (До)", data: rows.map((row) => baselineStageByCode.get(row.stageTypeCode)?.p95Ms || 0), backgroundColor: "rgba(124,58,237,0.35)", borderColor: "rgba(124,58,237,0.72)", borderWidth: 1, borderRadius: 8, yAxisID: "y"});
                     } else {
-                        stageDatasets.push({label: "Error rate, % (Before)", data: rows.map((row) => toPercentNumber(baselineStageByCode.get(row.stageTypeCode)?.errorRate)), backgroundColor: "rgba(185,28,28,0.35)", borderColor: "rgba(185,28,28,0.72)", borderWidth: 1, borderRadius: 8, yAxisID: "y1"});
+                        stageDatasets.push({label: "Доля ошибок, % (До)", data: rows.map((row) => toPercentNumber(baselineStageByCode.get(row.stageTypeCode)?.errorRate)), backgroundColor: "rgba(185,28,28,0.35)", borderColor: "rgba(185,28,28,0.72)", borderWidth: 1, borderRadius: 8, yAxisID: "y1"});
                     }
                 });
             }
@@ -3381,7 +4339,7 @@
                     if (metricCode === "p95") {
                         return {label: "P95, ms", data: rows.map((row) => baselineByCode.get(row.stageTypeCode)?.p95Ms || 0), backgroundColor: "rgba(124,58,237,0.72)", borderRadius: 8, yAxisID: "y"};
                     }
-                    return {label: "Error rate, %", data: rows.map((row) => toPercentNumber(baselineByCode.get(row.stageTypeCode)?.errorRate)), backgroundColor: "rgba(185,28,28,0.72)", borderRadius: 8, yAxisID: "y1"};
+                    return {label: "Доля ошибок, %", data: rows.map((row) => toPercentNumber(baselineByCode.get(row.stageTypeCode)?.errorRate)), backgroundColor: "rgba(185,28,28,0.72)", borderRadius: 8, yAxisID: "y1"};
                 });
                 upsertChart(stagesCompareCanvasId, {
                     type: "bar",
@@ -3447,6 +4405,2445 @@
         });
     }
 
+    function renderUniversalAnalysisPeriod() {
+        syncUniversalPeriodInputsFromHidden();
+        if (refs.universalAnalysisPreset) {
+            const presetCode = (refs.universalQuickPreset
+                ? refs.universalQuickPreset.value
+                : (refs.quickRangePresetSelect?.value || "")
+            ).trim().toLowerCase();
+            const presetText = universalQuickPresetLabel(presetCode);
+            refs.universalAnalysisPreset.value = UNIVERSAL_ANALYSIS_PRESET_VALUES.has(presetCode) ? presetCode : "";
+            refs.universalAnalysisPreset.title = presetText;
+        }
+    }
+
+    function syncUniversalPeriodInputsFromHidden() {
+        if (refs.universalPeriodFromInput) {
+            refs.universalPeriodFromInput.value = refs.universalFrom?.value || refs.from?.value || "";
+        }
+        if (refs.universalPeriodToInput) {
+            refs.universalPeriodToInput.value = refs.universalTo?.value || refs.to?.value || "";
+        }
+    }
+
+    function universalQuickPresetLabel(code) {
+        const normalized = String(code || "").trim().toLowerCase();
+        if (!normalized) {
+            return "—";
+        }
+        const labels = {
+            "15m": "15 минут",
+            "30m": "30 минут",
+            "1h": "1 час",
+            "3h": "3 часа",
+            "6h": "6 часов",
+            "12h": "12 часов",
+            "24h": "24 часа",
+            "1w": "7 дней",
+            "1mo": "30 дней",
+            "3mo": "3 месяца",
+            "6mo": "6 месяцев",
+            "1y": "1 год",
+            "all": "Все время"
+        };
+        return labels[normalized] || "—";
+    }
+
+    function updateUniversalTopEventsControls(visibleCount, totalCount) {
+        refs.universalTopEventsMore?.classList.toggle("d-none", visibleCount >= totalCount);
+        refs.universalTopEventsCollapse?.classList.toggle("d-none", visibleCount <= UNIVERSAL_TABLE_PAGE_SIZE);
+        if (refs.universalTopEventsCount) {
+            refs.universalTopEventsCount.textContent = totalCount
+                ? `Показано ${formatInt(visibleCount)} из ${formatInt(totalCount)}`
+                : "";
+        }
+        updateUniversalTopActionState();
+    }
+
+    function filteredUniversalTopEventRows() {
+        const rows = Array.isArray(state.universalTopEventRows) ? state.universalTopEventRows : [];
+        const query = normalizeSearchText(state.universalTopEventSearchQuery);
+        if (!query) {
+            return rows;
+        }
+        return rows.filter((row) => normalizeSearchText(`${row?.label || ""} ${row?.eventTypeName || ""} ${row?.eventTypeCode || ""} ${row?.key || ""}`).includes(query));
+    }
+
+    function updateUniversalTopActionState() {
+        const hasLocalState = !isUniversalDefaultSort(state.universalTopEventSortBy)
+            || state.universalTopEventSortDir !== "desc"
+            || !!String(state.universalTopEventSelectedCode || "").trim()
+            || !!String(state.universalTopEventSearchQuery || "").trim();
+        refs.universalTopEventsCard
+            ?.querySelector("[data-universal-top-sort-reset]")
+            ?.classList.toggle("d-none", !hasLocalState);
+    }
+
+    function isUniversalDefaultSort(sortBy) {
+        const value = String(sortBy || "").toLowerCase();
+        return !value || value === "riskscore" || value === "interesting";
+    }
+
+    function renderUniversalSeverityStats(target, totals = {}, options = {}) {
+        if (!target) {
+            return;
+        }
+        const critical = Math.max(0, toNumber(totals.critical));
+        const warning = Math.max(0, toNumber(totals.warning));
+        const normal = Math.max(0, toNumber(totals.normal));
+        const problemTotal = critical + warning;
+        const visibleProblem = Math.max(0, toNumber(options.visibleProblem));
+        const limited = problemTotal > 0 && visibleProblem > 0 && visibleProblem < problemTotal;
+        target.innerHTML = `
+            <span class="analytics-universal-severity-pill analytics-universal-severity-pill-critical">Критические: ${formatInt(critical)}</span>
+            <span class="analytics-universal-severity-pill analytics-universal-severity-pill-warning">Требуют внимания: ${formatInt(warning)}</span>
+            <span class="analytics-universal-severity-pill analytics-universal-severity-pill-normal">Нормальные: ${formatInt(normal)}</span>
+            ${limited ? `<span class="analytics-universal-severity-note">Показаны первые ${formatInt(visibleProblem)} проблемных значений из ${formatInt(problemTotal)}</span>` : ""}
+        `;
+    }
+
+    function universalDefaultVisibleCount(rows, totals = {}) {
+        const problemTotal = Math.max(0, toNumber(totals.critical) + toNumber(totals.warning));
+        const rowCount = Array.isArray(rows) ? rows.length : 0;
+        if (problemTotal <= 0) {
+            return Math.min(rowCount, UNIVERSAL_TABLE_PAGE_SIZE);
+        }
+        if (problemTotal < UNIVERSAL_TABLE_PAGE_SIZE) {
+            return Math.min(rowCount, UNIVERSAL_TABLE_PAGE_SIZE);
+        }
+        return Math.min(rowCount, Math.min(UNIVERSAL_DEFAULT_HARD_LIMIT, Math.max(UNIVERSAL_TABLE_PAGE_SIZE, Math.min(UNIVERSAL_DEFAULT_SOFT_LIMIT, problemTotal))));
+    }
+
+    function universalTopEventSortValue(row, sortBy) {
+        if (sortBy === "event") {
+            return row?.label || row?.eventTypeName || row?.eventTypeCode || row?.key || "";
+        }
+        if (sortBy === "avg") {
+            return toNumber(row?.avgMs);
+        }
+        if (sortBy === "p95") {
+            return toNumber(row?.p95 || row?.p95Ms);
+        }
+        if (sortBy === "error") {
+            return row?.err != null ? toNumber(row.err) : toNumber(row?.errorRate) * 100;
+        }
+        if (sortBy === "riskScore" || sortBy === "interesting") {
+            return [
+                row?.err != null ? toNumber(row.err) : toNumber(row?.errorRate) * 100,
+                toNumber(row?.p95 || row?.p95Ms),
+                toNumber(row?.avgMs),
+                toNumber(row?.count)
+            ];
+        }
+        return toNumber(row?.count);
+    }
+
+    function compareUniversalRiskValues(leftValue, rightValue, dir) {
+        const leftItems = Array.isArray(leftValue) ? leftValue : [leftValue];
+        const rightItems = Array.isArray(rightValue) ? rightValue : [rightValue];
+        const length = Math.max(leftItems.length, rightItems.length);
+        for (let index = 0; index < length; index += 1) {
+            const leftItem = leftItems[index] || 0;
+            const rightItem = rightItems[index] || 0;
+            if (leftItem !== rightItem) {
+                return (toNumber(leftItem) - toNumber(rightItem)) * dir;
+            }
+        }
+        return 0;
+    }
+
+    function sortUniversalTopEventRows() {
+        const sortBy = state.universalTopEventSortBy || "riskScore";
+        const dir = state.universalTopEventSortDir === "asc" ? 1 : -1;
+        const rowsForSort = Array.isArray(state.universalTopEventRows) ? state.universalTopEventRows : [];
+        const baselines = universalTopEventMetricBaselines(rowsForSort);
+        state.universalTopEventRows = rowsForSort
+            .slice()
+            .sort((left, right) => {
+                if (sortBy === "riskScore" || sortBy === "interesting") {
+                    const leftFlags = universalTopEventProblemFlags(left, state.universalTopEventRows, baselines);
+                    const rightFlags = universalTopEventProblemFlags(right, state.universalTopEventRows, baselines);
+                    const orderedValues = [
+                        [Number(leftFlags.critical), Number(rightFlags.critical)],
+                        [Number(leftFlags.important), Number(rightFlags.important)],
+                        [leftFlags.critical ? (left?.err != null ? toNumber(left.err) : toNumber(left?.errorRate) * 100) : 0, rightFlags.critical ? (right?.err != null ? toNumber(right.err) : toNumber(right?.errorRate) * 100) : 0],
+                        [leftFlags.critical ? leftFlags.share : 0, rightFlags.critical ? rightFlags.share : 0],
+                        [leftFlags.critical ? toNumber(left?.count) : 0, rightFlags.critical ? toNumber(right?.count) : 0],
+                        [leftFlags.critical ? toNumber(left?.p95 || left?.p95Ms) : 0, rightFlags.critical ? toNumber(right?.p95 || right?.p95Ms) : 0],
+                        [leftFlags.critical ? toNumber(left?.avgMs) : 0, rightFlags.critical ? toNumber(right?.avgMs) : 0],
+                        [leftFlags.important ? leftFlags.share : 0, rightFlags.important ? rightFlags.share : 0],
+                        [leftFlags.important ? toNumber(left?.count) : 0, rightFlags.important ? toNumber(right?.count) : 0],
+                        [leftFlags.important ? toNumber(left?.p95 || left?.p95Ms) : 0, rightFlags.important ? toNumber(right?.p95 || right?.p95Ms) : 0],
+                        [leftFlags.important ? toNumber(left?.avgMs) : 0, rightFlags.important ? toNumber(right?.avgMs) : 0],
+                        [(!leftFlags.critical && !leftFlags.important) ? toNumber(left?.count) : 0, (!rightFlags.critical && !rightFlags.important) ? toNumber(right?.count) : 0],
+                        [(!leftFlags.critical && !leftFlags.important) ? leftFlags.share : 0, (!rightFlags.critical && !rightFlags.important) ? rightFlags.share : 0],
+                        [(!leftFlags.critical && !leftFlags.important) ? toNumber(left?.p95 || left?.p95Ms) : 0, (!rightFlags.critical && !rightFlags.important) ? toNumber(right?.p95 || right?.p95Ms) : 0],
+                        [(!leftFlags.critical && !leftFlags.important) ? toNumber(left?.avgMs) : 0, (!rightFlags.critical && !rightFlags.important) ? toNumber(right?.avgMs) : 0]
+                    ];
+                    for (const [leftValue, rightValue] of orderedValues) {
+                        if (leftValue !== rightValue) {
+                            return (leftValue - rightValue) * dir;
+                        }
+                    }
+                    return String(left?.label || left?.key || "").localeCompare(String(right?.label || right?.key || ""), "ru");
+                }
+                const leftValue = universalTopEventSortValue(left, sortBy);
+                const rightValue = universalTopEventSortValue(right, sortBy);
+                if (Array.isArray(leftValue) || Array.isArray(rightValue)) {
+                    const compared = compareUniversalRiskValues(leftValue, rightValue, dir);
+                    if (compared !== 0) {
+                        return compared;
+                    }
+                } else if (typeof leftValue === "string" || typeof rightValue === "string") {
+                    const compared = String(leftValue).localeCompare(String(rightValue), "ru") * dir;
+                    if (compared !== 0) {
+                        return compared;
+                    }
+                } else if (leftValue !== rightValue) {
+                    return (leftValue - rightValue) * dir;
+                }
+                return String(left?.label || left?.key || "").localeCompare(String(right?.label || right?.key || ""), "ru");
+            });
+    }
+
+    function updateUniversalTopEventSortHeaders() {
+        refs.universalTopEventsCard?.querySelectorAll("[data-universal-top-sort]").forEach((button) => {
+            const sortBy = String(button.getAttribute("data-universal-top-sort") || "").trim();
+            const icon = button.querySelector("[data-sort-icon]");
+            const isActive = sortBy === state.universalTopEventSortBy;
+            button.classList.toggle("is-active", isActive);
+            if (icon) {
+                icon.textContent = isActive
+                    ? (state.universalTopEventSortDir === "asc" ? "↑" : "↓")
+                    : "↕";
+            }
+        });
+        updateUniversalTopActionState();
+    }
+
+    function universalTopEventMetricBaselines(rows) {
+        const p95Values = (rows || []).map((item) => toNumber(item?.p95 || item?.p95Ms)).filter((value) => value > 0);
+        const avgValues = (rows || []).map((item) => toNumber(item?.avgMs)).filter((value) => value > 0);
+        const countValues = (rows || []).map((item) => toNumber(item?.count)).filter((value) => value > 0);
+        return {
+            p95: p95Values.length ? p95Values.reduce((sum, value) => sum + value, 0) / p95Values.length : 0,
+            avg: avgValues.length ? avgValues.reduce((sum, value) => sum + value, 0) / avgValues.length : 0,
+            count: countValues.length ? countValues.reduce((sum, value) => sum + value, 0) / countValues.length : 0
+        };
+    }
+
+    function universalTopEventProblemFlags(row, rows, baselinesOverride = null) {
+        const errorRate = row?.err != null ? toNumber(row.err) : toNumber(row?.errorRate) * 100;
+        const p95 = toNumber(row?.p95 || row?.p95Ms);
+        const avg = toNumber(row?.avgMs);
+        const count = toNumber(row?.count);
+        const baselines = baselinesOverride || universalTopEventMetricBaselines(rows);
+        const totalCount = (rows || []).reduce((sum, item) => sum + toNumber(item?.count), 0);
+        const share = totalCount > 0 ? (count / totalCount) * 100 : 0;
+        const criticalP95 = p95 >= 3000 || (baselines.p95 > 0 && p95 >= baselines.p95 * 2.5 && p95 >= 1000);
+        const criticalAvg = avg >= 1500 || (baselines.avg > 0 && avg >= baselines.avg * 2.5 && avg >= 750);
+        const moderateP95 = p95 >= 1000 || (baselines.p95 > 0 && p95 >= baselines.p95 * 1.5 && p95 >= 500);
+        const moderateAvg = avg >= 500 || (baselines.avg > 0 && avg >= baselines.avg * 1.5 && avg >= 250);
+        const highCount = baselines.count > 0 && count >= baselines.count * 1.5;
+        const highShare = share >= 5;
+        const critical = errorRate > 0 || criticalP95 || criticalAvg;
+        return {
+            critical,
+            important: !critical && (highShare || highCount || moderateP95 || moderateAvg),
+            highP95: criticalP95 || moderateP95,
+            highAvg: criticalAvg || moderateAvg,
+            highCount,
+            highShare,
+            share,
+            hasError: errorRate > 0
+        };
+    }
+
+    function isUniversalTopEventProblemRow(row, rows) {
+        const flags = universalTopEventProblemFlags(row, rows);
+        return flags.critical || flags.important;
+    }
+
+    function universalTopEventSeverityTotals(rows) {
+        const source = Array.isArray(rows) ? rows : [];
+        const baselines = universalTopEventMetricBaselines(source);
+        return source.reduce((acc, row) => {
+            const flags = universalTopEventProblemFlags(row, source, baselines);
+            if (flags.critical) {
+                acc.critical += 1;
+            } else if (flags.important) {
+                acc.warning += 1;
+            } else {
+                acc.normal += 1;
+            }
+            return acc;
+        }, {critical: 0, warning: 0, normal: 0});
+    }
+
+    function universalRowLevelClass(flags) {
+        if (flags?.critical) {
+            return "analytics-universal-row-critical";
+        }
+        if (flags?.important) {
+            return "analytics-universal-row-important";
+        }
+        return "";
+    }
+
+    function renderUniversalResearchLayout(universal, eventRows = []) {
+        const totals = universal?.totals || {};
+        renderUniversalAnalysisPeriod();
+        if (refs.universalKpiCount) {
+            refs.universalKpiCount.textContent = formatInt(totals.count || totals.totalCount || 0);
+        }
+        if (refs.universalKpiAvg) {
+            refs.universalKpiAvg.textContent = formatMs(totals.avgMs || 0);
+        }
+        if (refs.universalKpiP95) {
+            refs.universalKpiP95.textContent = formatMs(totals.p95Ms || 0);
+        }
+        if (refs.universalKpiP99) {
+            refs.universalKpiP99.textContent = formatMs(totals.p99Ms || 0);
+        }
+        if (refs.universalKpiErrorRate) {
+            refs.universalKpiErrorRate.textContent = formatPercent(totals.errorRate);
+        }
+        state.universalErrorSelectedKey = "";
+        state.universalErrorSelectedSystemEvent = false;
+        state.universalErrorSortBy = "riskScore";
+        state.universalErrorSortDir = "desc";
+        state.universalErrorSearchQuery = "";
+        state.universalErrorVisibleCount = UNIVERSAL_TABLE_PAGE_SIZE;
+        if (refs.universalErrorSearchInput) {
+            refs.universalErrorSearchInput.value = "";
+        }
+        void loadUniversalErrorRows({reset: true});
+        state.universalModuleSelectedKey = "";
+        state.universalModuleSortBy = "riskScore";
+        state.universalModuleSortDir = "desc";
+        state.universalModuleSearchQuery = "";
+        state.universalModuleVisibleCount = UNIVERSAL_TABLE_PAGE_SIZE;
+        if (refs.universalModuleSearchInput) {
+            refs.universalModuleSearchInput.value = "";
+        }
+        void loadUniversalModuleRows({reset: true});
+        if (!refs.universalTopEventsBody) {
+            return;
+        }
+        state.universalTopEventSelectedCode = "";
+        state.universalTopEventSearchQuery = "";
+        if (refs.universalTopSearchInput) {
+            refs.universalTopSearchInput.value = "";
+        }
+        resetUniversalEventRootCause();
+        const rows = Array.isArray(eventRows) && eventRows.length
+            ? eventRows
+            : buildUniversalEventKpiRows(universal?.eventBreakdown || []);
+        state.universalTopEventSortBy = "riskScore";
+        state.universalTopEventSortDir = "desc";
+        state.universalTopEventRows = rows.slice();
+        sortUniversalTopEventRows();
+        state.universalTopEventSeverityTotals = universalTopEventSeverityTotals(state.universalTopEventRows);
+        const displayRows = filteredUniversalTopEventRows();
+        state.universalTopEventVisibleCount = universalDefaultVisibleCount(displayRows, universalTopEventSeverityTotals(displayRows));
+        const visibleRows = displayRows.slice(0, state.universalTopEventVisibleCount);
+        updateUniversalTopEventsControls(visibleRows.length, displayRows.length);
+        renderUniversalSeverityStats(refs.universalTopEventsSeverity, state.universalTopEventSeverityTotals, {
+            visibleProblem: isUniversalDefaultSort(state.universalTopEventSortBy)
+                ? visibleRows.filter((row) => isUniversalTopEventProblemRow(row, state.universalTopEventRows)).length
+                : 0
+        });
+        updateUniversalTopEventSortHeaders();
+        updateUniversalTopActionState();
+        if (!visibleRows.length) {
+            refs.universalTopEventsBody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="text-muted text-center py-3">Нет данных для выбранного фильтра</td>
+                </tr>
+            `;
+            showUniversalEventRootCause();
+            setUniversalEventRootCauseHeading(null);
+            if (refs.universalEventRootCauseBody) {
+                refs.universalEventRootCauseBody.innerHTML = `<div class="analytics-universal-placeholder">Причины проблем в ТОП событиях не найдены</div>`;
+            }
+            return;
+        }
+        refs.universalTopEventsBody.innerHTML = visibleRows.map((row) => {
+            const label = row.label || row.eventTypeName || row.eventTypeCode || row.key || "-";
+            const errorRateText = row.err != null
+                ? `${toNumber(row.err).toFixed(2)}%`
+                : formatPercent(row.errorRate);
+            const eventCode = row.eventTypeCode || row.key || "";
+            const isSelected = eventCode && state.universalTopEventSelectedCode === eventCode;
+            const rowClass = [universalRowLevelClass(universalTopEventProblemFlags(row, state.universalTopEventRows)), isSelected ? "analytics-universal-row-selected" : ""]
+                .filter(Boolean)
+                .join(" ");
+            return `
+                <tr class="${rowClass}" data-universal-top-row="${escapeHtml(eventCode)}">
+                    <td class="analytics-universal-event-name" title="${escapeHtml(label)}">${escapeHtml(label)}</td>
+                    <td class="text-end">${formatInt(row.count || 0)}</td>
+                    <td class="text-end">${formatMs(row.avgMs || 0)}</td>
+                    <td class="text-end">${formatMs(row.p95 || row.p95Ms || 0)}</td>
+                    <td class="text-end">${errorRateText}</td>
+                    <td class="text-end"><button class="btn btn-sm btn-outline-secondary analytics-universal-raw-btn" type="button" data-universal-top-raw="${escapeHtml(eventCode)}">Подробнее</button></td>
+                </tr>
+            `;
+        }).join("");
+        void loadUniversalEventRootCause("");
+    }
+
+    function renderUniversalTopEventsVisibleRows({scrollToTop = false} = {}) {
+        if (!refs.universalTopEventsBody) {
+            return;
+        }
+        updateUniversalTopEventSortHeaders();
+        const rows = filteredUniversalTopEventRows();
+        const visibleRows = rows.slice(0, Math.max(UNIVERSAL_TABLE_PAGE_SIZE, Number(state.universalTopEventVisibleCount || UNIVERSAL_TABLE_PAGE_SIZE)));
+        if (!visibleRows.length) {
+            renderUniversalSeverityStats(refs.universalTopEventsSeverity, {critical: 0, warning: 0, normal: 0});
+            refs.universalTopEventsBody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="text-muted text-center py-3">Нет данных для выбранного фильтра</td>
+                </tr>
+            `;
+            updateUniversalTopEventsControls(0, 0);
+            showUniversalEventRootCause();
+            setUniversalEventRootCauseHeading(null);
+            if (refs.universalEventRootCauseBody) {
+                refs.universalEventRootCauseBody.innerHTML = `<div class="analytics-universal-placeholder">Причины проблем в ТОП событиях не найдены</div>`;
+            }
+            return;
+        }
+        state.universalTopEventSeverityTotals = universalTopEventSeverityTotals(rows);
+        renderUniversalSeverityStats(refs.universalTopEventsSeverity, state.universalTopEventSeverityTotals, {
+            visibleProblem: isUniversalDefaultSort(state.universalTopEventSortBy)
+                ? visibleRows.filter((row) => isUniversalTopEventProblemRow(row, rows)).length
+                : 0
+        });
+        refs.universalTopEventsBody.innerHTML = visibleRows.map((row) => {
+            const label = row.label || row.eventTypeName || row.eventTypeCode || row.key || "-";
+            const errorRateText = row.err != null
+                ? `${toNumber(row.err).toFixed(2)}%`
+                : formatPercent(row.errorRate);
+            const eventCode = row.eventTypeCode || row.key || "";
+            const isSelected = eventCode && state.universalTopEventSelectedCode === eventCode;
+            const rowClass = [universalRowLevelClass(universalTopEventProblemFlags(row, rows)), isSelected ? "analytics-universal-row-selected" : ""]
+                .filter(Boolean)
+                .join(" ");
+            return `
+                <tr class="${rowClass}" data-universal-top-row="${escapeHtml(eventCode)}">
+                    <td class="analytics-universal-event-name" title="${escapeHtml(label)}">${escapeHtml(label)}</td>
+                    <td class="text-end">${formatInt(row.count || 0)}</td>
+                    <td class="text-end">${formatMs(row.avgMs || 0)}</td>
+                    <td class="text-end">${formatMs(row.p95 || row.p95Ms || 0)}</td>
+                    <td class="text-end">${errorRateText}</td>
+                    <td class="text-end"><button class="btn btn-sm btn-outline-secondary analytics-universal-raw-btn" type="button" data-universal-top-raw="${escapeHtml(eventCode)}">Подробнее</button></td>
+                </tr>
+            `;
+        }).join("");
+        updateUniversalTopEventsControls(visibleRows.length, rows.length);
+        if (scrollToTop) {
+            refs.universalTopEventsBody.closest(".analytics-universal-research-card")?.scrollIntoView({
+                behavior: "smooth",
+                block: "start"
+            });
+        }
+    }
+
+    function setUniversalAttributeLoading(loading) {
+        refs.universalAttributeLoader?.classList.toggle("d-none", !loading);
+        refs.universalAttributesCard?.classList.toggle("is-attribute-loading", !!loading);
+    }
+
+    function setUniversalAttributeError(message = "") {
+        if (!refs.universalAttributeError) {
+            return;
+        }
+        refs.universalAttributeError.textContent = message;
+        refs.universalAttributeError.classList.toggle("d-none", !message);
+    }
+
+    function setUniversalAttributeSearchMessage(message = "", tone = "muted") {
+        if (!refs.universalAttributeSearchMessage) {
+            return;
+        }
+        refs.universalAttributeSearchMessage.textContent = message;
+        refs.universalAttributeSearchMessage.classList.toggle("d-none", !message);
+        refs.universalAttributeSearchMessage.classList.toggle("text-danger", tone === "danger");
+        refs.universalAttributeSearchMessage.classList.toggle("text-muted", tone !== "danger");
+    }
+
+    function normalizeSearchText(value) {
+        return String(value || "").trim().toLocaleLowerCase("ru");
+    }
+
+    function findUniversalAttributeType(attributeCode) {
+        const code = String(attributeCode || "").trim();
+        return (Array.isArray(state.universalAttributeTypes) ? state.universalAttributeTypes : [])
+            .find((item) => String(item?.code || "").trim() === code) || null;
+    }
+
+    function isTechnicalUniversalAttribute(item) {
+        const haystack = normalizeSearchText(`${item?.code || ""} ${item?.name || ""}`);
+        return /\b(id|uuid|guid|hash|trace)\b/.test(haystack)
+            || haystack.includes("request id")
+            || haystack.includes("request_id")
+            || haystack.includes("session id")
+            || haystack.includes("session_id")
+            || haystack.includes("session hash")
+            || haystack.includes("идентификатор")
+            || haystack.includes("хэш");
+    }
+
+    function isHighCardinalityUniversalAttribute(item, count) {
+        const total = Math.max(1, toNumber(state.universalAttributeTotalCount));
+        const valueCount = toNumber(count);
+        return valueCount > 100 || (valueCount > 30 && valueCount / total > 0.2);
+    }
+
+    function isGoodGroupingUniversalAttribute(item, count) {
+        const valueCount = toNumber(count);
+        return valueCount >= 2 && valueCount <= 20 && !isTechnicalUniversalAttribute(item);
+    }
+
+    function universalAttributeKey(item) {
+        return normalizeSearchText(`${item?.code || ""} ${item?.name || ""}`).replace(/\s+/g, "_");
+    }
+
+    function isAuthUniversalAttribute(item) {
+        const key = universalAttributeKey(item);
+        return key.includes("auth_result")
+            || key.includes("authentication_result")
+            || key.includes("результат_автор")
+            || key.includes("результат_аутент");
+    }
+
+    function universalAttributeUsefulScore(item) {
+        const key = universalAttributeKey(item);
+        if (key.includes("http_path") || key.includes("request_path") || key === "path") {
+            return 1000;
+        }
+        if (key.includes("referrer") || key.includes("referer")) {
+            return 900;
+        }
+        if (key.includes("category")) {
+            return 800;
+        }
+        if (key.includes("client_type")) {
+            return 700;
+        }
+        if (key.includes("user_agent") || key.includes("browser")) {
+            return 650;
+        }
+        if (key.includes("http_method") || key.includes("http_status")) {
+            return 600;
+        }
+        if (isTechnicalUniversalAttribute(item)) {
+            return 50;
+        }
+        if (isAuthUniversalAttribute(item)) {
+            return 10;
+        }
+        return 300;
+    }
+
+    function universalAttributeProblemCount(item) {
+        const hint = state.universalAttributeCardHints instanceof Map
+            ? state.universalAttributeCardHints.get(item?.code)
+            : null;
+        return toNumber(hint?.problemCount);
+    }
+
+    function universalAttributeCardScore(item) {
+        const count = state.universalAttributeValueCounts instanceof Map
+            ? toNumber(state.universalAttributeValueCounts.get(item.code))
+            : 0;
+        const hint = state.universalAttributeCardHints instanceof Map
+            ? state.universalAttributeCardHints.get(item.code)
+            : null;
+        const hasAnomaly = !!hint?.hasAnomaly;
+        const problemCount = toNumber(hint?.problemCount);
+        const technical = isTechnicalUniversalAttribute(item);
+        const auth = isAuthUniversalAttribute(item);
+        return [
+            Number(hasAnomaly),
+            problemCount,
+            universalAttributeUsefulScore(item),
+            technical ? -1 : 0,
+            auth ? -1 : 0,
+            count
+        ];
+    }
+
+    function compareUniversalAttributeCardScore(left, right) {
+        const leftScore = universalAttributeCardScore(left);
+        const rightScore = universalAttributeCardScore(right);
+        const length = Math.max(leftScore.length, rightScore.length);
+        for (let index = 0; index < length; index += 1) {
+            const leftValue = Number(leftScore[index] || 0);
+            const rightValue = Number(rightScore[index] || 0);
+            if (leftValue !== rightValue) {
+                return rightValue - leftValue;
+            }
+        }
+        return String(left.name || left.code).localeCompare(String(right.name || right.code), "ru");
+    }
+
+    function pickDefaultUniversalAttribute(options) {
+        const sorted = (Array.isArray(options) ? options : [])
+            .filter((item) => item?.code)
+            .slice()
+            .sort(compareUniversalAttributeCardScore);
+        const problematic = sorted.filter((item) => universalAttributeProblemCount(item) > 0);
+        if (problematic.length) {
+            const meaningfulProblematic = problematic.filter((item) => !isAuthUniversalAttribute(item) && !isTechnicalUniversalAttribute(item));
+            return meaningfulProblematic[0] || problematic[0];
+        }
+        const meaningful = sorted.filter((item) => !isAuthUniversalAttribute(item) && !isTechnicalUniversalAttribute(item));
+        return meaningful[0] || sorted.find((item) => !isAuthUniversalAttribute(item)) || sorted[0] || null;
+    }
+
+    function ensureUniversalAttributeGroupVisible(attributeCode) {
+        void attributeCode;
+    }
+
+    function renderUniversalAttributeEmpty(message) {
+        updateUniversalAttributeSortHeaders();
+        renderUniversalSeverityStats(refs.universalAttributeSeverity, state.universalAttributeSeverityTotals || {critical: 0, warning: 0, normal: 0});
+        if (refs.universalAttributeValuesBody) {
+            refs.universalAttributeValuesBody.innerHTML = `
+                <tr>
+                    <td colspan="10" class="text-muted text-center py-3">${escapeHtml(message)}</td>
+                </tr>
+            `;
+        }
+        refs.universalAttributeMore?.classList.add("d-none");
+        refs.universalAttributeCollapse?.classList.add("d-none");
+        if (refs.universalAttributeCount) {
+            refs.universalAttributeCount.textContent = "";
+        }
+    }
+
+    function syncUniversalAttributeSelect(attributeTypes = []) {
+        if (!refs.universalAttributeSelect) {
+            return;
+        }
+        const previous = String(refs.universalAttributeSelect.value || "").trim();
+        const options = normalizeOptionList(attributeTypes);
+        state.universalAttributeTypes = options;
+        if (!options.length) {
+            refs.universalAttributeSelect.innerHTML = `<option value="">Нет доступных атрибутов</option>`;
+            renderUniversalAttributeEmpty("Нет доступных атрибутов");
+            return;
+        }
+        refs.universalAttributeSelect.innerHTML = options
+            .map((item) => `<option value="${escapeHtml(item.code)}">${escapeHtml(item.name || item.code)}</option>`)
+            .join("");
+        const defaultAttribute = pickDefaultUniversalAttribute(options);
+        refs.universalAttributeSelect.value = options.some((item) => item.code === previous)
+            ? previous
+            : (defaultAttribute?.code || options[0].code);
+        ensureUniversalAttributeGroupVisible(refs.universalAttributeSelect.value);
+        renderUniversalAttributeCards();
+    }
+
+    function formatAttributeValueCount(count) {
+        const value = Math.max(0, Math.round(toNumber(count)));
+        const mod10 = value % 10;
+        const mod100 = value % 100;
+        const word = mod10 === 1 && mod100 !== 11
+            ? "значение"
+            : ([2, 3, 4].includes(mod10) && ![12, 13, 14].includes(mod100) ? "значения" : "значений");
+        return `${formatInt(value)} ${word}`;
+    }
+
+    function renderUniversalAttributeCards() {
+        if (!refs.universalAttributeCards) {
+            return;
+        }
+        const options = Array.isArray(state.universalAttributeTypes) ? state.universalAttributeTypes : [];
+        const selected = String(refs.universalAttributeSelect?.value || "").trim();
+        if (!options.length) {
+            if (refs.universalAttributeSummary) {
+                refs.universalAttributeSummary.textContent = "Нет доступных атрибутов";
+            }
+            refs.universalAttributePickerToggle?.setAttribute("aria-expanded", "false");
+            refs.universalAttributeCards.innerHTML = `<div class="analytics-universal-placeholder">Нет доступных атрибутов</div>`;
+            refs.universalAttributeCards.classList.add("d-none");
+            return;
+        }
+        const active = options.find((item) => item.code === selected);
+        const activeHint = active && state.universalAttributeCardHints instanceof Map
+            ? state.universalAttributeCardHints.get(active.code)
+            : null;
+        const activeCount = active && state.universalAttributeValueCounts instanceof Map
+            ? state.universalAttributeValueCounts.get(active.code)
+            : null;
+        if (refs.universalAttributeSummary) {
+            const summaryParts = [
+                active?.name || active?.code || "Атрибут",
+                activeCount == null ? "" : formatAttributeValueCount(activeCount),
+                toNumber(activeHint?.criticalTotal) > 0 ? `Critical ${formatInt(activeHint.criticalTotal)}` : "",
+                toNumber(activeHint?.warningTotal) > 0 ? `Warning ${formatInt(activeHint.warningTotal)}` : "",
+                activeHint?.topValue ? `Главный фактор: ${activeHint.topValue}` : ""
+            ].filter(Boolean);
+            refs.universalAttributeSummary.innerHTML = summaryParts.map((item, index) => {
+                const className = index === 0 ? "analytics-universal-attribute-summary-name" : "analytics-universal-attribute-summary-meta";
+                return `<span class="${className}" title="${escapeHtml(item)}">${escapeHtml(item)}</span>`;
+            }).join("");
+        }
+        refs.universalAttributePickerToggle?.setAttribute("aria-expanded", state.universalAttributePickerOpen ? "true" : "false");
+        refs.universalAttributeCards.classList.toggle("d-none", !state.universalAttributePickerOpen);
+        if (!state.universalAttributePickerOpen) {
+            return;
+        }
+        const sortedOptions = options.slice().sort(compareUniversalAttributeCardScore);
+        refs.universalAttributeCards.innerHTML = sortedOptions.map((item) => {
+            const count = state.universalAttributeValueCounts instanceof Map
+                ? state.universalAttributeValueCounts.get(item.code)
+                : null;
+            const nameText = count == null
+                ? (item.name || item.code)
+                : `${item.name || item.code} (${formatInt(count)})`;
+            const hint = state.universalAttributeCardHints instanceof Map
+                ? state.universalAttributeCardHints.get(item.code)
+                : null;
+            const hints = [];
+            if (hint?.topValue) {
+                const topText = `TOP: ${hint.topValue} ${toNumber(hint.topShare).toFixed(2)}%`;
+                hints.push({
+                    text: topText,
+                    className: "analytics-universal-attribute-card-hint-top",
+                    title: topText
+                });
+            }
+            if (toNumber(hint?.problemCount) > 0) {
+                hints.push({
+                    text: `Проблемных: ${formatInt(hint.problemCount)}`,
+                    className: "analytics-universal-attribute-card-hint-warning"
+                });
+            }
+            if (hint?.hasAnomaly) {
+                hints.push({
+                    text: "Есть аномалии",
+                    className: "analytics-universal-attribute-card-hint-warning"
+                });
+            }
+            if (isTechnicalUniversalAttribute(item)) {
+                hints.push({
+                    text: "Технический идентификатор",
+                    className: "analytics-universal-attribute-card-hint-muted"
+                });
+            }
+            if (isHighCardinalityUniversalAttribute(item, count)) {
+                hints.push({
+                    text: "Высокая кардинальность",
+                    className: "analytics-universal-attribute-card-hint-muted"
+                });
+            }
+            if (isGoodGroupingUniversalAttribute(item, count)) {
+                hints.push({
+                    text: "Хорошо группирует",
+                    className: "analytics-universal-attribute-card-hint-good"
+                });
+            }
+            const activeClass = item.code === selected ? " is-active" : "";
+            const hintHtml = hints.length
+                ? `<span class="analytics-universal-attribute-card-hints">${hints.map((hintItem) => `
+                    <span class="analytics-universal-attribute-card-hint ${hintItem.className || ""}" title="${escapeHtml(hintItem.title || hintItem.text)}">${escapeHtml(hintItem.text)}</span>
+                `).join("")}</span>`
+                : (count == null ? `<span class="analytics-universal-attribute-card-hints"><span class="analytics-universal-attribute-card-hint analytics-universal-attribute-card-hint-muted">Загрузка...</span></span>` : "");
+            return `
+                <button class="analytics-universal-attribute-card${activeClass}" type="button" data-universal-attribute-card="${escapeHtml(item.code)}">
+                    <span class="analytics-universal-attribute-card-name" title="${escapeHtml(nameText)}">${escapeHtml(nameText)}</span>
+                    ${hintHtml}
+                </button>
+            `;
+        }).join("");
+    }
+
+    async function runUniversalLimited(tasks, limit = 4) {
+        const queue = Array.isArray(tasks) ? tasks.slice() : [];
+        const workers = Array.from({length: Math.min(Math.max(1, limit), queue.length)}, async () => {
+            while (queue.length) {
+                const task = queue.shift();
+                if (typeof task === "function") {
+                    await task();
+                }
+            }
+        });
+        await Promise.all(workers);
+    }
+
+    function buildUniversalAttributeCardHint(payload = {}) {
+        const rows = payload?.rows || [];
+        const normalizedRows = Array.isArray(rows) ? rows.filter((row) => toNumber(row?.count) > 0) : [];
+        if (!normalizedRows.length) {
+            return null;
+        }
+        const top = normalizedRows[0] || {};
+        const criticalTotal = toNumber(payload?.criticalTotal);
+        const warningTotal = toNumber(payload?.warningTotal);
+        return {
+            topValue: String(top.value || "").trim(),
+            topShare: toNumber(top.share),
+            problemCount: criticalTotal + warningTotal,
+            criticalTotal,
+            warningTotal,
+            hasAnomaly: criticalTotal > 0
+        };
+    }
+
+    async function refreshUniversalAttributeCardHints(attributeTypes = []) {
+        if (!(state.universalAttributeCardHints instanceof Map)) {
+            state.universalAttributeCardHints = new Map();
+        }
+        const requestId = ++state.universalAttributeHintRequestId;
+        const items = (Array.isArray(attributeTypes) ? attributeTypes : [])
+            .filter((item) => String(item?.code || "").trim())
+            .slice(0, 32);
+        const tasks = items.map((item) => async () => {
+            const code = String(item.code || "").trim();
+            try {
+                const params = universalAttributeBreakdownParams(code, 1, 0, {sortBy: "riskScore", sortDir: "desc"});
+                const payload = await fetchJson(`${api("/universal/attribute-breakdown")}?${params.toString()}`, {
+                    perfLabel: "universal-attribute-card-hint"
+                });
+                if (requestId !== state.universalAttributeHintRequestId) {
+                    return;
+                }
+                const hint = buildUniversalAttributeCardHint(payload || {});
+                if (hint) {
+                    state.universalAttributeCardHints.set(code, hint);
+                    state.universalAttributeValueCounts.set(code, toNumber(payload?.total));
+                    const top = hint.topValue ? {value: hint.topValue, share: hint.topShare} : null;
+                    if (top && state.universalAttributeTopValues instanceof Map) {
+                        state.universalAttributeTopValues.set(code, top);
+                    }
+                }
+                renderUniversalAttributeCards();
+            } catch (error) {
+                if (requestId === state.universalAttributeHintRequestId) {
+                    console.warn("Universal attribute card hint failed", code, error);
+                }
+            }
+        });
+        await runUniversalLimited(tasks, 3);
+        if (requestId === state.universalAttributeHintRequestId && !state.universalAttributeUserSelected && refs.universalAttributeSelect) {
+            const defaultAttribute = pickDefaultUniversalAttribute(state.universalAttributeTypes);
+            const current = String(refs.universalAttributeSelect.value || "").trim();
+            if (defaultAttribute?.code && defaultAttribute.code !== current && universalAttributeProblemCount(defaultAttribute) > 0) {
+                refs.universalAttributeSelect.value = defaultAttribute.code;
+                ensureUniversalAttributeGroupVisible(defaultAttribute.code);
+                renderUniversalAttributeCards();
+                await loadUniversalAttributeRows({reset: true});
+            }
+        }
+    }
+
+    function universalAttributeBreakdownParams(attributeCode, limit, offset, options = {}) {
+        const ranges = resolveUniversalCompareRanges();
+        const params = new URLSearchParams();
+        setIfPresent(params, "from", toIso(ranges.afterFrom));
+        setIfPresent(params, "to", toIso(ranges.afterTo));
+        Array.from(selectedUniversalEventCodes()).forEach((code) => {
+            params.append("eventCodes", code);
+        });
+        selectedUniversalStageCodes().forEach((code) => {
+            params.append("stageTypeCodes", code);
+        });
+        setIfPresent(params, "moduleCode", refs.moduleType?.value?.trim());
+        params.set("attributeCode", attributeCode);
+        params.set("limit", String(Math.max(1, Number(limit || 10))));
+        params.set("offset", String(Math.max(0, Number(offset || 0))));
+        params.set("sortBy", options.sortBy || state.universalAttributeSortBy || "count");
+        params.set("sortDir", options.sortDir || (state.universalAttributeSortDir === "asc" ? "asc" : "desc"));
+        return params;
+    }
+
+    async function fetchUniversalAttributeBreakdown(attributeCode, limit, offset, requestId) {
+        if (state.universalAttributeAbortController) {
+            state.universalAttributeAbortController.abort();
+        }
+        const controller = new AbortController();
+        state.universalAttributeAbortController = controller;
+        const timeoutId = window.setTimeout(() => controller.abort(), UNIVERSAL_ATTRIBUTE_TABLE_TIMEOUT_MS);
+        try {
+            const params = universalAttributeBreakdownParams(attributeCode, limit, offset);
+            const payload = await fetchJson(`${api("/universal/attribute-breakdown")}?${params.toString()}`, {
+                perfLabel: "universal-attribute-breakdown",
+                signal: controller.signal
+            });
+            if (requestId !== state.universalAttributeRequestId) {
+                return {stale: true, rows: [], total: 0};
+            }
+            return {
+                stale: false,
+                rows: Array.isArray(payload?.rows) ? payload.rows : [],
+                total: toNumber(payload?.total || 0),
+                criticalTotal: toNumber(payload?.criticalTotal || 0),
+                warningTotal: toNumber(payload?.warningTotal || 0),
+                normalTotal: toNumber(payload?.normalTotal || 0),
+                problemEventCount: toNumber(payload?.problemEventCount || 0)
+            };
+        } catch (error) {
+            if (controller.signal.aborted) {
+                return {
+                    stale: requestId !== state.universalAttributeRequestId,
+                    timedOut: true,
+                    rows: [],
+                    total: 0
+                };
+            }
+            throw error;
+        } finally {
+            window.clearTimeout(timeoutId);
+            if (state.universalAttributeAbortController === controller) {
+                state.universalAttributeAbortController = null;
+            }
+        }
+    }
+
+    function universalAttributeLabel(attributeCode) {
+        const code = String(attributeCode || "").trim();
+        if (code.toUpperCase() === "EVENT_TYPE") {
+            return "Событие";
+        }
+        if (code.toUpperCase() === "ERROR_MESSAGE") {
+            return "Ошибка";
+        }
+        const item = (Array.isArray(state.universalAttributeTypes) ? state.universalAttributeTypes : [])
+            .find((option) => String(option?.code || "").trim() === code);
+        return item?.name || code || "-";
+    }
+
+    function universalRootCauseParams(attributeCode, attributeValue = null) {
+        const ranges = resolveUniversalCompareRanges();
+        const params = new URLSearchParams();
+        setIfPresent(params, "from", toIso(ranges.afterFrom));
+        setIfPresent(params, "to", toIso(ranges.afterTo));
+        Array.from(selectedUniversalEventCodes()).forEach((code) => {
+            params.append("eventCodes", code);
+        });
+        selectedUniversalStageCodes().forEach((code) => {
+            params.append("stageTypeCodes", code);
+        });
+        setIfPresent(params, "moduleCode", refs.moduleType?.value?.trim());
+        params.set("attributeCode", attributeCode);
+        if (attributeValue) {
+            params.set("attributeValue", attributeValue);
+        }
+        params.set("limit", "12");
+        return params;
+    }
+
+    function universalRootCauseGroupInfo(attributeCode) {
+        const code = String(attributeCode || "").trim().toUpperCase();
+        if (code === "EVENT_TYPE") {
+            return {key: "events", label: "События"};
+        }
+        if (code === "ERROR_MESSAGE") {
+            return {key: "errors", label: "Ошибки"};
+        }
+        if (code === "HTTP_PATH") {
+            return {key: "routes", label: "Маршруты"};
+        }
+        if (code === "REFERRER") {
+            return {key: "referrers", label: "Источники перехода"};
+        }
+        if (["CATEGORY", "CATEGORY_SLUG", "CATEGORY_NAME"].includes(code)) {
+            return {key: "categories", label: "Категории"};
+        }
+        if (["CLIENT_TYPE", "USER_AGENT", "HTTP_STATUS", "HTTP_METHOD"].includes(code)) {
+            return {key: "client", label: "Клиент и запрос"};
+        }
+        if (["REQUEST_ID", "SESSION_ID_HASH", "SESSION_HASH", "USER_ID_HASH", "USER_HASH", "ENTITY_ID", "TRACE_ID", "UUID"].includes(code)) {
+            return {key: "technical", label: "Технические признаки"};
+        }
+        return {key: "other", label: "Прочее"};
+    }
+
+    function groupUniversalRootCauseFactors(factors) {
+        const order = ["events", "routes", "referrers", "categories", "client", "technical", "errors", "other"];
+        const groups = new Map();
+        (Array.isArray(factors) ? factors : []).forEach((factor) => {
+            const info = universalRootCauseGroupInfo(factor?.attributeCode);
+            if (!groups.has(info.key)) {
+                groups.set(info.key, {key: info.key, label: info.label, factors: []});
+            }
+            groups.get(info.key).factors.push(factor);
+        });
+        return order
+            .map((key) => groups.get(key))
+            .filter((group) => group && group.factors.length);
+    }
+
+    function universalCoveragePercent(count, problemEventCount) {
+        const total = toNumber(problemEventCount);
+        return total > 0 ? (toNumber(count) / total) * 100 : 0;
+    }
+
+    function renderUniversalRootCauseFactorLine(factor, options = {}) {
+        const label = universalAttributeLabel(factor?.attributeCode);
+        const value = String(factor?.value || "-");
+        const share = toNumber(factor?.share);
+        const coverage = universalCoveragePercent(factor?.count, options.problemEventCount);
+        const coverageMeta = options.showCoverage
+            ? `Покрытие ${coverage.toFixed(2)}% · `
+            : "";
+        return `
+            <li class="analytics-universal-root-cause-factor">
+                <div class="analytics-universal-root-cause-factor-text" title="${escapeHtml(`${label} ${value}`)}">
+                    <span class="analytics-universal-root-cause-factor-name">${escapeHtml(label)}</span>
+                    <strong class="analytics-universal-root-cause-factor-value">${escapeHtml(value)}</strong>
+                </div>
+                <div class="analytics-universal-root-cause-factor-meta">
+                    Count ${formatInt(factor?.count)} · ${coverageMeta}Доля ${share.toFixed(2)}% · P95 ${formatMs(factor?.p95Ms)}
+                </div>
+            </li>
+        `;
+    }
+
+    function renderUniversalRootCauseFactorLineAt(factor, index, options = {}) {
+        const hiddenClass = index >= 3 ? " analytics-universal-root-cause-factor-hidden" : "";
+        return renderUniversalRootCauseFactorLine(factor, options)
+            .replace("analytics-universal-root-cause-factor", `analytics-universal-root-cause-factor${hiddenClass}`);
+    }
+
+    function renderUniversalRootCauseGroups(factors, options = {}) {
+        const groups = groupUniversalRootCauseFactors(factors);
+        if (!groups.length) {
+            return `<div class="analytics-universal-root-cause-muted">Дополнительных факторов не найдено</div>`;
+        }
+        return groups.map((group) => {
+            const hiddenCount = Math.max(0, group.factors.length - 3);
+            return `
+                <section class="analytics-universal-root-cause-group" data-universal-rca-group>
+                    <div class="analytics-universal-root-cause-group-title">${escapeHtml(group.label)}</div>
+                    <ol class="analytics-universal-root-cause-list">
+                        ${group.factors.map((factor, index) => renderUniversalRootCauseFactorLineAt(factor, index, options)).join("")}
+                        ${hiddenCount ? `<li><button class="analytics-universal-root-cause-more" type="button" data-universal-rca-group-toggle data-more-label="+ ещё ${formatInt(hiddenCount)}" data-collapse-label="Свернуть">+ ещё ${formatInt(hiddenCount)}</button></li>` : ""}
+                    </ol>
+                </section>
+            `;
+        }).join("");
+    }
+
+    function toggleUniversalRootCauseGroup(button) {
+        const group = button?.closest?.("[data-universal-rca-group]");
+        if (!group) {
+            return;
+        }
+        const expanded = !group.classList.contains("is-expanded");
+        group.classList.toggle("is-expanded", expanded);
+        button.textContent = expanded
+            ? (button.getAttribute("data-collapse-label") || "Свернуть")
+            : (button.getAttribute("data-more-label") || "+ ещё");
+    }
+
+    function universalEventRootCauseParams(eventCode) {
+        const ranges = resolveUniversalCompareRanges();
+        const code = String(eventCode || "").trim();
+        const params = new URLSearchParams();
+        setIfPresent(params, "from", toIso(ranges.afterFrom));
+        setIfPresent(params, "to", toIso(ranges.afterTo));
+        if (code) {
+            params.set("eventCode", code);
+        } else {
+            Array.from(selectedUniversalEventCodes()).forEach((selectedCode) => {
+                params.append("eventCodes", selectedCode);
+            });
+        }
+        selectedUniversalStageCodes().forEach((code) => {
+            params.append("stageTypeCodes", code);
+        });
+        setIfPresent(params, "moduleCode", refs.moduleType?.value?.trim());
+        params.set("limit", "18");
+        return params;
+    }
+
+    function findUniversalTopEventRow(eventCode) {
+        const code = String(eventCode || "").trim();
+        return (Array.isArray(state.universalTopEventRows) ? state.universalTopEventRows : [])
+            .find((row) => String(row?.eventTypeCode || row?.key || "").trim() === code) || null;
+    }
+
+    function showUniversalEventRootCause() {
+        refs.universalEventAnalysis?.classList.add("has-event-root-cause");
+        refs.universalEventRootCausePanel?.classList.remove("d-none");
+    }
+
+    function setUniversalEventRootCauseHeading(row = null) {
+        if (refs.universalEventRootCauseTitle) {
+            refs.universalEventRootCauseTitle.textContent = row
+                ? (row.label || row.eventTypeName || row.eventTypeCode || row.key || "-")
+                : "ТОП событий";
+        }
+    }
+
+    function resetUniversalEventRootCause() {
+        if (refs.universalEventRootCauseBody) {
+            refs.universalEventRootCauseBody.innerHTML = "";
+        }
+        if (state.universalEventRootCauseAbortController) {
+            state.universalEventRootCauseAbortController.abort();
+            state.universalEventRootCauseAbortController = null;
+        }
+    }
+
+    function renderUniversalEventRootCauseLoading(row) {
+        if (!refs.universalEventRootCauseBody || !refs.universalEventRootCausePanel) {
+            return;
+        }
+        showUniversalEventRootCause();
+        setUniversalEventRootCauseHeading(row);
+        refs.universalEventRootCauseBody.innerHTML = `
+            <div class="analytics-universal-root-cause-loading">
+                <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                Загрузка причин…
+            </div>
+        `;
+    }
+
+    function renderUniversalEventRootCause(payload, row) {
+        if (!refs.universalEventRootCauseBody || !refs.universalEventRootCausePanel) {
+            return;
+        }
+        showUniversalEventRootCause();
+        setUniversalEventRootCauseHeading(row);
+        const eventCode = String(row?.eventTypeCode || row?.key || state.universalTopEventSelectedCode || "").trim();
+        const factors = Array.isArray(payload?.factors) ? payload.factors : [];
+        const groupedFactors = renderUniversalRootCauseGroups(factors);
+        const p95Factors = factors
+            .slice()
+            .sort((left, right) => toNumber(right?.p95Ms) - toNumber(left?.p95Ms))
+            .slice(0, 5)
+            .map((factor) => {
+                const factorLabel = universalAttributeLabel(factor?.attributeCode);
+                const value = String(factor?.value || "-");
+                return `
+                    <li class="analytics-universal-root-cause-factor">
+                        <div class="analytics-universal-root-cause-factor-text" title="${escapeHtml(`${factorLabel} ${value}`)}">
+                            <span class="analytics-universal-root-cause-factor-name">${escapeHtml(factorLabel)}</span>
+                            <strong class="analytics-universal-root-cause-factor-value">${escapeHtml(value)}</strong>
+                        </div>
+                        <div class="analytics-universal-root-cause-factor-meta">P95 ${formatMs(factor?.p95Ms)} · ${toNumber(factor?.share).toFixed(2)}%</div>
+                    </li>
+                `;
+            }).join("");
+        refs.universalEventRootCauseBody.innerHTML = `
+            <div class="analytics-universal-root-cause-groups">${groupedFactors}</div>
+            <section class="analytics-universal-root-cause-group">
+                <div class="analytics-universal-root-cause-group-title">Факторы с максимальным P95</div>
+                <ol class="analytics-universal-root-cause-list">
+                    ${p95Factors || `<li class="analytics-universal-root-cause-muted">Нет данных по P95</li>`}
+                </ol>
+            </section>
+            <button class="btn btn-sm btn-dark analytics-universal-raw-btn analytics-universal-root-cause-raw" type="button" data-universal-event-root-raw="${escapeHtml(eventCode)}">Сырые события →</button>
+        `;
+    }
+
+    async function loadUniversalEventRootCause(eventCode) {
+        const code = String(eventCode || "").trim();
+        const row = code ? findUniversalTopEventRow(code) : null;
+        const requestId = ++state.universalEventRootCauseRequestId;
+        if (state.universalEventRootCauseAbortController) {
+            state.universalEventRootCauseAbortController.abort();
+        }
+        if (code && !row) {
+            resetUniversalEventRootCause();
+            return;
+        }
+        const controller = new AbortController();
+        state.universalEventRootCauseAbortController = controller;
+        const timeoutId = window.setTimeout(() => controller.abort(), UNIVERSAL_ATTRIBUTE_TABLE_TIMEOUT_MS);
+        renderUniversalEventRootCauseLoading(row);
+        try {
+            const params = universalEventRootCauseParams(code);
+            const payload = await fetchJson(`${api("/universal/event-root-cause")}?${params.toString()}`, {
+                perfLabel: "universal-event-root-cause",
+                signal: controller.signal
+            });
+            if (requestId !== state.universalEventRootCauseRequestId || String(state.universalTopEventSelectedCode || "") !== code) {
+                return;
+            }
+            renderUniversalEventRootCause(payload, row);
+        } catch (error) {
+            if (requestId !== state.universalEventRootCauseRequestId || String(state.universalTopEventSelectedCode || "") !== code) {
+                return;
+            }
+            console.warn("Universal event root cause analysis failed", error);
+            refs.universalEventRootCauseBody.innerHTML = `<div class="analytics-universal-placeholder">Не удалось загрузить причины</div>`;
+        } finally {
+            window.clearTimeout(timeoutId);
+            if (state.universalEventRootCauseAbortController === controller) {
+                state.universalEventRootCauseAbortController = null;
+            }
+        }
+    }
+
+    function universalErrorParams(limit, offset, options = {}) {
+        const ranges = resolveUniversalCompareRanges();
+        const params = new URLSearchParams();
+        setIfPresent(params, "from", toIso(ranges.afterFrom));
+        setIfPresent(params, "to", toIso(ranges.afterTo));
+        Array.from(selectedUniversalEventCodes()).forEach((code) => {
+            params.append("eventCodes", code);
+        });
+        selectedUniversalStageCodes().forEach((code) => {
+            params.append("stageTypeCodes", code);
+        });
+        setIfPresent(params, "moduleCode", refs.moduleType?.value?.trim());
+        params.set("limit", String(Math.max(1, Number(limit || UNIVERSAL_TABLE_PAGE_SIZE))));
+        params.set("offset", String(Math.max(0, Number(offset || 0))));
+        params.set("sortBy", options.sortBy || state.universalErrorSortBy || "riskScore");
+        params.set("sortDir", options.sortDir || (state.universalErrorSortDir === "asc" ? "asc" : "desc"));
+        return params;
+    }
+
+    function universalErrorRootCauseParams(errorKey = "", systemEvent = false) {
+        const ranges = resolveUniversalCompareRanges();
+        const params = new URLSearchParams();
+        setIfPresent(params, "from", toIso(ranges.afterFrom));
+        setIfPresent(params, "to", toIso(ranges.afterTo));
+        Array.from(selectedUniversalEventCodes()).forEach((code) => {
+            params.append("eventCodes", code);
+        });
+        selectedUniversalStageCodes().forEach((code) => {
+            params.append("stageTypeCodes", code);
+        });
+        setIfPresent(params, "moduleCode", refs.moduleType?.value?.trim());
+        const key = String(errorKey || "").trim();
+        if (key) {
+            params.set("errorKey", key);
+            params.set("systemEventsOnly", systemEvent ? "true" : "false");
+        }
+        params.set("limit", "18");
+        return params;
+    }
+
+    function updateUniversalErrorSortHeaders() {
+        refs.universalErrorsCard?.querySelectorAll("[data-universal-error-sort]").forEach((button) => {
+            const sortBy = String(button.getAttribute("data-universal-error-sort") || "").trim();
+            const icon = button.querySelector("[data-sort-icon]");
+            const isActive = sortBy === state.universalErrorSortBy;
+            button.classList.toggle("is-active", isActive);
+            if (icon) {
+                icon.textContent = isActive
+                    ? (state.universalErrorSortDir === "asc" ? "↑" : "↓")
+                    : "↕";
+            }
+        });
+        updateUniversalErrorActionState();
+    }
+
+    function universalErrorRowLevelClass(row) {
+        const level = String(row?.severityLevel || "").toLowerCase();
+        if (level === "critical") {
+            return "analytics-universal-row-critical";
+        }
+        if (level === "warning") {
+            return "analytics-universal-row-important";
+        }
+        return "";
+    }
+
+    function universalErrorShortLabel(row) {
+        const errorKey = String(row?.errorKey || "").trim();
+        const message = String(row?.errorMessage || "").trim();
+        if (!message) {
+            return errorKey || "Неизвестная ошибка";
+        }
+        const firstLine = message.split(/\r?\n/, 1)[0].trim();
+        const exceptionMatch = firstLine.match(/(?:[\w.$]+(?:Exception|Error))(?:\s*:\s*[^;]{1,120})?/i);
+        return String(exceptionMatch?.[0] || firstLine || errorKey || "Неизвестная ошибка").trim();
+    }
+
+    function filteredUniversalErrorRows() {
+        const rows = Array.isArray(state.universalErrorRows) ? state.universalErrorRows : [];
+        const query = normalizeSearchText(state.universalErrorSearchQuery);
+        if (!query) {
+            return rows;
+        }
+        return rows.filter((row) => normalizeSearchText(`${universalErrorShortLabel(row)} ${row?.errorKey || ""} ${row?.errorMessage || ""} ${row?.eventTypeCode || ""}`).includes(query));
+    }
+
+    function updateUniversalErrorActionState() {
+        const hasLocalState = !isUniversalDefaultSort(state.universalErrorSortBy)
+            || state.universalErrorSortDir !== "desc"
+            || !!String(state.universalErrorSelectedKey || "").trim()
+            || !!String(state.universalErrorSearchQuery || "").trim();
+        refs.universalErrorsCard
+            ?.querySelector("[data-universal-error-sort-reset]")
+            ?.classList.toggle("d-none", !hasLocalState);
+    }
+
+    function renderUniversalErrorEmpty(message) {
+        updateUniversalErrorSortHeaders();
+        renderUniversalSeverityStats(refs.universalErrorsSeverity, state.universalErrorSeverityTotals || {critical: 0, warning: 0, normal: 0});
+        if (refs.universalErrorsBody) {
+            refs.universalErrorsBody.innerHTML = `
+                <tr>
+                    <td colspan="9" class="text-muted text-center py-3">${escapeHtml(message)}</td>
+                </tr>
+            `;
+        }
+        refs.universalErrorsMore?.classList.add("d-none");
+        refs.universalErrorsCollapse?.classList.add("d-none");
+        if (refs.universalErrorsCount) {
+            refs.universalErrorsCount.textContent = "";
+        }
+        updateUniversalErrorActionState();
+    }
+
+    function renderUniversalErrorRows() {
+        if (!refs.universalErrorsBody) {
+            return;
+        }
+        updateUniversalErrorSortHeaders();
+        const rows = filteredUniversalErrorRows();
+        const visibleRows = rows.slice(0, Math.max(UNIVERSAL_TABLE_PAGE_SIZE, Number(state.universalErrorVisibleCount || UNIVERSAL_TABLE_PAGE_SIZE)));
+        const totalRows = Math.max(String(state.universalErrorSearchQuery || "").trim() ? rows.length : toNumber(state.universalErrorTotalRows), rows.length);
+        const problemEventCount = toNumber(state.universalErrorProblemEventCount);
+        renderUniversalSeverityStats(refs.universalErrorsSeverity, state.universalErrorSeverityTotals);
+        if (!visibleRows.length) {
+            renderUniversalErrorEmpty("Ошибки для выбранного фильтра не найдены");
+            return;
+        }
+        refs.universalErrorsBody.innerHTML = visibleRows.map((row) => {
+            const errorKey = String(row?.errorKey || "").trim();
+            const systemEvent = row?.systemEvent === true;
+            const eventTypeCode = String(row?.eventTypeCode || "").trim();
+            const isSelected = errorKey
+                && state.universalErrorSelectedKey === errorKey
+                && state.universalErrorSelectedSystemEvent === systemEvent;
+            const rowClass = [universalErrorRowLevelClass(row), isSelected ? "analytics-universal-row-selected" : ""]
+                .filter(Boolean)
+                .join(" ");
+            const message = String(row?.errorMessage || row?.errorKey || "Неизвестная ошибка");
+            const shortLabel = universalErrorShortLabel(row);
+            const coverage = universalCoveragePercent(row?.count, problemEventCount);
+            return `
+                <tr class="${rowClass}" data-universal-error-row="${escapeHtml(errorKey)}" data-universal-error-system="${systemEvent ? "true" : "false"}">
+                    <td><div class="analytics-universal-error-name" title="${escapeHtml(message)}">${escapeHtml(shortLabel)}</div></td>
+                    <td class="text-end">${formatInt(row?.count)}</td>
+                    <td class="text-end">${coverage.toFixed(2)}%</td>
+                    <td class="text-end">${toNumber(row?.share).toFixed(2)}%</td>
+                    <td class="text-end">${formatInt(row?.eventCount)}</td>
+                    <td class="text-end">${formatMs(row?.avgMs)}</td>
+                    <td class="text-end">${formatMs(row?.p95Ms)}</td>
+                    <td class="text-end analytics-universal-error-last-seen">${formatDateTime(row?.lastSeen)}</td>
+                    <td class="text-end"><button class="btn btn-sm btn-outline-secondary analytics-universal-raw-btn" type="button" title="Открыть исходные события" data-universal-error-raw="${escapeHtml(errorKey)}" data-universal-error-system="${systemEvent ? "true" : "false"}" data-universal-error-event-code="${escapeHtml(eventTypeCode)}">Подробнее</button></td>
+                </tr>
+            `;
+        }).join("");
+        refs.universalErrorsMore?.classList.toggle("d-none", rows.length >= totalRows);
+        refs.universalErrorsCollapse?.classList.toggle("d-none", visibleRows.length <= UNIVERSAL_TABLE_PAGE_SIZE);
+        if (refs.universalErrorsCount) {
+            refs.universalErrorsCount.textContent = `Показано ${formatInt(visibleRows.length)} из ${formatInt(totalRows)}`;
+        }
+        updateUniversalErrorActionState();
+    }
+
+    async function loadUniversalErrorRows({reset = false} = {}) {
+        if (!refs.universalErrorsBody) {
+            return;
+        }
+        const requestId = ++state.universalErrorRequestId;
+        try {
+            if (reset) {
+                state.universalErrorRows = [];
+                state.universalErrorTotalRows = 0;
+                state.universalErrorProblemEventCount = 0;
+                state.universalErrorVisibleCount = UNIVERSAL_TABLE_PAGE_SIZE;
+                renderUniversalErrorEmpty("Загрузка ошибок…");
+            }
+            const currentRows = Array.isArray(state.universalErrorRows) ? state.universalErrorRows : [];
+            const targetVisible = Math.max(UNIVERSAL_TABLE_PAGE_SIZE, Number(state.universalErrorVisibleCount || UNIVERSAL_TABLE_PAGE_SIZE));
+            const need = Math.max(UNIVERSAL_TABLE_PAGE_SIZE, targetVisible - currentRows.length);
+            const offset = reset ? 0 : currentRows.length;
+            const params = universalErrorParams(need, offset);
+            const payload = await fetchJson(`${api("/universal/error-breakdown")}?${params.toString()}`, {
+                perfLabel: "universal-error-breakdown"
+            });
+            if (requestId !== state.universalErrorRequestId) {
+                return;
+            }
+            const rows = Array.isArray(payload?.rows) ? payload.rows : [];
+            state.universalErrorTotalRows = Math.max(0, Number(payload?.total || 0));
+            state.universalErrorProblemEventCount = toNumber(payload?.problemEventCount);
+            state.universalErrorSeverityTotals = {
+                critical: toNumber(payload?.criticalTotal),
+                warning: toNumber(payload?.warningTotal),
+                normal: toNumber(payload?.normalTotal)
+            };
+            state.universalErrorRows = [...(reset ? [] : currentRows), ...rows];
+            if (!state.universalErrorRows.some((row) => String(row?.errorKey || "") === state.universalErrorSelectedKey
+                && (row?.systemEvent === true) === state.universalErrorSelectedSystemEvent)) {
+                state.universalErrorSelectedKey = "";
+                state.universalErrorSelectedSystemEvent = false;
+            }
+            renderUniversalErrorRows();
+            void loadUniversalErrorRootCause(state.universalErrorSelectedKey, state.universalErrorSelectedSystemEvent);
+        } catch (error) {
+            if (requestId === state.universalErrorRequestId) {
+                console.warn("Universal error breakdown failed", error);
+                renderUniversalErrorEmpty("Ошибка загрузки анализа ошибок");
+                renderUniversalErrorRootCausePlaceholder("Не удалось загрузить причины");
+            }
+        }
+    }
+
+    function renderUniversalErrorRootCausePlaceholder(message) {
+        if (!refs.universalErrorRootCauseBody) {
+            return;
+        }
+        refs.universalErrorRootCauseBody.innerHTML = `<div class="analytics-universal-placeholder">${escapeHtml(message)}</div>`;
+    }
+
+    function renderUniversalErrorRootCauseLoading(errorKey = "", systemEvent = false) {
+        if (!refs.universalErrorRootCauseBody) {
+            return;
+        }
+        if (refs.universalErrorRootCauseTitle) {
+            const row = (Array.isArray(state.universalErrorRows) ? state.universalErrorRows : [])
+                .find((item) => String(item?.errorKey || "") === String(errorKey || "")
+                    && (item?.systemEvent === true) === systemEvent);
+            refs.universalErrorRootCauseTitle.textContent = row ? universalErrorShortLabel(row) : "Ошибки";
+        }
+        refs.universalErrorRootCauseBody.innerHTML = `
+            <div class="analytics-universal-root-cause-loading">
+                <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                Загрузка причин…
+            </div>
+        `;
+    }
+
+    function renderUniversalErrorRootCause(payload, errorKey = "", systemEvent = false) {
+        if (!refs.universalErrorRootCauseBody) {
+            return;
+        }
+        const key = String(errorKey || "").trim();
+        const row = (Array.isArray(state.universalErrorRows) ? state.universalErrorRows : [])
+            .find((item) => String(item?.errorKey || "") === key
+                && (item?.systemEvent === true) === systemEvent);
+        if (refs.universalErrorRootCauseTitle) {
+            refs.universalErrorRootCauseTitle.textContent = row ? universalErrorShortLabel(row) : "Ошибки";
+        }
+        const factors = Array.isArray(payload?.factors) ? payload.factors : [];
+        if (!toNumber(payload?.problemEventCount) || !factors.length) {
+            renderUniversalErrorRootCausePlaceholder("Причины ошибок не найдены");
+            return;
+        }
+        const message = String(row?.errorMessage || "").trim();
+        const eventTypeCode = String(row?.eventTypeCode || "").trim();
+        refs.universalErrorRootCauseBody.innerHTML = `
+            ${message ? `<div class="analytics-universal-error-message" title="${escapeHtml(message)}">${escapeHtml(message)}</div>` : ""}
+            <div class="analytics-universal-root-cause-groups">${renderUniversalRootCauseGroups(factors, {problemEventCount: payload?.problemEventCount, showCoverage: true})}</div>
+            <button class="btn btn-sm btn-dark analytics-universal-raw-btn analytics-universal-root-cause-raw" type="button" data-universal-error-root-raw="${escapeHtml(key)}" data-universal-error-system="${systemEvent ? "true" : "false"}" data-universal-error-event-code="${escapeHtml(eventTypeCode)}">Журнал событий →</button>
+        `;
+    }
+
+    async function loadUniversalErrorRootCause(errorKey = "", systemEvent = false) {
+        const key = String(errorKey || "").trim();
+        const requestId = ++state.universalErrorRootCauseRequestId;
+        if (state.universalErrorRootCauseAbortController) {
+            state.universalErrorRootCauseAbortController.abort();
+        }
+        const controller = new AbortController();
+        state.universalErrorRootCauseAbortController = controller;
+        const timeoutId = window.setTimeout(() => controller.abort(), UNIVERSAL_ATTRIBUTE_TABLE_TIMEOUT_MS);
+        renderUniversalErrorRootCauseLoading(key, systemEvent);
+        try {
+            const params = universalErrorRootCauseParams(key, systemEvent);
+            const payload = await fetchJson(`${api("/universal/error-root-cause")}?${params.toString()}`, {
+                perfLabel: "universal-error-root-cause",
+                signal: controller.signal
+            });
+            if (requestId !== state.universalErrorRootCauseRequestId
+                || String(state.universalErrorSelectedKey || "") !== key
+                || state.universalErrorSelectedSystemEvent !== systemEvent) {
+                return;
+            }
+            renderUniversalErrorRootCause(payload, key, systemEvent);
+        } catch (error) {
+            if (requestId === state.universalErrorRootCauseRequestId
+                && String(state.universalErrorSelectedKey || "") === key
+                && state.universalErrorSelectedSystemEvent === systemEvent) {
+                console.warn("Universal error root cause failed", error);
+                renderUniversalErrorRootCausePlaceholder(controller.signal.aborted
+                    ? "Причины не успели загрузиться. Уточните период или фильтр."
+                    : "Не удалось загрузить причины");
+            }
+        } finally {
+            window.clearTimeout(timeoutId);
+            if (state.universalErrorRootCauseAbortController === controller) {
+                state.universalErrorRootCauseAbortController = null;
+            }
+        }
+    }
+
+    function universalModuleParams(limit, offset) {
+        const ranges = resolveUniversalCompareRanges();
+        const params = new URLSearchParams();
+        setIfPresent(params, "from", toIso(ranges.afterFrom));
+        setIfPresent(params, "to", toIso(ranges.afterTo));
+        Array.from(selectedUniversalEventCodes()).forEach((code) => {
+            params.append("eventCodes", code);
+        });
+        selectedUniversalStageCodes().forEach((code) => {
+            params.append("stageTypeCodes", code);
+        });
+        const moduleCode = refs.moduleType?.value?.trim();
+        if (moduleCode) {
+            params.set("moduleCode", moduleCode);
+        }
+        params.set("limit", String(Math.max(1, Number(limit || UNIVERSAL_TABLE_PAGE_SIZE))));
+        params.set("offset", String(Math.max(0, Number(offset || 0))));
+        params.set("sortBy", state.universalModuleSortBy || "riskScore");
+        params.set("sortDir", state.universalModuleSortDir === "asc" ? "asc" : "desc");
+        return params;
+    }
+
+    function universalModuleRootCauseParams(moduleKey = "") {
+        const ranges = resolveUniversalCompareRanges();
+        const params = new URLSearchParams();
+        setIfPresent(params, "from", toIso(ranges.afterFrom));
+        setIfPresent(params, "to", toIso(ranges.afterTo));
+        Array.from(selectedUniversalEventCodes()).forEach((code) => {
+            params.append("eventCodes", code);
+        });
+        selectedUniversalStageCodes().forEach((code) => {
+            params.append("stageTypeCodes", code);
+        });
+        const row = findUniversalModuleRow(moduleKey);
+        if (row) {
+            setIfPresent(params, "moduleCode", row.moduleCode);
+            setIfPresent(params, "selectedStageTypeCode", row.stageTypeCode);
+            params.set("systemEventsOnly", row.systemEvent === true ? "true" : "false");
+        } else {
+            setIfPresent(params, "moduleCode", refs.moduleType?.value?.trim());
+        }
+        params.set("limit", "24");
+        return params;
+    }
+
+    function findUniversalModuleRow(moduleKey) {
+        const key = String(moduleKey || "").trim();
+        return (Array.isArray(state.universalModuleRows) ? state.universalModuleRows : [])
+            .find((row) => String(row?.moduleKey || "").trim() === key) || null;
+    }
+
+    function universalModuleLabel(row) {
+        if (!row) {
+            return "Модули";
+        }
+        const stage = String(row.stageTypeName || row.stageTypeCode || "").trim();
+        const module = String(row.moduleName || row.moduleCode || "").trim();
+        if (stage && module && stage.toLowerCase() !== module.toLowerCase()) {
+            return `${stage} / ${module}`;
+        }
+        return stage || module || "Неизвестный модуль";
+    }
+
+    function filteredUniversalModuleRows() {
+        const rows = Array.isArray(state.universalModuleRows) ? state.universalModuleRows : [];
+        const query = normalizeSearchText(state.universalModuleSearchQuery);
+        if (!query) {
+            return rows;
+        }
+        return rows.filter((row) => normalizeSearchText(`${universalModuleLabel(row)} ${row?.moduleCode || ""} ${row?.moduleName || ""} ${row?.stageTypeCode || ""} ${row?.stageTypeName || ""}`).includes(query));
+    }
+
+    function updateUniversalModuleActionState() {
+        const hasLocalState = !isUniversalDefaultSort(state.universalModuleSortBy)
+            || state.universalModuleSortDir !== "desc"
+            || !!String(state.universalModuleSelectedKey || "").trim()
+            || !!String(state.universalModuleSearchQuery || "").trim();
+        refs.universalModulesCard
+            ?.querySelector("[data-universal-module-sort-reset]")
+            ?.classList.toggle("d-none", !hasLocalState);
+    }
+
+    function updateUniversalModuleSortHeaders() {
+        refs.universalModulesCard?.querySelectorAll("[data-universal-module-sort]").forEach((button) => {
+            const sortBy = String(button.getAttribute("data-universal-module-sort") || "").trim();
+            const icon = button.querySelector("[data-sort-icon]");
+            const isActive = sortBy === state.universalModuleSortBy;
+            button.classList.toggle("is-active", isActive);
+            if (icon) {
+                icon.textContent = isActive
+                    ? (state.universalModuleSortDir === "asc" ? "↑" : "↓")
+                    : "↕";
+            }
+        });
+        updateUniversalModuleActionState();
+    }
+
+    function universalModuleRowLevelClass(row) {
+        const level = String(row?.severityLevel || "").toLowerCase();
+        if (level === "critical") {
+            return "analytics-universal-row-critical";
+        }
+        if (level === "warning") {
+            return "analytics-universal-row-important";
+        }
+        return "";
+    }
+
+    function renderUniversalModuleEmpty(message) {
+        updateUniversalModuleSortHeaders();
+        renderUniversalSeverityStats(refs.universalModulesSeverity, state.universalModuleSeverityTotals);
+        if (refs.universalModulesBody) {
+            refs.universalModulesBody.innerHTML = `
+                <tr>
+                    <td colspan="10" class="text-muted text-center py-3">${escapeHtml(message)}</td>
+                </tr>
+            `;
+        }
+        refs.universalModulesMore?.classList.add("d-none");
+        refs.universalModulesCollapse?.classList.add("d-none");
+        if (refs.universalModulesCount) {
+            refs.universalModulesCount.textContent = "";
+        }
+        updateUniversalModuleActionState();
+    }
+
+    function renderUniversalModuleRows() {
+        if (!refs.universalModulesBody) {
+            return;
+        }
+        updateUniversalModuleSortHeaders();
+        const rows = filteredUniversalModuleRows();
+        const visibleRows = rows.slice(0, Math.max(UNIVERSAL_TABLE_PAGE_SIZE, Number(state.universalModuleVisibleCount || UNIVERSAL_TABLE_PAGE_SIZE)));
+        const totalRows = Math.max(String(state.universalModuleSearchQuery || "").trim() ? rows.length : toNumber(state.universalModuleTotalRows), rows.length);
+        const problemEventCount = toNumber(state.universalModuleProblemEventCount);
+        renderUniversalSeverityStats(refs.universalModulesSeverity, state.universalModuleSeverityTotals);
+        if (!visibleRows.length) {
+            renderUniversalModuleEmpty("Модули для выбранного фильтра не найдены");
+            return;
+        }
+        refs.universalModulesBody.innerHTML = visibleRows.map((row) => {
+            const moduleKey = String(row?.moduleKey || "").trim();
+            const isSelected = moduleKey && state.universalModuleSelectedKey === moduleKey;
+            const rowClass = [universalModuleRowLevelClass(row), isSelected ? "analytics-universal-row-selected" : ""]
+                .filter(Boolean)
+                .join(" ");
+            const label = universalModuleLabel(row);
+            const coverage = universalCoveragePercent(row?.count, problemEventCount);
+            return `
+                <tr class="${rowClass}" data-universal-module-row="${escapeHtml(moduleKey)}">
+                    <td><div class="analytics-universal-module-name" title="${escapeHtml(label)}">${escapeHtml(label)}</div></td>
+                    <td class="text-end">${formatInt(row?.count)}</td>
+                    <td class="text-end">${coverage.toFixed(2)}%</td>
+                    <td class="text-end">${toNumber(row?.share).toFixed(2)}%</td>
+                    <td class="text-end">${formatInt(row?.errorCount)}</td>
+                    <td class="text-end">${formatPercent(row?.errorRate)}</td>
+                    <td class="text-end">${formatMs(row?.avgMs)}</td>
+                    <td class="text-end">${formatMs(row?.p95Ms)}</td>
+                    <td class="text-end">${formatInt(row?.eventCount)}</td>
+                    <td class="text-end"><button class="btn btn-sm btn-outline-secondary analytics-universal-raw-btn" type="button"
+                        title="${row?.systemEvent === true ? "Открыть служебные события" : "Открыть исходные события"}"
+                        data-universal-module-raw
+                        data-universal-module-code="${escapeHtml(row?.moduleCode || "")}"
+                        data-universal-module-stage="${escapeHtml(row?.stageTypeCode || "")}"
+                        data-universal-module-system="${row?.systemEvent === true ? "true" : "false"}"
+                        data-universal-module-errors="${toNumber(row?.errorCount) > 0 ? "true" : "false"}">Подробнее</button></td>
+                </tr>
+            `;
+        }).join("");
+        refs.universalModulesMore?.classList.toggle("d-none", rows.length >= totalRows);
+        refs.universalModulesCollapse?.classList.toggle("d-none", visibleRows.length <= UNIVERSAL_TABLE_PAGE_SIZE);
+        if (refs.universalModulesCount) {
+            refs.universalModulesCount.textContent = `Показано ${formatInt(visibleRows.length)} из ${formatInt(totalRows)}`;
+        }
+        updateUniversalModuleActionState();
+    }
+
+    async function loadUniversalModuleRows({reset = false} = {}) {
+        if (!refs.universalModulesBody) {
+            return;
+        }
+        const requestId = ++state.universalModuleRequestId;
+        try {
+            if (reset) {
+                state.universalModuleRows = [];
+                state.universalModuleTotalRows = 0;
+                state.universalModuleProblemEventCount = 0;
+                state.universalModuleVisibleCount = UNIVERSAL_TABLE_PAGE_SIZE;
+                renderUniversalModuleEmpty("Загрузка модулей…");
+            }
+            const currentRows = Array.isArray(state.universalModuleRows) ? state.universalModuleRows : [];
+            const targetVisible = Math.max(UNIVERSAL_TABLE_PAGE_SIZE, Number(state.universalModuleVisibleCount || UNIVERSAL_TABLE_PAGE_SIZE));
+            const need = Math.max(UNIVERSAL_TABLE_PAGE_SIZE, targetVisible - currentRows.length);
+            const offset = reset ? 0 : currentRows.length;
+            const payload = await fetchJson(`${api("/universal/module-breakdown")}?${universalModuleParams(need, offset).toString()}`, {
+                perfLabel: "universal-module-breakdown"
+            });
+            if (requestId !== state.universalModuleRequestId) {
+                return;
+            }
+            const rows = Array.isArray(payload?.rows) ? payload.rows : [];
+            state.universalModuleTotalRows = Math.max(0, Number(payload?.total || 0));
+            state.universalModuleProblemEventCount = toNumber(payload?.problemEventCount);
+            state.universalModuleSeverityTotals = {
+                critical: toNumber(payload?.criticalTotal),
+                warning: toNumber(payload?.warningTotal),
+                normal: toNumber(payload?.normalTotal)
+            };
+            state.universalModuleRows = [...(reset ? [] : currentRows), ...rows];
+            if (!findUniversalModuleRow(state.universalModuleSelectedKey)) {
+                state.universalModuleSelectedKey = "";
+            }
+            renderUniversalModuleRows();
+            void loadUniversalModuleRootCause(state.universalModuleSelectedKey);
+        } catch (error) {
+            if (requestId === state.universalModuleRequestId) {
+                console.warn("Universal module breakdown failed", error);
+                renderUniversalModuleEmpty("Ошибка загрузки анализа модулей");
+                renderUniversalModuleRootCausePlaceholder("Не удалось загрузить причины");
+            }
+        }
+    }
+
+    function renderUniversalModuleRootCausePlaceholder(message) {
+        if (!refs.universalModuleRootCauseBody) {
+            return;
+        }
+        refs.universalModuleRootCauseBody.innerHTML = `<div class="analytics-universal-placeholder">${escapeHtml(message)}</div>`;
+    }
+
+    function renderUniversalModuleRootCauseLoading(moduleKey = "") {
+        if (!refs.universalModuleRootCauseBody) {
+            return;
+        }
+        if (refs.universalModuleRootCauseTitle) {
+            refs.universalModuleRootCauseTitle.textContent = universalModuleLabel(findUniversalModuleRow(moduleKey));
+        }
+        refs.universalModuleRootCauseBody.innerHTML = `
+            <div class="analytics-universal-root-cause-loading">
+                <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                Загрузка причин…
+            </div>
+        `;
+    }
+
+    function renderUniversalModuleRootCause(payload, moduleKey = "") {
+        if (!refs.universalModuleRootCauseBody) {
+            return;
+        }
+        const row = findUniversalModuleRow(moduleKey);
+        if (refs.universalModuleRootCauseTitle) {
+            refs.universalModuleRootCauseTitle.textContent = universalModuleLabel(row);
+        }
+        const factors = Array.isArray(payload?.factors) ? payload.factors : [];
+        if (!toNumber(payload?.problemEventCount) || !factors.length) {
+            renderUniversalModuleRootCausePlaceholder("Причины проблем модулей не найдены");
+            return;
+        }
+        refs.universalModuleRootCauseBody.innerHTML = `
+            <div class="analytics-universal-root-cause-groups">${renderUniversalRootCauseGroups(factors, {problemEventCount: payload?.problemEventCount, showCoverage: true})}</div>
+            <button class="btn btn-sm btn-dark analytics-universal-raw-btn analytics-universal-root-cause-raw" type="button"
+                data-universal-module-raw
+                data-universal-module-code="${escapeHtml(row?.moduleCode || "")}"
+                data-universal-module-stage="${escapeHtml(row?.stageTypeCode || "")}"
+                data-universal-module-system="${row?.systemEvent === true ? "true" : "false"}"
+                data-universal-module-errors="${toNumber(row?.errorCount) > 0 ? "true" : "false"}">${row?.systemEvent === true ? "Служебные события →" : "Журнал событий →"}</button>
+        `;
+    }
+
+    async function loadUniversalModuleRootCause(moduleKey = "") {
+        const key = String(moduleKey || "").trim();
+        const requestId = ++state.universalModuleRootCauseRequestId;
+        if (state.universalModuleRootCauseAbortController) {
+            state.universalModuleRootCauseAbortController.abort();
+        }
+        const controller = new AbortController();
+        state.universalModuleRootCauseAbortController = controller;
+        const timeoutId = window.setTimeout(() => controller.abort(), UNIVERSAL_ATTRIBUTE_TABLE_TIMEOUT_MS);
+        renderUniversalModuleRootCauseLoading(key);
+        try {
+            const payload = await fetchJson(`${api("/universal/module-root-cause")}?${universalModuleRootCauseParams(key).toString()}`, {
+                perfLabel: "universal-module-root-cause",
+                signal: controller.signal
+            });
+            if (requestId !== state.universalModuleRootCauseRequestId
+                || String(state.universalModuleSelectedKey || "") !== key) {
+                return;
+            }
+            renderUniversalModuleRootCause(payload, key);
+        } catch (error) {
+            if (requestId === state.universalModuleRootCauseRequestId
+                && String(state.universalModuleSelectedKey || "") === key) {
+                console.warn("Universal module root cause failed", error);
+                renderUniversalModuleRootCausePlaceholder(controller.signal.aborted
+                    ? "Причины не успели загрузиться. Уточните период или фильтр."
+                    : "Не удалось загрузить причины");
+            }
+        } finally {
+            window.clearTimeout(timeoutId);
+            if (state.universalModuleRootCauseAbortController === controller) {
+                state.universalModuleRootCauseAbortController = null;
+            }
+        }
+    }
+
+    function renderUniversalRootCausePlaceholder(message) {
+        if (!refs.universalRootCauseBody) {
+            return;
+        }
+        refs.universalRootCauseBody.innerHTML = `<div class="analytics-universal-placeholder">${escapeHtml(message)}</div>`;
+    }
+
+    function setUniversalAttributeRootCauseTitle(attributeCode = "", attributeValue = "") {
+        if (!refs.universalRootCauseTitle) {
+            return;
+        }
+        refs.universalRootCauseTitle.textContent = attributeValue || universalAttributeLabel(attributeCode);
+    }
+
+    function renderUniversalRootCauseLoading(attributeCode = "", attributeValue = "") {
+        if (!refs.universalRootCauseBody) {
+            return;
+        }
+        setUniversalAttributeRootCauseTitle(attributeCode, attributeValue);
+        refs.universalRootCauseBody.innerHTML = `
+            <div class="analytics-universal-root-cause-loading">
+                <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                Загрузка причин…
+            </div>
+        `;
+    }
+
+    function renderUniversalRootCause(payload) {
+        if (!refs.universalRootCauseBody) {
+            return;
+        }
+        const factors = Array.isArray(payload?.factors) ? payload.factors : [];
+        const problemEventCount = toNumber(payload?.problemEventCount);
+        const criticalValueCount = toNumber(payload?.criticalValueCount);
+        const warningValueCount = toNumber(payload?.warningValueCount);
+        const attributeCode = String(payload?.attributeCode || refs.universalAttributeSelect?.value || "").trim();
+        const attributeValue = String(payload?.attributeValue || state.universalRootCauseSelectedValue || "").trim();
+        setUniversalAttributeRootCauseTitle(attributeCode, attributeValue);
+        const clearButton = attributeValue
+            ? `<button class="analytics-universal-root-cause-clear" type="button" data-universal-root-cause-clear title="Вернуться к анализу атрибута" aria-label="Вернуться к анализу атрибута">×</button>`
+            : "";
+        if (!problemEventCount || !factors.length) {
+            refs.universalRootCauseBody.innerHTML = `
+                ${clearButton}
+                <div class="analytics-universal-placeholder">Для текущего контекста не найдено устойчивых факторов среди проблемных значений</div>
+            `;
+            return;
+        }
+        const main = factors[0];
+        const groupedFactors = renderUniversalRootCauseGroups(factors);
+        const rawAttributeCode = attributeValue ? attributeCode : String(main?.attributeCode || "");
+        const rawAttributeValue = attributeValue ? attributeValue : String(main?.value || "");
+        refs.universalRootCauseBody.innerHTML = `
+            ${clearButton}
+            <div class="analytics-universal-root-cause-groups">${groupedFactors}</div>
+            <button class="btn btn-sm btn-dark analytics-universal-raw-btn analytics-universal-root-cause-raw" type="button" data-universal-attribute-raw data-universal-attribute-code="${escapeHtml(rawAttributeCode)}" data-universal-attribute-value="${escapeHtml(rawAttributeValue)}">Журнал событий →</button>
+        `;
+    }
+
+    async function loadUniversalRootCause(attributeCode, attributeValue = "") {
+        const code = String(attributeCode || "").trim();
+        const value = String(attributeValue || "").trim();
+        const requestId = ++state.universalRootCauseRequestId;
+        if (state.universalRootCauseAbortController) {
+            state.universalRootCauseAbortController.abort();
+        }
+        if (!code) {
+            renderUniversalRootCausePlaceholder("Выберите атрибут, чтобы увидеть вероятные причины");
+            return;
+        }
+        const controller = new AbortController();
+        state.universalRootCauseAbortController = controller;
+        const timeoutId = window.setTimeout(() => controller.abort(), UNIVERSAL_ATTRIBUTE_TABLE_TIMEOUT_MS);
+        renderUniversalRootCauseLoading(code, value);
+        try {
+            const params = universalRootCauseParams(code, value);
+            const payload = await fetchJson(`${api("/universal/root-cause")}?${params.toString()}`, {
+                perfLabel: "universal-root-cause",
+                signal: controller.signal
+            });
+            if (requestId !== state.universalRootCauseRequestId) {
+                return;
+            }
+            renderUniversalRootCause(payload);
+        } catch (error) {
+            if (requestId !== state.universalRootCauseRequestId) {
+                return;
+            }
+            if (controller.signal.aborted) {
+                renderUniversalRootCausePlaceholder("Причины не успели загрузиться. Уточните период или фильтр.");
+                return;
+            }
+            console.warn("Universal root cause analysis failed", error);
+            renderUniversalRootCausePlaceholder("Не удалось загрузить причины");
+        } finally {
+            window.clearTimeout(timeoutId);
+            if (state.universalRootCauseAbortController === controller) {
+                state.universalRootCauseAbortController = null;
+            }
+        }
+    }
+
+    function selectUniversalAttribute(attributeCode, options = {}) {
+        const code = String(attributeCode || "").trim();
+        if (!code || !refs.universalAttributeSelect) {
+            return Promise.resolve();
+        }
+        refs.universalAttributeSelect.value = code;
+        state.universalAttributeSearchQuery = options.searchQuery || "";
+        state.universalAttributePinnedRow = options.pinnedRow || null;
+        state.universalRootCauseSelectedValue = "";
+        state.universalAttributePickerOpen = false;
+        ensureUniversalAttributeGroupVisible(code);
+        renderUniversalAttributeCards();
+        return loadUniversalAttributeRows({reset: true});
+    }
+
+    function matchesUniversalAttributeQuery(item, query) {
+        const normalizedQuery = normalizeSearchText(query);
+        if (!normalizedQuery) {
+            return false;
+        }
+        return normalizeSearchText(item?.name).includes(normalizedQuery)
+            || normalizeSearchText(item?.code).includes(normalizedQuery);
+    }
+
+    function matchesUniversalAttributeValue(row, query) {
+        const normalizedQuery = normalizeSearchText(query);
+        if (!normalizedQuery) {
+            return false;
+        }
+        return normalizeSearchText(row?.value).includes(normalizedQuery);
+    }
+
+    async function findUniversalAttributeByValue(query, requestId) {
+        const normalizedQuery = normalizeSearchText(query);
+        const items = Array.isArray(state.universalAttributeTypes) ? state.universalAttributeTypes : [];
+        let found = null;
+        const tasks = items.map((item) => async () => {
+            if (found || requestId !== state.universalAttributeRequestId) {
+                return;
+            }
+            const code = String(item?.code || "").trim();
+            if (!code) {
+                return;
+            }
+            try {
+                const params = universalAttributeBreakdownParams(code, 20, 0, {sortBy: "count", sortDir: "desc"});
+                const payload = await fetchJson(`${api("/universal/attribute-breakdown")}?${params.toString()}`, {
+                    perfLabel: "universal-attribute-value-search"
+                });
+                if (found || requestId !== state.universalAttributeRequestId) {
+                    return;
+                }
+                const rows = Array.isArray(payload?.rows) ? payload.rows : [];
+                const row = rows.find((itemRow) => matchesUniversalAttributeValue(itemRow, normalizedQuery));
+                if (row) {
+                    found = {attribute: item, row};
+                }
+            } catch (error) {
+                if (requestId === state.universalAttributeRequestId) {
+                    console.warn("Universal attribute value search failed", code, error);
+                }
+            }
+        });
+        await runUniversalLimited(tasks, 3);
+        return found;
+    }
+
+    async function runUniversalAttributeSearch() {
+        const query = String(refs.universalAttributeSearchInput?.value || "").trim();
+        state.universalAttributePinnedRow = null;
+        state.universalAttributeSearchQuery = query;
+        setUniversalAttributeSearchMessage("");
+        if (!query) {
+            setUniversalAttributeSearchMessage("Введите атрибут или значение для поиска");
+            return;
+        }
+        const options = Array.isArray(state.universalAttributeTypes) ? state.universalAttributeTypes : [];
+        const attributeMatch = options.find((item) => matchesUniversalAttributeQuery(item, query));
+        if (attributeMatch) {
+            setUniversalAttributeSearchMessage(`Найден атрибут: ${attributeMatch.name || attributeMatch.code}`);
+            state.universalAttributeUserSelected = true;
+            await selectUniversalAttribute(attributeMatch.code, {searchQuery: query});
+            return;
+        }
+        const requestId = ++state.universalAttributeRequestId;
+        setUniversalAttributeLoading(true);
+        try {
+            const found = await Promise.race([
+                findUniversalAttributeByValue(query, requestId),
+                new Promise((resolve) => window.setTimeout(() => resolve({timedOut: true}), UNIVERSAL_ATTRIBUTE_TABLE_TIMEOUT_MS))
+            ]);
+            if (requestId !== state.universalAttributeRequestId) {
+                return;
+            }
+            if (found?.timedOut) {
+                setUniversalAttributeSearchMessage("Ничего не найдено. Уточните период или фильтр.", "danger");
+                return;
+            }
+            if (!found?.attribute) {
+                setUniversalAttributeSearchMessage("Ничего не найдено", "danger");
+                return;
+            }
+            setUniversalAttributeSearchMessage(`Найдено в атрибуте: ${found.attribute.name || found.attribute.code}`);
+            state.universalAttributeUserSelected = true;
+            await selectUniversalAttribute(found.attribute.code, {
+                searchQuery: query,
+                pinnedRow: found.row || null
+            });
+        } finally {
+            if (requestId === state.universalAttributeRequestId) {
+                setUniversalAttributeLoading(false);
+            }
+        }
+    }
+
+    function universalAttributeRowSortValue(row, sortBy) {
+        if (sortBy === "value") {
+            return String(row?.value || "").toLocaleLowerCase("ru");
+        }
+        if (sortBy === "share") {
+            return toNumber(row?.share);
+        }
+        if (sortBy === "count") {
+            return toNumber(row?.count);
+        }
+        if (sortBy === "avg") {
+            return toNumber(row?.avgMs);
+        }
+        if (sortBy === "p95") {
+            return toNumber(row?.p95Ms);
+        }
+        if (sortBy === "error") {
+            return toNumber(row?.errorRate);
+        }
+        if (sortBy === "riskScore" || sortBy === "interesting") {
+            const flags = universalAttributeProblemFlags(row, state.universalAttributeRows);
+            return [
+                Number(flags.critical),
+                Number(flags.important),
+                flags.critical ? toNumber(row?.errorRate) : 0,
+                flags.critical ? toNumber(row?.p95Ms) : 0,
+                flags.critical ? toNumber(row?.avgMs) : 0,
+                flags.critical ? toNumber(row?.count) : 0,
+                flags.critical ? toNumber(row?.share) : 0,
+                flags.important ? toNumber(row?.p95Ms) : 0,
+                flags.important ? toNumber(row?.avgMs) : 0,
+                flags.important ? toNumber(row?.count) : 0,
+                flags.important ? toNumber(row?.share) : 0,
+                (!flags.critical && !flags.important) ? toNumber(row?.count) : 0,
+                (!flags.critical && !flags.important) ? toNumber(row?.share) : 0,
+                (!flags.critical && !flags.important) ? toNumber(row?.p95Ms) : 0,
+                (!flags.critical && !flags.important) ? toNumber(row?.avgMs) : 0
+            ];
+        }
+        return toNumber(row?.count);
+    }
+
+    function universalAttributeMetricBaselines(rows) {
+        const p95Values = (rows || []).map((item) => toNumber(item?.p95Ms)).filter((value) => value > 0);
+        const avgValues = (rows || []).map((item) => toNumber(item?.avgMs)).filter((value) => value > 0);
+        const countValues = (rows || []).map((item) => toNumber(item?.count)).filter((value) => value > 0);
+        return {
+            p95: p95Values.length ? p95Values.reduce((sum, value) => sum + value, 0) / p95Values.length : 0,
+            avg: avgValues.length ? avgValues.reduce((sum, value) => sum + value, 0) / avgValues.length : 0,
+            count: countValues.length ? countValues.reduce((sum, value) => sum + value, 0) / countValues.length : 0
+        };
+    }
+
+    function universalAttributeProblemFlags(row, rows, baselinesOverride = null) {
+        const baselines = baselinesOverride || universalAttributeMetricBaselines(rows);
+        const severityLevel = String(row?.severityLevel || "").toLowerCase();
+        const errorRate = toNumber(row?.errorRate);
+        const p95 = toNumber(row?.p95Ms);
+        const avg = toNumber(row?.avgMs);
+        const count = toNumber(row?.count);
+        const share = toNumber(row?.share);
+        const criticalP95 = p95 >= 3000 || (baselines.p95 > 0 && p95 >= baselines.p95 * 2.5 && p95 >= 1000);
+        const criticalAvg = avg >= 1500 || (baselines.avg > 0 && avg >= baselines.avg * 2.5 && avg >= 750);
+        const moderateP95 = p95 >= 1000 || (baselines.p95 > 0 && p95 >= baselines.p95 * 1.5 && p95 >= 500);
+        const moderateAvg = avg >= 500 || (baselines.avg > 0 && avg >= baselines.avg * 1.5 && avg >= 250);
+        const highCount = baselines.count > 0 && count >= baselines.count * 1.5;
+        const highShare = share >= 5;
+        const critical = severityLevel === "critical" || errorRate > 0 || criticalP95 || criticalAvg;
+        return {
+            critical,
+            important: severityLevel === "warning" || (!critical && (highShare || highCount || moderateP95 || moderateAvg)),
+            highCount,
+            highShare,
+            highP95: criticalP95 || moderateP95,
+            highAvg: criticalAvg || moderateAvg,
+            hasError: errorRate > 0
+        };
+    }
+
+    function sortUniversalAttributeRows() {
+        const sortBy = state.universalAttributeSortBy || "riskScore";
+        const dir = state.universalAttributeSortDir === "asc" ? 1 : -1;
+        state.universalAttributeRows = (Array.isArray(state.universalAttributeRows) ? state.universalAttributeRows : [])
+            .slice()
+            .sort((left, right) => {
+                const leftValue = universalAttributeRowSortValue(left, sortBy);
+                const rightValue = universalAttributeRowSortValue(right, sortBy);
+                if (Array.isArray(leftValue) || Array.isArray(rightValue)) {
+                    const compared = compareUniversalRiskValues(leftValue, rightValue, dir);
+                    if (compared !== 0) {
+                        return compared;
+                    }
+                } else if (typeof leftValue === "string" || typeof rightValue === "string") {
+                    return String(leftValue).localeCompare(String(rightValue), "ru") * dir;
+                }
+                if (leftValue === rightValue) {
+                    return String(left?.value || "").localeCompare(String(right?.value || ""), "ru");
+                }
+                return (leftValue - rightValue) * dir;
+            });
+    }
+
+    function applyUniversalAttributePinnedRow(rows) {
+        const pinned = state.universalAttributePinnedRow;
+        if (!pinned?.value) {
+            return rows;
+        }
+        const normalizedPinned = normalizeSearchText(pinned.value);
+        const sourceRows = Array.isArray(rows) ? rows : [];
+        const withoutPinned = sourceRows.filter((row) => normalizeSearchText(row?.value) !== normalizedPinned);
+        return [pinned, ...withoutPinned];
+    }
+
+    function updateUniversalAttributeSortHeaders() {
+        refs.universalAttributesCard?.querySelectorAll("[data-universal-attribute-sort]").forEach((button) => {
+            const sortBy = String(button.getAttribute("data-universal-attribute-sort") || "").trim();
+            const icon = button.querySelector("[data-sort-icon]");
+            const isActive = sortBy === state.universalAttributeSortBy;
+            button.classList.toggle("is-active", isActive);
+            if (icon) {
+                icon.textContent = isActive
+                    ? (state.universalAttributeSortDir === "asc" ? "↑" : "↓")
+                    : "↕";
+            }
+        });
+        updateUniversalAttributeActionState();
+    }
+
+    function updateUniversalAttributeActionState() {
+        const hasLocalState = !isUniversalDefaultSort(state.universalAttributeSortBy)
+            || state.universalAttributeSortDir !== "desc"
+            || !!String(state.universalAttributeSearchQuery || "").trim()
+            || !!String(state.universalRootCauseSelectedValue || "").trim()
+            || !!state.universalAttributePinnedRow;
+        refs.universalAttributesCard
+            ?.querySelector("[data-universal-attribute-sort-reset]")
+            ?.classList.toggle("d-none", !hasLocalState);
+    }
+
+    function renderUniversalAttributeRows() {
+        if (!refs.universalAttributeValuesBody) {
+            return;
+        }
+        updateUniversalAttributeSortHeaders();
+        const rows = applyUniversalAttributePinnedRow(Array.isArray(state.universalAttributeRows) ? state.universalAttributeRows : []);
+        const visibleRows = rows.slice(0, Math.max(UNIVERSAL_TABLE_PAGE_SIZE, Number(state.universalAttributeVisibleCount || UNIVERSAL_TABLE_PAGE_SIZE)));
+        if (!visibleRows.length) {
+            renderUniversalAttributeEmpty("Нет данных для выбранного атрибута");
+            return;
+        }
+        const totalRows = Math.max(toNumber(state.universalAttributeTotalRows), rows.length);
+        const totalCount = Math.max(1, visibleRows.reduce((sum, row) => sum + toNumber(row.count), 0));
+        const problemEventCount = toNumber(state.universalAttributeProblemEventCount);
+        const baselineP95 = toNumber(refs.universalKpiP95?.textContent || 0);
+        const baselineErrorRate = rows.length
+            ? rows.reduce((max, row) => Math.max(max, toNumber(row.errorRate)), 0)
+            : 0;
+        const attributeBaselines = universalAttributeMetricBaselines(rows);
+        renderUniversalSeverityStats(refs.universalAttributeSeverity, state.universalAttributeSeverityTotals, {
+            visibleProblem: isUniversalDefaultSort(state.universalAttributeSortBy)
+                ? visibleRows.filter((row) => {
+                    const flags = universalAttributeProblemFlags(row, rows, attributeBaselines);
+                    return flags.critical || flags.important;
+                }).length
+                : 0
+        });
+        refs.universalAttributeValuesBody.innerHTML = visibleRows.map((row) => {
+            const rowValue = String(row.value || "").trim();
+            const share = row.share == null ? (toNumber(row.count) / totalCount) * 100 : toNumber(row.share);
+            const coverage = universalCoveragePercent(row.count, problemEventCount);
+            const flags = universalAttributeProblemFlags(row, rows, attributeBaselines);
+            const highP95 = flags.highP95 || (baselineP95 > 0 && toNumber(row.p95Ms) >= baselineP95 * 1.25);
+            const highError = flags.hasError || toNumber(row.errorRate) >= Math.max(0.1, baselineErrorRate * 0.8);
+            const isSelected = rowValue && state.universalRootCauseSelectedValue === rowValue;
+            const rowClass = [universalRowLevelClass(flags), isSelected ? "analytics-universal-row-selected" : ""]
+                .filter(Boolean)
+                .join(" ");
+            return `
+                <tr class="${rowClass}" data-universal-attribute-row data-universal-attribute-value="${escapeHtml(rowValue)}">
+                    <td class="analytics-universal-event-name" title="${escapeHtml(row.value)}">${escapeHtml(row.value || "-")}</td>
+                    <td class="text-end">${formatInt(row.count)}</td>
+                    <td class="text-end">${coverage.toFixed(2)}%</td>
+                    <td class="text-end">${share.toFixed(2)}%</td>
+                    <td class="text-end">${formatMs(row.avgMs)}</td>
+                    <td class="text-end ${highP95 ? "analytics-universal-metric-warning" : ""}">${formatMs(row.p95Ms)}</td>
+                    <td class="text-end ${highError ? "analytics-universal-metric-warning" : ""}">${formatPercent(row.errorRate)}</td>
+                    <td class="text-end"><button class="btn btn-sm btn-outline-secondary analytics-universal-raw-btn" type="button" data-universal-attribute-raw data-universal-attribute-code="${escapeHtml(refs.universalAttributeSelect?.value || "")}" data-universal-attribute-value="${escapeHtml(row.value || "")}">Подробнее</button></td>
+                </tr>
+            `;
+        }).join("");
+        refs.universalAttributeMore?.classList.toggle("d-none", rows.length >= totalRows);
+        refs.universalAttributeCollapse?.classList.toggle("d-none", visibleRows.length <= UNIVERSAL_TABLE_PAGE_SIZE);
+        if (refs.universalAttributeCount) {
+            refs.universalAttributeCount.textContent = `Показано ${formatInt(visibleRows.length)} из ${formatInt(totalRows)}`;
+        }
+    }
+
+    async function loadUniversalAttributeRows({reset = false, keepSort = false} = {}) {
+        const attributeCode = String(refs.universalAttributeSelect?.value || "").trim();
+        if (!attributeCode) {
+            renderUniversalRootCausePlaceholder("Выберите атрибут, чтобы увидеть вероятные причины");
+            renderUniversalAttributeEmpty("Выберите атрибут");
+            return;
+        }
+        const requestId = ++state.universalAttributeRequestId;
+        setUniversalAttributeError("");
+        setUniversalAttributeLoading(true);
+        try {
+            if (reset) {
+                if (state.universalAttributeAbortController) {
+                    state.universalAttributeAbortController.abort();
+                }
+                state.universalAttributeRows = [];
+                state.universalAttributeValues = [];
+                state.universalAttributeTotalRows = 0;
+                state.universalAttributeVisibleCount = UNIVERSAL_TABLE_PAGE_SIZE;
+                if (!keepSort) {
+                    state.universalAttributeSortBy = "riskScore";
+                    state.universalAttributeSortDir = "desc";
+                }
+            }
+            const currentRows = Array.isArray(state.universalAttributeRows) ? state.universalAttributeRows : [];
+            const targetVisible = Math.max(UNIVERSAL_TABLE_PAGE_SIZE, Number(state.universalAttributeVisibleCount || UNIVERSAL_TABLE_PAGE_SIZE));
+            const offset = reset ? 0 : currentRows.length;
+            const limit = Math.max(1, targetVisible - offset);
+            const batch = await fetchUniversalAttributeBreakdown(attributeCode, limit, offset, requestId);
+            if (requestId !== state.universalAttributeRequestId) {
+                return;
+            }
+            if (batch.stale) {
+                return;
+            }
+            state.universalAttributeTotalRows = Math.max(0, Number(batch.total || 0));
+            state.universalAttributeProblemEventCount = toNumber(batch.problemEventCount);
+            state.universalAttributeSeverityTotals = {
+                critical: toNumber(batch.criticalTotal),
+                warning: toNumber(batch.warningTotal),
+                normal: toNumber(batch.normalTotal)
+            };
+            state.universalAttributeRows = [...(reset ? [] : currentRows), ...batch.rows]
+                .filter((row) => toNumber(row.count) > 0);
+            sortUniversalAttributeRows();
+            if (isUniversalDefaultSort(state.universalAttributeSortBy) && reset) {
+                state.universalAttributeVisibleCount = Math.max(
+                    UNIVERSAL_TABLE_PAGE_SIZE,
+                    Math.min(state.universalAttributeRows.length, UNIVERSAL_DEFAULT_HARD_LIMIT)
+                );
+            }
+            if (batch.timedOut) {
+                setUniversalAttributeError("Данные не успели загрузиться. Уточните период или фильтр.");
+                if (!state.universalAttributeRows.length) {
+                    renderUniversalAttributeEmpty("Данные не успели загрузиться. Уточните период или фильтр.");
+                    refs.universalAttributeMore?.classList.toggle("d-none", !state.universalAttributeTotalRows);
+                    if (refs.universalAttributeCount && state.universalAttributeTotalRows) {
+                        refs.universalAttributeCount.textContent = `Загружено 0 из ${formatInt(state.universalAttributeTotalRows)}`;
+                    }
+                } else {
+                    renderUniversalAttributeRows();
+                }
+            } else {
+                renderUniversalAttributeRows();
+            }
+            if (reset) {
+                void loadUniversalRootCause(attributeCode, state.universalRootCauseSelectedValue || "");
+            }
+        } catch (error) {
+            if (requestId === state.universalAttributeRequestId) {
+                console.error("Universal attribute analysis failed", error);
+                setUniversalAttributeError(error instanceof Error ? error.message : "Не удалось загрузить анализ атрибутов");
+                renderUniversalAttributeEmpty("Ошибка загрузки анализа атрибутов");
+            }
+        } finally {
+            if (requestId === state.universalAttributeRequestId) {
+                setUniversalAttributeLoading(false);
+            }
+        }
+    }
+
+    async function refreshUniversalAttributeBlock(universal) {
+        syncUniversalAttributeSelect(universal?.availableAttributeTypes || []);
+        if (!state.universalAttributeTypes.length) {
+            return;
+        }
+        state.universalAttributeValueCounts = new Map();
+        state.universalAttributeTopValues = new Map();
+        state.universalAttributeCardHints = new Map();
+        state.universalAttributePinnedRow = null;
+        state.universalAttributeSearchQuery = "";
+        setUniversalAttributeSearchMessage("");
+        state.universalAttributeTotalRows = 0;
+        state.universalAttributeTotalCount = toNumber(universal?.totals?.count || universal?.totals?.totalCount || 0);
+        void refreshUniversalAttributeCardHints(state.universalAttributeTypes);
+        await loadUniversalAttributeRows({reset: true});
+    }
+
+    function mergeUniversalTimeSeries(seriesList) {
+        const byTime = new Map();
+        (seriesList || []).flat().forEach((point) => {
+            const time = String(point?.time || "").trim();
+            if (!time) {
+                return;
+            }
+            const current = byTime.get(time) || {
+                time,
+                count: 0,
+                errorWeighted: 0,
+                avgWeighted: 0,
+                p95Ms: 0,
+                p99Ms: 0
+            };
+            const count = toNumber(point.count);
+            current.count += count;
+            current.avgWeighted += toNumber(point.avgMs) * count;
+            current.errorWeighted += toNumber(point.errorRate) * count;
+            current.p95Ms = Math.max(current.p95Ms, toNumber(point.p95Ms));
+            current.p99Ms = Math.max(current.p99Ms, toNumber(point.p99Ms));
+            byTime.set(time, current);
+        });
+        return Array.from(byTime.values())
+            .sort((left, right) => String(left.time).localeCompare(String(right.time)))
+            .map((point) => ({
+                time: point.time,
+                count: point.count,
+                avgMs: point.count ? point.avgWeighted / point.count : 0,
+                p95Ms: point.p95Ms,
+                p99Ms: point.p99Ms,
+                errorRate: point.count ? point.errorWeighted / point.count : 0
+            }));
+    }
+
+    function mergeUniversalEventRows(rowGroups) {
+        const byCode = new Map();
+        (rowGroups || []).flat().forEach((row) => {
+            const code = String(row?.eventTypeCode || row?.key || "").trim();
+            if (!code) {
+                return;
+            }
+            const current = byCode.get(code) || {
+                eventTypeCode: code,
+                eventTypeName: row.eventTypeName || row.label || code,
+                count: 0,
+                errorWeighted: 0,
+                avgWeighted: 0,
+                p95Ms: 0,
+                p99Ms: 0,
+                maxMs: 0
+            };
+            const count = toNumber(row.count);
+            current.count += count;
+            current.avgWeighted += toNumber(row.avgMs) * count;
+            current.errorWeighted += toNumber(row.errorRate) * count;
+            current.p95Ms = Math.max(current.p95Ms, toNumber(row.p95Ms || row.p95));
+            current.p99Ms = Math.max(current.p99Ms, toNumber(row.p99Ms));
+            current.maxMs = Math.max(current.maxMs, toNumber(row.maxMs));
+            byCode.set(code, current);
+        });
+        return Array.from(byCode.values()).map((row) => ({
+            eventTypeCode: row.eventTypeCode,
+            eventTypeName: row.eventTypeName,
+            count: row.count,
+            errorRate: row.count ? row.errorWeighted / row.count : 0,
+            avgMs: row.count ? row.avgWeighted / row.count : 0,
+            p95Ms: row.p95Ms,
+            p99Ms: row.p99Ms,
+            maxMs: row.maxMs
+        }));
+    }
+
+    function mergeUniversalPayloads(payloads) {
+        const sources = (payloads || []).filter(Boolean);
+        if (sources.length <= 1) {
+            return sources[0] || null;
+        }
+        const totals = sources.reduce((acc, payload) => {
+            const source = payload?.totals || {};
+            const count = toNumber(source.count || source.totalCount);
+            const errorCount = toNumber(source.errorCount);
+            const successCount = toNumber(source.successCount);
+            acc.count += count;
+            acc.errorCount += errorCount;
+            acc.successCount += successCount;
+            acc.avgWeighted += toNumber(source.avgMs) * count;
+            acc.p95Ms = Math.max(acc.p95Ms, toNumber(source.p95Ms));
+            acc.p99Ms = Math.max(acc.p99Ms, toNumber(source.p99Ms));
+            acc.maxMs = Math.max(acc.maxMs, toNumber(source.maxMs));
+            acc.errorWeighted += toNumber(source.errorRate) * count;
+            return acc;
+        }, {count: 0, errorCount: 0, successCount: 0, avgWeighted: 0, errorWeighted: 0, p95Ms: 0, p99Ms: 0, maxMs: 0});
+        const attrByCode = new Map();
+        sources.flatMap((payload) => payload?.availableAttributeTypes || []).forEach((item) => {
+            const code = String(item?.code || "").trim();
+            if (code && !attrByCode.has(code)) {
+                attrByCode.set(code, {code, name: item.name || code});
+            }
+        });
+        const first = sources[0] || {};
+        return {
+            ...first,
+            totals: {
+                count: totals.count,
+                totalCount: totals.count,
+                errorCount: totals.errorCount,
+                successCount: totals.successCount || Math.max(0, totals.count - totals.errorCount),
+                errorRate: totals.count ? (totals.errorCount ? totals.errorCount / totals.count : totals.errorWeighted / totals.count) : 0,
+                avgMs: totals.count ? totals.avgWeighted / totals.count : 0,
+                p95Ms: totals.p95Ms,
+                p99Ms: totals.p99Ms,
+                maxMs: totals.maxMs
+            },
+            series: mergeUniversalTimeSeries(sources.map((payload) => payload?.series || [])),
+            stages: sources.flatMap((payload) => payload?.stages || []),
+            eventBreakdown: mergeUniversalEventRows(sources.map((payload) => payload?.eventBreakdown || [])),
+            eventSeries: sources.flatMap((payload) => payload?.eventSeries || []),
+            eventStageBreakdown: sources.flatMap((payload) => payload?.eventStageBreakdown || []),
+            availableAttributeTypes: Array.from(attrByCode.values())
+        };
+    }
+
+    function universalStageScopeKey() {
+        const stages = selectedUniversalStageCodes();
+        return stages.length > 1 ? `stageSet=${stages.slice().sort().join(",")}` : "";
+    }
+
+    async function loadUniversalPayloadForSelectedStages(useBaseline, paramsOptions, cachePrefix, perfLabel, loadOptions = {}) {
+        const stages = selectedUniversalStageCodes();
+        if (stages.length <= 1) {
+            const params = universalParams(useBaseline, paramsOptions);
+            const paramsKey = params.toString();
+            return loadUniversalPayload(`${cachePrefix}:${paramsKey}`, `${api("/universal")}?${paramsKey}`, perfLabel, loadOptions);
+        }
+        const payloads = await Promise.all(stages.map((stageCode) => {
+            const params = universalParams(useBaseline, {...paramsOptions, stageTypeCode: stageCode});
+            const paramsKey = params.toString();
+            return loadUniversalPayload(`${cachePrefix}:${stageCode}:${paramsKey}`, `${api("/universal")}?${paramsKey}`, perfLabel, loadOptions);
+        }));
+        return mergeUniversalPayloads(payloads);
+    }
+
     async function loadUniversal(loadOptions) {
         const totalStarted = performance.now();
         const options = (loadOptions && typeof loadOptions === "object")
@@ -3487,8 +6884,9 @@
             && selectedUniversalEventCodes().size > 1;
         const params = universalParams(false, {includeEventStageBreakdown});
         const eventsScopeParams = universalParams(false, {includeEventFilter: false, includeEventStageBreakdown: false});
-        const paramsKey = params.toString();
-        const eventsScopeKey = eventsScopeParams.toString();
+        const stageScopeKey = universalStageScopeKey();
+        const paramsKey = [params.toString(), stageScopeKey].filter(Boolean).join("&");
+        const eventsScopeKey = [eventsScopeParams.toString(), stageScopeKey].filter(Boolean).join("&");
         const universalUrl = `${api("/universal")}?${paramsKey}`;
         const eventScopeUrl = `${api("/universal")}?${eventsScopeKey}`;
         const eventFilterActive = paramsKey !== eventsScopeKey;
@@ -3501,22 +6899,29 @@
             : null;
         const baselineParamsKey = baselineParams?.toString() || "";
         const baselineRequest = universalCompareEnabled
-            ? loadUniversalPayload(
-                `baseline:${baselineParamsKey}`,
-                `${api("/universal")}?${baselineParamsKey}`,
+            ? loadUniversalPayloadForSelectedStages(
+                true,
+                {includeEventStageBreakdown},
+                "baseline",
                 "universal-baseline",
                 {action, perfStats}
             )
             : Promise.resolve(null);
         const fetchStarted = performance.now();
         if (eventFilterActive) {
-            const eventScopePromise = loadUniversalEventScope(eventsScopeKey, eventScopeUrl, {action, perfStats})
+            const eventScopePromise = loadUniversalPayloadForSelectedStages(
+                false,
+                {includeEventFilter: false, includeEventStageBreakdown: false},
+                "event-scope",
+                "universal-event-scope",
+                {action, perfStats}
+            )
                 .catch((error) => {
                     console.error("Universal event scope refresh failed", error);
                     return null;
                 });
             [universal, baseline] = await Promise.all([
-                loadUniversalPayload(`main:${paramsKey}`, universalUrl, "universal-main", {
+                loadUniversalPayloadForSelectedStages(false, {includeEventStageBreakdown}, "main", "universal-main", {
                     action,
                     allowStale: allowStaleMainPayload,
                     perfStats
@@ -3535,12 +6940,13 @@
                         || isStaleMainReloadRequest(mainReloadRequestId)) {
                         return;
                     }
+                    rememberUniversalEventScope(eventsScopeKey, eventScopePayload);
                     fillUniversalEventSelectorByPeriod(eventScopePayload);
                 });
             }
         } else {
             [universal, baseline] = await Promise.all([
-                loadUniversalPayload(`main:${paramsKey}`, universalUrl, "universal-main", {
+                loadUniversalPayloadForSelectedStages(false, {includeEventStageBreakdown}, "main", "universal-main", {
                     action,
                     allowStale: allowStaleMainPayload,
                     perfStats
@@ -3554,7 +6960,7 @@
         if (isStaleUniversalRequest(universalRequestId) || isStaleMainReloadRequest(mainReloadRequestId)) {
             return;
         }
-        const currentExpectedParamsKey = universalParams(false, {includeEventStageBreakdown}).toString();
+        const currentExpectedParamsKey = [universalParams(false, {includeEventStageBreakdown}).toString(), universalStageScopeKey()].filter(Boolean).join("&");
         if (currentExpectedParamsKey !== paramsKey) {
             console.info("[UNIVERSAL_MODE_DEBUG] stale render skipped", {
                 action,
@@ -3609,12 +7015,12 @@
             const palette = ["#6d28d9", "#0f766e", "#b45309", "#b91c1c", "#1d4ed8", "#be185d", "#475569", "#0369a1", "#4d7c0f", "#7c2d12"];
             const selectedMetricCode = showCount ? "count" : (showAvg ? "avg" : (showP95 ? "p95" : "error"));
             const metricLabel = selectedMetricCode === "count"
-                ? "Count"
+                ? "Количество"
                 : selectedMetricCode === "avg"
                     ? "AVG"
                     : selectedMetricCode === "p95"
                         ? "P95"
-                        : "Error rate, %";
+                        : "Доля ошибок, %";
             const seriesByCode = new Map((universal.eventSeries || []).map((item) => [String(item.eventTypeCode || "").trim(), item]));
             selectedEventCodes.forEach((eventCode, index) => {
                 const payload = seriesByCode.get(eventCode);
@@ -3638,7 +7044,7 @@
             });
         } else {
             if (showCount) {
-                datasets.push({label: "Count", data: countSeries, borderColor: colors.primary, tension: 0.25, pointRadius: 1.1});
+                datasets.push({label: "Количество", data: countSeries, borderColor: colors.primary, tension: 0.25, pointRadius: 1.1});
             }
             if (showAvg) {
                 datasets.push({label: "AVG", data: avgSeries, borderColor: colors.teal, tension: 0.25, pointRadius: 1.1});
@@ -3647,7 +7053,7 @@
                 datasets.push({label: "P95", data: p95Series, borderColor: colors.amber, tension: 0.25, pointRadius: 1.1});
             }
             if (showError) {
-                datasets.push({label: "Error rate, %", data: errSeries, borderColor: colors.red, tension: 0.25, pointRadius: 1.1});
+                datasets.push({label: "Доля ошибок, %", data: errSeries, borderColor: colors.red, tension: 0.25, pointRadius: 1.1});
             }
         }
 
@@ -3664,12 +7070,12 @@
             if (hasPerEventMode) {
                 const selectedMetricCode = showCount ? "count" : (showAvg ? "avg" : (showP95 ? "p95" : "error"));
                 const metricLabel = selectedMetricCode === "count"
-                    ? "Count"
+                    ? "Количество"
                     : selectedMetricCode === "avg"
                         ? "AVG"
                         : selectedMetricCode === "p95"
                             ? "P95"
-                            : "Error rate, %";
+                            : "Доля ошибок, %";
                 const palette = ["#6d28d9", "#0f766e", "#b45309", "#b91c1c", "#1d4ed8", "#be185d", "#475569", "#0369a1", "#4d7c0f", "#7c2d12"];
                 selectedEventCodes.forEach((eventCode, index) => {
                     const payload = beforeSeriesByEventCode.get(eventCode);
@@ -3695,7 +7101,7 @@
             } else {
                 if (showCount) {
                     datasets.push({
-                        label: "Count (До)",
+                        label: "Количество (До)",
                         data: beforeCount,
                         borderColor: "rgba(109,40,217,0.45)",
                         borderDash: [6, 4],
@@ -3725,7 +7131,7 @@
                 }
                 if (showError) {
                     datasets.push({
-                        label: "Error rate, % (До)",
+                        label: "Доля ошибок, % (До)",
                         data: beforeErr,
                         borderColor: "rgba(185,28,28,0.5)",
                         borderDash: [6, 4],
@@ -3757,6 +7163,8 @@
                 eventNameByCode
             )
             : [];
+        renderUniversalResearchLayout(universal, currentEventRows);
+        void refreshUniversalAttributeBlock(universal);
         logUniversalRenderInput({
             action,
             renderContext,
@@ -3777,7 +7185,7 @@
             if (hasPerEventMode) {
                 const palette = ["#6d28d9", "#0f766e", "#b45309", "#b91c1c", "#1d4ed8", "#be185d", "#475569", "#0369a1", "#4d7c0f", "#7c2d12"];
                 const selectedMetricCode = showCount ? "count" : (showAvg ? "avg" : (showP95 ? "p95" : "error"));
-                const metricLabel = selectedMetricCode === "count" ? "Count" : selectedMetricCode === "avg" ? "AVG" : selectedMetricCode === "p95" ? "P95" : "Error rate, %";
+                const metricLabel = selectedMetricCode === "count" ? "Количество" : selectedMetricCode === "avg" ? "AVG" : selectedMetricCode === "p95" ? "P95" : "Доля ошибок, %";
                 const seriesByCode = new Map((baseline.eventSeries || []).map((item) => [String(item.eventTypeCode || "").trim(), item]));
                 selectedEventCodes.forEach((eventCode, index) => {
                     const payload = seriesByCode.get(eventCode);
@@ -3798,10 +7206,10 @@
                     });
                 });
             } else {
-                if (showCount) beforeDatasets.push({label: "Count", data: (baseline.series || []).map((point) => point.count || 0), borderColor: colors.primary, tension: 0.25, pointRadius: 1.1});
+                if (showCount) beforeDatasets.push({label: "Количество", data: (baseline.series || []).map((point) => point.count || 0), borderColor: colors.primary, tension: 0.25, pointRadius: 1.1});
                 if (showAvg) beforeDatasets.push({label: "AVG", data: (baseline.series || []).map((point) => point.avgMs || 0), borderColor: colors.teal, tension: 0.25, pointRadius: 1.1});
                 if (showP95) beforeDatasets.push({label: "P95", data: (baseline.series || []).map((point) => point.p95Ms || 0), borderColor: colors.amber, tension: 0.25, pointRadius: 1.1});
-                if (showError) beforeDatasets.push({label: "Error rate, %", data: (baseline.series || []).map((point) => toPercentNumber(point.errorRate)), borderColor: colors.red, tension: 0.25, pointRadius: 1.1});
+                if (showError) beforeDatasets.push({label: "Доля ошибок, %", data: (baseline.series || []).map((point) => toPercentNumber(point.errorRate)), borderColor: colors.red, tension: 0.25, pointRadius: 1.1});
             }
             upsertChart(timelineCompareCanvasId, {
                 type: "line",
@@ -3828,7 +7236,7 @@
                 ? "AVG, ms"
                 : primaryStageMetricCode === "p95"
                     ? "P95, ms"
-                    : "Error rate, %";
+                    : "Доля ошибок, %";
             const perEventStageMode = hasPerEventMode;
             const baselineStageByCode = new Map((baseline?.stages || []).map((row) => [row.stageTypeCode, row]));
             const beforeStageMetricValue = (stageRow, metricCode) => {
@@ -3937,7 +7345,7 @@
                 if (metricCode === "p95") {
                     return {label: "P95, ms", data: rows.map((row) => row.p95Ms || 0), backgroundColor: "rgba(124,58,237,0.72)", borderRadius: 8, yAxisID: "y"};
                 }
-                return {label: "Error rate, %", data: rows.map((row) => toPercentNumber(row.errorRate)), backgroundColor: "rgba(185,28,28,0.72)", borderRadius: 8, yAxisID: "y1"};
+                return {label: "Доля ошибок, %", data: rows.map((row) => toPercentNumber(row.errorRate)), backgroundColor: "rgba(185,28,28,0.72)", borderRadius: 8, yAxisID: "y1"};
             });
             if (baseline && universalGhostEnabled) {
                 stageSelectedMetrics.forEach((metricCode) => {
@@ -3966,7 +7374,7 @@
                         return;
                     }
                     stageDatasets.push({
-                        label: "Error rate, % (До)",
+                        label: "Доля ошибок, % (До)",
                         data: rows.map((row) => beforeStageMetricValue(baselineStageByCode.get(row.stageTypeCode), "error")),
                         backgroundColor: "rgba(185,28,28,0.35)",
                         borderColor: "rgba(185,28,28,0.72)",
@@ -4008,7 +7416,7 @@
                     if (metricCode === "p95") {
                         return {label: "P95, ms", data: rows.map((row) => baselineByCode.get(row.stageTypeCode)?.p95Ms || 0), backgroundColor: "rgba(124,58,237,0.72)", borderRadius: 8, yAxisID: "y"};
                     }
-                    return {label: "Error rate, %", data: rows.map((row) => toPercentNumber(baselineByCode.get(row.stageTypeCode)?.errorRate)), backgroundColor: "rgba(185,28,28,0.72)", borderRadius: 8, yAxisID: "y1"};
+                    return {label: "Доля ошибок, %", data: rows.map((row) => toPercentNumber(baselineByCode.get(row.stageTypeCode)?.errorRate)), backgroundColor: "rgba(185,28,28,0.72)", borderRadius: 8, yAxisID: "y1"};
                 });
                 upsertChart(stagesCompareCanvasId, {
                     type: "bar",
@@ -4368,7 +7776,7 @@
         });
         updateUniversalMetricToggleLabel();
         renderUniversalMetricVisualList();
-        // Always propagate main metrics -> stage metrics.
+        // Always propagate main metrics to the hidden metrics view.
         syncUniversalStageMetricsFromSeries();
         enforceUniversalStageMetricRules();
         updateUniversalStageMetricToggleLabel();
@@ -4425,7 +7833,7 @@
         const labelsMap = {
             avg: "AVG",
             p95: "P95",
-            error: "Error rate"
+            error: "Доля ошибок"
         };
         const names = selected.map((code) => labelsMap[code] || code).join(", ");
         refs.universalStageMetricToggle.textContent = names ? `Метрики: ${names}` : "Метрики слоёв";
@@ -4542,8 +7950,9 @@
     }
 
     function selectedUniversalEventCodes() {
-        if (state.universalAnalysisMode === "overall" || refs.universalEventOverall?.checked) {
-            return new Set();
+        const drilldownCodes = state.universalDiagnosticsDrilldownContext?.eventCodes;
+        if (Array.isArray(drilldownCodes) && drilldownCodes.length > 0) {
+            return new Set(drilldownCodes);
         }
         return new Set(
             Array.from(refs.universalEventTypeList?.selectedOptions || [])
@@ -4552,14 +7961,188 @@
         );
     }
 
+    function selectedUniversalStageCodes() {
+        return Array.from(refs.universalStageType?.selectedOptions || [])
+            .map((item) => String(item.value || "").trim())
+            .filter((value) => value.length > 0);
+    }
+
+    function setSelectedUniversalStages(stageCodes = []) {
+        const selected = new Set((stageCodes || [])
+            .map((code) => String(code || "").trim())
+            .filter((code) => code.length > 0));
+        Array.from(refs.universalStageType?.options || []).forEach((option) => {
+            option.selected = selected.has(String(option.value || "").trim());
+        });
+        syncUniversalStageControls();
+    }
+
+    function syncUniversalStageSelectFromCards() {
+        const checked = Array.from(refs.universalStageList?.querySelectorAll("[data-universal-stage-option]:checked") || [])
+            .map((item) => String(item.value || "").trim())
+            .filter((value) => value.length > 0);
+        setSelectedUniversalStages(checked);
+    }
+
+    function syncUniversalStageControls() {
+        const selected = new Set(selectedUniversalStageCodes());
+        const checkboxes = Array.from(refs.universalStageList?.querySelectorAll("[data-universal-stage-option]") || []);
+        checkboxes.forEach((control) => {
+            control.checked = selected.has(String(control.value || "").trim());
+        });
+        const hasSelected = selected.size > 0;
+        if (refs.universalStageAll) {
+            refs.universalStageAll.checked = !hasSelected;
+        }
+        if (!refs.universalStageToggle) {
+            updateUniversalFilterResetVisibility();
+            return;
+        }
+        if (!hasSelected) {
+            refs.universalStageToggle.textContent = "Все этапы";
+            refs.universalStageToggle.title = "Все этапы";
+            updateUniversalFilterResetVisibility();
+            return;
+        }
+        const names = checkboxes
+            .filter((control) => selected.has(String(control.value || "").trim()))
+            .map((control) => control.closest(".form-check")?.querySelector(".form-check-label")?.textContent?.trim() || control.value)
+            .filter(Boolean);
+        const label = names.length === 1
+            ? names[0]
+            : `Этапы: ${names.length}`;
+        refs.universalStageToggle.textContent = label;
+        refs.universalStageToggle.title = names.join(", ");
+        updateUniversalFilterResetVisibility();
+    }
+
+    function hasUniversalEventStageFilters() {
+        const rangeDiffers = (refs.universalFrom?.value || "") !== (refs.from?.value || "")
+            || (refs.universalTo?.value || "") !== (refs.to?.value || "");
+        return selectedUniversalEventCodes().size > 0
+            || selectedUniversalStageCodes().length > 0
+            || rangeDiffers;
+    }
+
+    function updateUniversalFilterResetVisibility() {
+        refs.universalFilterReset?.classList.toggle("d-none", !hasUniversalEventStageFilters());
+    }
+
+    function resetDiagnosticsStateForGlobalReset() {
+        state.universalDiagnosticsDrilldownContext = null;
+        state.universalEventRootCauseRequestId += 1;
+        state.universalRootCauseRequestId += 1;
+        state.universalErrorRootCauseRequestId += 1;
+        state.universalModuleRootCauseRequestId += 1;
+        state.universalAttributeRequestId += 1;
+        state.universalErrorRequestId += 1;
+        state.universalModuleRequestId += 1;
+        [
+            "universalEventRootCauseAbortController",
+            "universalRootCauseAbortController",
+            "universalAttributeAbortController",
+            "universalErrorRootCauseAbortController",
+            "universalModuleRootCauseAbortController"
+        ].forEach((key) => {
+            if (state[key]) {
+                state[key].abort();
+                state[key] = null;
+            }
+        });
+        state.universalAnalysisMode = "overall";
+        resetUniversalEventSelectionForOverall();
+        setSelectedUniversalStages([]);
+        clearUniversalSelectedEventDerivedState();
+        state.universalTopEventRows = [];
+        state.universalTopEventVisibleCount = UNIVERSAL_TABLE_PAGE_SIZE;
+        state.universalTopEventSortBy = "riskScore";
+        state.universalTopEventSortDir = "desc";
+        state.universalTopEventSelectedCode = "";
+        state.universalTopEventSearchQuery = "";
+        state.universalTopEventSeverityTotals = {critical: 0, warning: 0, normal: 0};
+        state.universalAttributePickerOpen = false;
+        state.universalAttributeSearchQuery = "";
+        state.universalAttributeValues = [];
+        state.universalAttributeRows = [];
+        state.universalAttributeVisibleCount = UNIVERSAL_TABLE_PAGE_SIZE;
+        state.universalAttributeTotalRows = 0;
+        state.universalAttributeProblemEventCount = 0;
+        state.universalAttributeSeverityTotals = {critical: 0, warning: 0, normal: 0};
+        state.universalAttributeSortBy = "riskScore";
+        state.universalAttributeSortDir = "desc";
+        state.universalAttributeUserSelected = false;
+        state.universalAttributePinnedRow = null;
+        state.universalRootCauseSelectedValue = "";
+        state.universalErrorRows = [];
+        state.universalErrorVisibleCount = UNIVERSAL_TABLE_PAGE_SIZE;
+        state.universalErrorTotalRows = 0;
+        state.universalErrorProblemEventCount = 0;
+        state.universalErrorSeverityTotals = {critical: 0, warning: 0, normal: 0};
+        state.universalErrorSortBy = "riskScore";
+        state.universalErrorSortDir = "desc";
+        state.universalErrorSelectedKey = "";
+        state.universalErrorSelectedSystemEvent = false;
+        state.universalErrorSearchQuery = "";
+        state.universalModuleRows = [];
+        state.universalModuleVisibleCount = UNIVERSAL_TABLE_PAGE_SIZE;
+        state.universalModuleTotalRows = 0;
+        state.universalModuleProblemEventCount = 0;
+        state.universalModuleSeverityTotals = {critical: 0, warning: 0, normal: 0};
+        state.universalModuleSortBy = "riskScore";
+        state.universalModuleSortDir = "desc";
+        state.universalModuleSelectedKey = "";
+        state.universalModuleSearchQuery = "";
+        state.eventsForcedEventCodes = null;
+        state.eventsForcedErrorKey = "";
+        state.eventsForcedModuleCode = "";
+        state.eventsForcedStageTypeCode = "";
+        state.eventsPage = 0;
+        state.scenarioDetailDrilldownBySource = {};
+        state.scenarioDetailBeforeDrilldownBySource = {};
+        state.scenarioDetailSelectionBySource = {};
+        state.scenarioEventFilterBeforeBySource = {};
+        state.scenarioDetailRequestId += 1;
+        state.analysisIntervalHistory = [];
+        state.activeAnalysisInterval = null;
+        Object.keys(state.expandedIntervalSelectionBySource || {}).forEach((canvasId) => {
+            clearExpandedIntervalSelection(canvasId);
+        });
+        if (state.expandedChart?.sourceCanvasId) {
+            hideExpandedScenarioDetailPanel(state.expandedChart.sourceCanvasId);
+        }
+        if (refs.universalTopSearchInput) refs.universalTopSearchInput.value = "";
+        if (refs.universalAttributeSearchInput) refs.universalAttributeSearchInput.value = "";
+        if (refs.universalErrorSearchInput) refs.universalErrorSearchInput.value = "";
+        if (refs.universalModuleSearchInput) refs.universalModuleSearchInput.value = "";
+        if (refs.universalAttrCode) refs.universalAttrCode.value = "";
+        if (refs.universalAttrValue) refs.universalAttrValue.value = "";
+        if (refs.universalBucket) refs.universalBucket.value = "";
+        syncUniversalFilterModeUi();
+        updateUniversalFilterResetVisibility();
+        ensureActiveAnalysisIntervalChip();
+        syncExpandedIntervalCancelButtons();
+    }
+
+    function renderUniversalStageOptions(stageTypes = []) {
+        const options = normalizeOptionList(stageTypes);
+        if (refs.universalStageList) {
+            refs.universalStageList.innerHTML = options.length
+                ? options.map((item) => `
+                    <label class="form-check">
+                        <input class="form-check-input" type="checkbox" value="${escapeHtml(item.code)}" data-universal-stage-option>
+                        <span class="form-check-label">${escapeHtml(item.name || item.code)}</span>
+                    </label>
+                `).join("")
+                : `<div class="text-muted small">Нет доступных этапов</div>`;
+        }
+        syncUniversalStageControls();
+    }
+
     function validUniversalAnalysisMode(mode) {
         return ["overall", "single-event", "multi-event"].includes(mode);
     }
 
     function resolveUniversalEventMetricMode() {
-        if (validUniversalAnalysisMode(state.universalAnalysisMode)) {
-            return state.universalAnalysisMode;
-        }
         const selected = Array.from(selectedUniversalEventCodes());
         if (refs.universalEventOverall?.checked || selected.length === 0) {
             return "overall";
@@ -4642,10 +8225,10 @@
     function metricDisplayName(code) {
         const value = String(code || "").trim();
         const labels = {
-            count: "Count",
+            count: "Количество",
             avg: "AVG",
             p95: "P95",
-            error: "Error rate"
+            error: "Доля ошибок"
         };
         const optionText = Array.from(refs.universalSeriesMetricList?.options || [])
             .find((option) => String(option.value || "").trim() === value)
@@ -4728,18 +8311,7 @@
     }
 
     function renderUniversalAnalysisModeControl() {
-        const control = ensureUniversalAnalysisModeControl();
-        if (!control) {
-            return;
-        }
-        const mode = resolveUniversalEventMetricMode();
-        control.querySelectorAll("[data-universal-analysis-mode]").forEach((button) => {
-            const active = button.getAttribute("data-universal-analysis-mode") === mode;
-            button.classList.toggle("is-active", active);
-            button.setAttribute("aria-selected", active ? "true" : "false");
-            button.setAttribute("tabindex", active ? "0" : "-1");
-        });
-        control.setAttribute("data-universal-event-mode", mode);
+        refs.universalForm?.querySelector("[data-universal-analysis-mode-control]")?.remove();
     }
 
     function ensureUniversalEventVisualList() {
@@ -4775,22 +8347,11 @@
         const mode = resolveUniversalEventMetricMode();
         const selected = selectedUniversalEventCodes();
         refs.universalEventTypePopup?.setAttribute("data-universal-event-mode", mode);
-        refs.universalEventOverall?.closest(".analytics-universal-events-popup-head")?.classList.add("d-none");
-        if (mode === "overall") {
-            list.innerHTML = `
-                <div class="analytics-universal-overall-state">
-                    <div class="analytics-universal-overall-state-title">Все события</div>
-                    <div class="analytics-universal-overall-state-sub">Конкретные события выбираются в режимах "Одно событие" и "Сравнение событий".</div>
-                </div>
-            `;
-            return;
-        }
+        refs.universalEventOverall?.closest(".analytics-universal-events-popup-head")?.classList.remove("d-none");
         list.innerHTML = Array.from(refs.universalEventTypeList.options || []).map((option) => {
             const code = String(option.value || "").trim();
             const checked = selected.has(code);
-            const control = mode === "single-event"
-                ? `<span class="analytics-universal-option-radio" aria-hidden="true">${checked ? "✓" : ""}</span>`
-                : `<span class="analytics-universal-option-checkbox" aria-hidden="true">${checked ? "✓" : ""}</span>`;
+            const control = `<span class="analytics-universal-option-checkbox" aria-hidden="true">${checked ? "✓" : ""}</span>`;
             return `
                 <button type="button"
                         class="analytics-universal-option ${checked ? "is-selected" : ""}"
@@ -4809,21 +8370,13 @@
         if (!eventCode) {
             return;
         }
-        const mode = resolveUniversalEventMetricMode();
-        if (mode === "overall") {
-            return;
-        }
-        if (mode === "single-event") {
-            setSelectedUniversalEventCodes([eventCode]);
+        const selected = selectedUniversalEventCodes();
+        if (selected.has(eventCode)) {
+            selected.delete(eventCode);
         } else {
-            const selected = selectedUniversalEventCodes();
-            if (selected.has(eventCode) && selected.size > 1) {
-                selected.delete(eventCode);
-            } else {
-                selected.add(eventCode);
-            }
-            setSelectedUniversalEventCodes(Array.from(selected));
+            selected.add(eventCode);
         }
+        setSelectedUniversalEventCodes(Array.from(selected));
         refs.universalEventTypeList?.dispatchEvent(new Event("change", {bubbles: true}));
     }
 
@@ -4876,7 +8429,7 @@
                         data-universal-metric-option="${escapeHtml(code)}"
                         ${disabled ? "disabled" : ""}
                         aria-pressed="${checked ? "true" : "false"}"
-                        title="${escapeHtml(disabled ? "Count доступен только для всех этапов" : (option.textContent || code))}">
+                         title="${escapeHtml(disabled ? "Количество доступно только для всех этапов" : (option.textContent || code))}">
                     ${control}
                     <span class="analytics-universal-option-label">${escapeHtml(option.textContent || code)}</span>
                 </button>
@@ -4941,14 +8494,9 @@
         refs.universalEventTypePopup?.setAttribute("data-universal-event-mode", mode);
         refs.universalSeriesMetricToggle?.setAttribute("data-universal-event-mode", mode);
         refs.universalEventTypeToggle?.setAttribute("data-universal-event-mode", mode);
-        const eventReadonly = mode === "overall";
-        refs.universalEventTypeToggle?.classList.toggle("is-readonly", eventReadonly);
-        refs.universalEventTypeToggle?.setAttribute("aria-disabled", eventReadonly ? "true" : "false");
-        refs.universalEventTypeToggle?.setAttribute("tabindex", eventReadonly ? "-1" : "0");
-        if (eventReadonly) {
-            refs.universalEventTypePopup?.classList.add("d-none");
-            refs.universalEventTypeToggle?.setAttribute("aria-expanded", "false");
-        }
+        refs.universalEventTypeToggle?.classList.remove("is-readonly");
+        refs.universalEventTypeToggle?.setAttribute("aria-disabled", "false");
+        refs.universalEventTypeToggle?.setAttribute("tabindex", "0");
     }
 
     function updateUniversalEventToggleLabel() {
@@ -4959,6 +8507,7 @@
         if (mode === "overall") {
             refs.universalEventTypeToggle.textContent = "События: все";
             refs.universalEventTypeToggle.title = "Общая статистика по всем событиям";
+            updateUniversalFilterResetVisibility();
             return;
         }
         const selected = Array.from(selectedUniversalEventCodes());
@@ -4966,15 +8515,18 @@
             if (!selected.length) {
                 refs.universalEventTypeToggle.textContent = "Событие не выбрано";
                 refs.universalEventTypeToggle.title = "Выберите событие для анализа";
+                updateUniversalFilterResetVisibility();
                 return;
             }
             const name = universalEventDisplayName(selected[0]);
             refs.universalEventTypeToggle.textContent = `Событие: ${name}`;
             refs.universalEventTypeToggle.title = `Событие: ${name}`;
+            updateUniversalFilterResetVisibility();
             return;
         }
         refs.universalEventTypeToggle.textContent = `Сравниваемые события: ${selected.length}`;
         refs.universalEventTypeToggle.title = `Сравниваемые события: ${selected.length}`;
+        updateUniversalFilterResetVisibility();
     }
 
     function enforceUniversalEventMetricDependency(source) {
@@ -5007,26 +8559,37 @@
         if (moduleCode) {
             params.set("moduleCode", moduleCode);
         }
-        const analysisMode = resolveUniversalEventMetricMode();
-        params.set("analysisMode", analysisMode);
         const selectedEventCodes = selectedUniversalEventCodes();
-        const eventFilterAllowed = includeEventFilter && analysisMode !== "overall";
+        const eventFilterAllowed = includeEventFilter;
         if (eventFilterAllowed && selectedEventCodes.size > 0) {
             selectedEventCodes.forEach((code) => {
                 params.append("eventTypeCode", code);
             });
         }
-        const attrCode = (refs.universalAttrCode?.value || "").trim();
+        const attrCode = options.attributeCode != null
+            ? String(options.attributeCode || "").trim()
+            : (refs.universalAttrCode?.value || "").trim();
         if (attrCode) {
             params.set("attributeCode", attrCode);
         }
-        const attrValue = (refs.universalAttrValue?.value || "").trim();
+        const attrValue = options.attributeValue != null
+            ? String(options.attributeValue || "").trim()
+            : (refs.universalAttrValue?.value || "").trim();
         if (attrValue) {
             params.set("attributeValue", attrValue);
         }
-        const stageType = (refs.universalStageType?.value || "").trim();
+        const selectedStageCodes = selectedUniversalStageCodes();
+        const stageType = options.stageTypeCode != null
+            ? String(options.stageTypeCode || "").trim()
+            : "";
         if (stageType) {
             params.set("stageTypeCode", stageType);
+            params.set("stageTypeCodes", stageType);
+        } else {
+            selectedStageCodes.forEach((code) => {
+                params.append("stageTypeCode", code);
+                params.append("stageTypeCodes", code);
+            });
         }
         const requestPath = refs.analyticsRequestPath?.value?.trim();
         if (requestPath) {
@@ -5043,6 +8606,18 @@
     }
 
     function resolveUniversalCompareRanges() {
+        const drilldownContext = state.universalDiagnosticsDrilldownContext;
+        const drilldownFrom = String(drilldownContext?.from || "").trim();
+        const drilldownTo = String(drilldownContext?.to || "").trim();
+        if (drilldownFrom && drilldownTo) {
+            const normalized = normalizeCompareRangesByAfter(drilldownFrom, drilldownTo, "", "");
+            return {
+                beforeFrom: normalized.beforeFrom,
+                beforeTo: normalized.beforeTo,
+                afterFrom: normalized.afterFrom,
+                afterTo: normalized.afterTo
+            };
+        }
         if (UNIVERSAL_COMPARE_FOLLOWS_GLOBAL) {
             return resolveGlobalBeforeRange();
         }
@@ -5206,7 +8781,8 @@
                 }]
             },
             options: baseChartOptions("Количество"),
-            __analyticsTimePoints: sampledEvents.indexes.map((index) => eventTimePoints[index]).filter(Boolean)
+            __analyticsTimePoints: sampledEvents.indexes.map((index) => eventTimePoints[index]).filter(Boolean),
+            __analyticsEffectiveBucketMinutes: eventsCountData?.bucketMinutes || ""
         });
         if (needInlineCompareEventsCount) {
             const baselineData = baselineDataByKey.get(eventsCountKeys?.beforeKey || "");
@@ -5264,7 +8840,8 @@
                 ]
             },
             options: baseChartOptions("ms"),
-            __analyticsTimePoints: sampledLatency.indexes.map((index) => latencyTimePoints[index]).filter(Boolean)
+            __analyticsTimePoints: sampledLatency.indexes.map((index) => latencyTimePoints[index]).filter(Boolean),
+            __analyticsEffectiveBucketMinutes: latencyData?.bucketMinutes || ""
         });
         if (needInlineCompareLatency) {
             const baselineData = baselineDataByKey.get(latencyKeys?.beforeKey || "");
@@ -5297,7 +8874,7 @@
             data: {
                 labels: sampledError.labels,
                 datasets: [{
-                    label: "Error rate, %",
+                    label: "Доля ошибок, %",
                     data: sampledError.datasets[0] || [],
                     borderColor: colors.red,
                     backgroundColor: "rgba(185,28,28,0.16)",
@@ -5307,7 +8884,8 @@
                 }]
             },
             options: barChartOptions("%"),
-            __analyticsTimePoints: sampledError.indexes.map((index) => errorTimePoints[index]).filter(Boolean)
+            __analyticsTimePoints: sampledError.indexes.map((index) => errorTimePoints[index]).filter(Boolean),
+            __analyticsEffectiveBucketMinutes: errorData?.bucketMinutes || ""
         });
         if (needInlineCompareError) {
             const baselineData = baselineDataByKey.get(errorKeys?.beforeKey || "");
@@ -5320,7 +8898,7 @@
                 data: {
                     labels: sampledBaselineErr.labels,
                     datasets: [{
-                        label: "Error rate (До), %",
+                        label: "Доля ошибок (До), %",
                         data: sampledBaselineErr.datasets[0] || [],
                         borderColor: colors.red,
                         backgroundColor: "rgba(185,28,28,0.14)",
@@ -5521,7 +9099,7 @@
             data: {
                 labels: stageLabels,
                 datasets: [{
-                    label: "Error rate, %",
+                    label: "Доля ошибок, %",
                     data: stageErrors,
                     backgroundColor: "rgba(185,28,28,0.8)",
                     borderRadius: 8
@@ -5538,7 +9116,7 @@
                 data: {
                     labels: baselineRows.map((row) => row.stageTypeName || row.stageTypeCode),
                     datasets: [{
-                        label: "Error rate (До), %",
+                        label: "Доля ошибок (До), %",
                         data: baselineRows.map((row) => toPercentNumber(row.errorRate)),
                         backgroundColor: "rgba(185,28,28,0.55)",
                         borderRadius: 8
@@ -6998,15 +10576,814 @@
         modal.show();
     }
 
+    function toggleSystemPopup(popup, toggle) {
+        if (!popup || !toggle) {
+            return;
+        }
+        const open = popup.classList.contains("d-none");
+        popup.classList.toggle("d-none", !open);
+        toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    }
+
+    function closeSystemPopup(popup, toggle) {
+        popup?.classList.add("d-none");
+        toggle?.setAttribute("aria-expanded", "false");
+    }
+
+    function systemChartMetricDefinitions() {
+        return {
+            count: {label: "Количество", yTitle: "События", color: colors.primary, axis: "yCount", read: (point) => point?.count || 0},
+            avg: {label: "AVG", yTitle: "ms", color: colors.teal, axis: "yMs", read: (point) => point?.avgMs || 0},
+            p95: {label: "P95", yTitle: "ms", color: colors.amber, axis: "yMs", read: (point) => point?.p95Ms || 0},
+            p99: {label: "P99", yTitle: "ms", color: "#1d4ed8", axis: "yMs", read: (point) => point?.p99Ms || 0},
+            error: {label: "Доля ошибок, %", yTitle: "%", color: colors.red, axis: "yPercent", read: (point) => toPercentNumber(point?.errorRate)}
+        };
+    }
+
+    function selectedSystemChartMetrics() {
+        const selected = Array.from(refs.systemChartMetric?.selectedOptions || [])
+            .map((option) => String(option.value || "").trim())
+            .filter(Boolean);
+        return selected.length ? selected : ["count"];
+    }
+
+    function setSelectedSystemChartMetrics(metricCodes) {
+        const desired = new Set((metricCodes || []).map((code) => String(code || "").trim()).filter(Boolean));
+        Array.from(refs.systemChartMetric?.options || []).forEach((option) => {
+            option.selected = desired.has(String(option.value || "").trim());
+        });
+        renderSystemChartMetricOptions();
+    }
+
+    function systemChartAnalysisMode() {
+        const count = selectedSystemChartEventCodes().length;
+        if (count > 1) {
+            return "multi-event";
+        }
+        return count === 1 ? "single-event" : "overall";
+    }
+
+    function chooseSystemComparisonMetric(metrics = selectedSystemChartMetrics()) {
+        return metrics.includes("p95") ? "p95" : (metrics[0] || "count");
+    }
+
+    function syncSystemChartMetricMode() {
+        const mode = systemChartAnalysisMode();
+        const selected = selectedSystemChartMetrics();
+        if (mode === "multi-event" && selected.length > 1) {
+            state.systemMetricSelectionBeforeSingle = selected;
+            state.systemMetricSingleForced = true;
+            setSelectedSystemChartMetrics([chooseSystemComparisonMetric(selected)]);
+            return;
+        }
+        if (mode !== "multi-event"
+            && state.systemMetricSingleForced
+            && state.systemMetricSelectionBeforeSingle.length > 1
+            && selected.length <= 1) {
+            setSelectedSystemChartMetrics(state.systemMetricSelectionBeforeSingle);
+        }
+        if (mode !== "multi-event") {
+            state.systemMetricSingleForced = false;
+            state.systemMetricSelectionBeforeSingle = [];
+        }
+        renderSystemChartMetricOptions();
+    }
+
+    function renderSystemChartMetricOptions() {
+        if (!refs.systemChartMetricOptions || !refs.systemChartMetric) {
+            return;
+        }
+        const selected = new Set(selectedSystemChartMetrics());
+        const single = systemChartAnalysisMode() === "multi-event";
+        refs.systemChartMetricOptions.innerHTML = Array.from(refs.systemChartMetric.options).map((option) => {
+            const code = String(option.value || "").trim();
+            const checked = selected.has(code);
+            const controlClass = single ? "analytics-universal-option-radio" : "analytics-universal-option-checkbox";
+            return `
+                <button type="button"
+                        class="analytics-universal-option ${checked ? "is-selected" : ""}"
+                        data-system-metric-option="${escapeHtml(code)}"
+                        aria-pressed="${checked ? "true" : "false"}">
+                    <span class="${controlClass}" aria-hidden="true">${checked ? "✓" : ""}</span>
+                    <span class="analytics-universal-option-label">${escapeHtml(option.textContent || code)}</span>
+                </button>
+            `;
+        }).join("");
+        if (refs.systemChartMetricToggle) {
+            refs.systemChartMetricToggle.textContent = single
+                ? `Метрика сравнения: ${systemChartMetricDefinitions()[selectedSystemChartMetrics()[0]]?.label || "Количество"}`
+                : `Метрики: ${selectedSystemChartMetrics().length}`;
+        }
+    }
+
+    function selectSystemChartMetric(metricCode) {
+        const code = String(metricCode || "").trim();
+        if (!code) {
+            return;
+        }
+        markSystemChartLocalDirty();
+        const mode = systemChartAnalysisMode();
+        if (mode === "multi-event") {
+            setSelectedSystemChartMetrics([code]);
+        } else {
+            const selected = new Set(selectedSystemChartMetrics());
+            if (selected.has(code) && selected.size > 1) {
+                selected.delete(code);
+            } else {
+                selected.add(code);
+            }
+            setSelectedSystemChartMetrics(Array.from(selected));
+        }
+        void loadSystemEventsChart({refreshOptions: false});
+    }
+
+    function syncSystemSortFromEventsRefs() {
+        if (refs.systemEventsSortBy && refs.eventsSortBy) {
+            refs.systemEventsSortBy.value = refs.eventsSortBy.value || "startedAt";
+        } else if (refs.systemEventsSortBy) {
+            refs.systemEventsSortBy.value = state.systemEventsSortBy || "startedAt";
+        }
+        if (refs.systemEventsSortDir && refs.eventsSortDir) {
+            refs.systemEventsSortDir.value = refs.eventsSortDir.value || "desc";
+        } else if (refs.systemEventsSortDir) {
+            refs.systemEventsSortDir.value = state.systemEventsSortDir || "desc";
+        }
+        updateEventsSortHeaders();
+    }
+
+    function syncSystemSortToEventsRefs() {
+        if (refs.eventsSortBy && refs.systemEventsSortBy) {
+            refs.eventsSortBy.value = refs.systemEventsSortBy.value;
+        }
+        if (refs.eventsSortDir && refs.systemEventsSortDir) {
+            refs.eventsSortDir.value = refs.systemEventsSortDir.value;
+        }
+        if (refs.systemEventsSortBy?.value) {
+            state.systemEventsSortBy = refs.systemEventsSortBy.value;
+        }
+        if (refs.systemEventsSortDir?.value) {
+            state.systemEventsSortDir = refs.systemEventsSortDir.value === "asc" ? "asc" : "desc";
+        }
+        updateEventsSortHeaders();
+    }
+
+    function eventSortHeaderDefinitions() {
+        return [
+            {index: 0, sortBy: "startedAt"},
+            {index: 1, sortBy: "eventTypeCode"},
+            {index: 2, sortBy: "durationMs"},
+            {index: 4, sortBy: "requestPath"},
+            {index: 5, sortBy: "traceId"},
+            {index: 6, sortBy: "isError"}
+        ];
+    }
+
+    function initEventsSortHeaders() {
+        const headers = Array.from(refs.eventsTable?.querySelectorAll("thead th") || []);
+        eventSortHeaderDefinitions().forEach(({index, sortBy}) => {
+            const header = headers[index];
+            if (!header || header.querySelector("[data-events-sort]")) {
+                return;
+            }
+            const label = (header.textContent || "").trim();
+            header.textContent = "";
+            const button = document.createElement("button");
+            button.className = "analytics-table-sort-btn";
+            if (header.classList.contains("text-end")) {
+                button.classList.add("justify-content-end");
+            }
+            button.type = "button";
+            button.dataset.eventsSort = sortBy;
+            button.append(document.createTextNode(label || sortBy));
+            button.append(document.createTextNode(" "));
+            const icon = document.createElement("span");
+            icon.dataset.sortIcon = "";
+            button.append(icon);
+            header.append(button);
+        });
+        updateEventsSortHeaders();
+    }
+
+    function updateEventsSortHeaders() {
+        const activeSortBy = state.eventsSystemOnly ? state.systemEventsSortBy : state.eventsSortBy;
+        const activeSortDir = state.eventsSystemOnly ? state.systemEventsSortDir : state.eventsSortDir;
+        refs.eventsTable?.querySelectorAll("[data-events-sort]").forEach((button) => {
+            const sortBy = String(button.getAttribute("data-events-sort") || "").trim();
+            const icon = button.querySelector("[data-sort-icon]");
+            const isActive = sortBy === activeSortBy;
+            button.classList.toggle("is-active", isActive);
+            if (icon) {
+                icon.textContent = isActive
+                    ? (activeSortDir === "asc" ? "↑" : "↓")
+                    : "↕";
+            }
+        });
+    }
+
+    function markSystemChartLocalDirty() {
+        if (state.syncingSystemChartFromMain) {
+            return;
+        }
+        state.systemChartLocalDirty = true;
+        syncSystemChartResetMainButton();
+    }
+
+    function syncSystemChartResetMainButton() {
+        const show = !!state.systemChartLocalDirty;
+        refs.systemChartResetMain?.classList.toggle("d-none", !show);
+        if (refs.systemChartResetMain) {
+            refs.systemChartResetMain.disabled = !show;
+        }
+    }
+
+    function syncSystemChartIntervalUndoButton() {
+        const show = state.systemIntervalHistory.length > 0
+            || state.systemActiveInterval?.sourceCanvasId === "chart-system-events";
+        refs.systemChartIntervalUndo?.classList.toggle("d-none", !show);
+        if (refs.systemChartIntervalUndo) {
+            refs.systemChartIntervalUndo.disabled = !show;
+        }
+    }
+
+    function currentSystemChartFilterSnapshot() {
+        return {
+            from: refs.systemChartFrom?.value || "",
+            to: refs.systemChartTo?.value || "",
+            preset: refs.systemChartPreset?.value || "",
+            bucket: refs.systemChartBucket?.value || "",
+            compare: refs.systemChartCompare?.value || "off",
+            isError: refs.systemChartIsError?.value || "",
+            eventCodes: selectedSystemChartEventCodes(),
+            allEvents: !!refs.systemChartEventsAll?.checked,
+            activeInterval: state.systemActiveInterval ? {...state.systemActiveInterval} : null
+        };
+    }
+
+    function restoreSystemChartFilterSnapshot(snapshot) {
+        if (!snapshot) {
+            return;
+        }
+        if (refs.systemChartFrom) refs.systemChartFrom.value = snapshot.from || "";
+        if (refs.systemChartTo) refs.systemChartTo.value = snapshot.to || "";
+        if (refs.systemChartPreset) refs.systemChartPreset.value = snapshot.preset || "";
+        if (refs.systemChartBucket) refs.systemChartBucket.value = snapshot.bucket || "";
+        if (refs.systemChartCompare) refs.systemChartCompare.value = isValidInlineCompareMode(snapshot.compare) ? snapshot.compare : "off";
+        if (refs.systemChartIsError) refs.systemChartIsError.value = snapshot.isError || "";
+        const selected = new Set(Array.isArray(snapshot.eventCodes) ? snapshot.eventCodes : []);
+        Array.from(refs.systemChartEventsList?.options || []).forEach((option) => {
+            option.selected = selected.has(String(option.value || "").trim());
+        });
+        if (refs.systemChartEventsAll) {
+            refs.systemChartEventsAll.checked = snapshot.allEvents !== false || selected.size === 0;
+        }
+        syncQuickRangeSelectFromRange(
+            refs.systemChartPreset,
+            refs.systemChartFrom?.value || "",
+            refs.systemChartTo?.value || ""
+        );
+        updateSystemChartEventsLabel();
+        syncSystemChartMetricMode();
+    }
+
+    function applyMainEventToSystemSelector() {
+        const mainEventCode = refs.eventType?.value?.trim() || "";
+        const matchingOption = mainEventCode
+            ? Array.from(refs.systemChartEventsList?.options || [])
+                .find((option) => String(option.value || "").trim() === mainEventCode)
+            : null;
+        Array.from(refs.systemChartEventsList?.options || []).forEach((option) => {
+            option.selected = !!matchingOption && option === matchingOption;
+        });
+        if (refs.systemChartEventsAll) {
+            refs.systemChartEventsAll.checked = !matchingOption;
+        }
+        updateSystemChartEventsLabel();
+        syncSystemChartMetricMode();
+    }
+
+    async function syncSystemChartFiltersFromMain(options = {}) {
+        const force = !!options.force;
+        if (!refs.systemChartForm || (state.systemChartLocalDirty && !force)) {
+            syncSystemChartResetMainButton();
+            return false;
+        }
+        state.syncingSystemChartFromMain = true;
+        try {
+            if (refs.systemChartFrom) refs.systemChartFrom.value = refs.from?.value || "";
+            if (refs.systemChartTo) refs.systemChartTo.value = refs.to?.value || "";
+            syncQuickRangeSelectFromRange(
+                refs.systemChartPreset,
+                refs.systemChartFrom?.value || "",
+                refs.systemChartTo?.value || ""
+            );
+            if (refs.systemChartBucket) {
+                const mainBucket = refs.bucket?.value || "";
+                refs.systemChartBucket.value = Array.from(refs.systemChartBucket.options || [])
+                    .some((option) => option.value === mainBucket)
+                    ? mainBucket
+                    : "";
+            }
+            if (refs.systemChartCompare) {
+                const mainCompare = resolveGlobalInlineCompareMode();
+                refs.systemChartCompare.value = Array.from(refs.systemChartCompare.options || [])
+                    .some((option) => option.value === mainCompare)
+                    ? mainCompare
+                    : "off";
+            }
+            if (refs.systemChartIsError) {
+                refs.systemChartIsError.value = "";
+            }
+            if (options.refreshOptions) {
+                await refreshSystemChartEventOptions({preserveSelection: false});
+            } else {
+                applyMainEventToSystemSelector();
+            }
+            state.systemChartLocalDirty = false;
+            syncSystemChartResetMainButton();
+            return true;
+        } finally {
+            state.syncingSystemChartFromMain = false;
+        }
+    }
+
+    async function resetSystemChartToMain() {
+        state.systemIntervalHistory = [];
+        state.systemActiveInterval = null;
+        await syncSystemChartFiltersFromMain({force: true, refreshOptions: true});
+        syncSystemChartIntervalUndoButton();
+        await submitSystemFilters({refreshOptions: false});
+    }
+
+    async function undoSystemChartInterval() {
+        const snapshot = state.systemIntervalHistory.pop()
+            || (state.systemActiveInterval?.sourceCanvasId === "chart-system-events"
+                ? {
+                    from: state.systemActiveInterval.fromBefore || "",
+                    to: state.systemActiveInterval.toBefore || "",
+                    preset: "",
+                    bucket: refs.systemChartBucket?.value || "",
+                    compare: refs.systemChartCompare?.value || "off",
+                    isError: refs.systemChartIsError?.value || "",
+                    eventCodes: selectedSystemChartEventCodes(),
+                    allEvents: !!refs.systemChartEventsAll?.checked,
+                    activeInterval: null
+                }
+                : null);
+        if (!snapshot) {
+            syncSystemChartIntervalUndoButton();
+            return;
+        }
+        restoreSystemChartFilterSnapshot(snapshot);
+        state.systemActiveInterval = snapshot.activeInterval || null;
+        state.systemIntervalSelection = null;
+        state.systemIntervalSelectionEnabled = false;
+        refs.systemChartIntervalToggle?.classList.remove("active");
+        refs.systemChartIntervalToggle?.setAttribute("aria-pressed", "false");
+        syncSystemChartIntervalUndoButton();
+        markSystemChartLocalDirty();
+        await submitSystemFilters({refreshOptions: true});
+    }
+
+    async function submitSystemFilters(options = {}) {
+        if (state.currentDashboardTab !== "system") {
+            return;
+        }
+        if (options.refreshOptions) {
+            await refreshSystemChartEventOptions();
+        }
+        syncSystemChartMetricMode();
+        await Promise.all([
+            loadSystemEventsChart({refreshOptions: false}),
+            loadEvents(true)
+        ]);
+    }
+
+    function syncSystemChartRangeFromMain(force) {
+        if (!refs.systemChartFrom || !refs.systemChartTo) {
+            return;
+        }
+        if (force || !refs.systemChartFrom.value) {
+            refs.systemChartFrom.value = refs.from?.value || "";
+        }
+        if (force || !refs.systemChartTo.value) {
+            refs.systemChartTo.value = refs.to?.value || "";
+        }
+        syncQuickRangeSelectFromRange(
+            refs.systemChartPreset,
+            refs.systemChartFrom.value,
+            refs.systemChartTo.value
+        );
+    }
+
+    async function applySystemChartPreset(presetValue) {
+        if (!refs.systemChartFrom || !refs.systemChartTo) {
+            return;
+        }
+        const preset = String(presetValue || "").trim().toLowerCase();
+        if (!preset) {
+            return;
+        }
+        if (preset === "all") {
+            await ensureAllTimeRangeLoaded();
+            const allRange = getAllTimeLocalRange();
+            refs.systemChartFrom.value = allRange.from;
+            refs.systemChartTo.value = allRange.to;
+            return;
+        }
+        const range = buildQuickRangeFromDate(new Date(), preset);
+        if (!range) {
+            return;
+        }
+        refs.systemChartFrom.value = toDateTimeLocalString(range.fromDate);
+        refs.systemChartTo.value = toDateTimeLocalString(range.toDate);
+    }
+
+    function selectedSystemChartEventCodes() {
+        if (refs.systemChartEventsAll?.checked) {
+            return [];
+        }
+        return Array.from(refs.systemChartEventsList?.selectedOptions || [])
+            .map((option) => String(option.value || "").trim())
+            .filter(Boolean);
+    }
+
+    function updateSystemChartEventsLabel() {
+        if (!refs.systemChartEventsToggle) {
+            return;
+        }
+        const selected = selectedSystemChartEventCodes();
+        refs.systemChartEventsToggle.textContent = selected.length
+            ? `События: ${selected.length}`
+            : "Все служебные";
+        refs.systemChartEventsToggle.title = selected.length
+            ? `Выбрано служебных событий: ${selected.length}`
+            : "Все служебные события";
+    }
+
+    async function refreshSystemChartEventOptions(options = {}) {
+        if (!refs.systemChartEventsList) {
+            return;
+        }
+        const preserveSelection = options.preserveSelection !== false;
+        const previous = preserveSelection ? new Set(selectedSystemChartEventCodes()) : new Set();
+        const payload = await fetchPeriodFilterOptions({
+            fromValue: refs.systemChartFrom?.value || refs.from?.value || "",
+            toValue: refs.systemChartTo?.value || refs.to?.value || "",
+            moduleCode: refs.moduleType?.value?.trim() || "",
+            eventTypeCode: "",
+            includeEventType: false,
+            systemEventsOnly: true
+        });
+        const available = normalizeOptionList(payload?.eventTypes);
+        refs.systemChartEventsList.innerHTML = available.map((item) => {
+            const selected = previous.has(item.code);
+            return `<option value="${escapeHtml(item.code)}" ${selected ? "selected" : ""}>${escapeHtml(item.name)}</option>`;
+        }).join("");
+        const validSelected = Array.from(refs.systemChartEventsList.selectedOptions || []).length;
+        if (refs.systemChartEventsAll) {
+            refs.systemChartEventsAll.checked = validSelected === 0;
+        }
+        if (!preserveSelection) {
+            applyMainEventToSystemSelector();
+        }
+        updateSystemChartEventsLabel();
+        syncSystemChartMetricMode();
+    }
+
+    function systemChartRange() {
+        const fromValue = refs.systemChartFrom?.value || refs.from?.value || "";
+        const toValue = refs.systemChartTo?.value || refs.to?.value || "";
+        const fromDate = new Date(fromValue);
+        const toDate = new Date(toValue);
+        if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime()) || fromDate >= toDate) {
+            return null;
+        }
+        return {fromDate, toDate};
+    }
+
+    function systemChartParams(fromDate, toDate) {
+        const params = new URLSearchParams();
+        params.set("from", fromDate.toISOString());
+        params.set("to", toDate.toISOString());
+        params.set("systemEventsOnly", "true");
+        params.set("includeEventStageBreakdown", "false");
+        const moduleCode = refs.moduleType?.value?.trim();
+        if (moduleCode) {
+            params.set("moduleCode", moduleCode);
+        }
+        selectedSystemChartEventCodes().forEach((code) => {
+            params.append("eventTypeCode", code);
+        });
+        const bucket = refs.systemChartBucket?.value?.trim();
+        if (bucket) {
+            params.set("bucketMinutes", bucket);
+        }
+        const isError = refs.systemChartIsError?.value || "";
+        if (isError !== "") {
+            params.set("isError", isError);
+        }
+        return params;
+    }
+
+    function buildSystemChartConfig(payload, options = {}) {
+        const definitions = systemChartMetricDefinitions();
+        const metricCodes = selectedSystemChartMetrics();
+        const selectedCodes = selectedSystemChartEventCodes();
+        const eventSeries = new Map(
+            (Array.isArray(payload?.eventSeries) ? payload.eventSeries : [])
+                .map((row) => [String(row?.eventTypeCode || "").trim(), row])
+        );
+        const aggregateSeries = Array.isArray(payload?.series) ? payload.series : [];
+        const singleEventRow = selectedCodes.length === 1 ? eventSeries.get(selectedCodes[0]) : null;
+        const sourceSeries = singleEventRow && Array.isArray(singleEventRow.series)
+            ? singleEventRow.series
+            : aggregateSeries;
+        const labels = sourceSeries.map((point) => formatTime(point.time));
+        const timePoints = sourceSeries.map((point) => point?.time).filter(Boolean);
+        const palette = ["#6d28d9", "#0f766e", "#b45309", "#b91c1c", "#1d4ed8", "#be185d", "#475569", "#0369a1"];
+        const datasets = [];
+        if (selectedCodes.length > 1) {
+            const metric = definitions[metricCodes[0]] || definitions.count;
+            selectedCodes.forEach((code, index) => {
+                const row = eventSeries.get(code);
+                if (!row) {
+                    return;
+                }
+                const points = Array.isArray(row.series) ? row.series : [];
+                datasets.push({
+                    label: `${row.eventTypeName || row.eventTypeCode} · ${metric.label}${options.baseline ? " (до)" : ""}`,
+                    data: points.map(metric.read),
+                    borderColor: palette[index % palette.length],
+                    borderDash: options.baseline ? [6, 4] : undefined,
+                    yAxisID: metric.axis,
+                    tension: 0.25,
+                    pointRadius: 1.2
+                });
+            });
+        } else {
+            metricCodes.forEach((metricCode, index) => {
+                const metric = definitions[metricCode] || definitions.count;
+                datasets.push({
+                    label: `${metric.label}${singleEventRow ? ` · ${singleEventRow.eventTypeName || singleEventRow.eventTypeCode}` : ""}${options.baseline ? " (до)" : ""}`,
+                    data: sourceSeries.map(metric.read),
+                    borderColor: options.baseline ? palette[(index + 5) % palette.length] : metric.color,
+                    borderDash: options.baseline ? [6, 4] : undefined,
+                    yAxisID: metric.axis,
+                    tension: 0.25,
+                    pointRadius: 1.2
+                });
+            });
+        }
+        const chartOptions = baseChartOptions("");
+        const usedAxes = new Set(datasets.map((dataset) => dataset.yAxisID));
+        chartOptions.scales.y.display = false;
+        chartOptions.scales.yCount = {
+            display: usedAxes.has("yCount"),
+            position: "left",
+            beginAtZero: true,
+            grid: {color: "rgba(148,163,184,0.14)"},
+            ticks: {color: "#64748b"},
+            title: {display: usedAxes.has("yCount"), text: "События", color: "#64748b"}
+        };
+        chartOptions.scales.yMs = {
+            display: usedAxes.has("yMs"),
+            position: usedAxes.has("yCount") ? "right" : "left",
+            beginAtZero: true,
+            grid: {drawOnChartArea: !usedAxes.has("yCount"), color: "rgba(148,163,184,0.1)"},
+            ticks: {color: "#64748b"},
+            title: {display: usedAxes.has("yMs"), text: "ms", color: "#64748b"}
+        };
+        chartOptions.scales.yPercent = {
+            display: usedAxes.has("yPercent") && !usedAxes.has("yCount") && !usedAxes.has("yMs"),
+            position: "left",
+            beginAtZero: true,
+            suggestedMax: 100,
+            grid: {drawOnChartArea: false},
+            ticks: {color: "#64748b"},
+            title: {
+                display: usedAxes.has("yPercent") && !usedAxes.has("yCount") && !usedAxes.has("yMs"),
+                text: "%",
+                color: "#64748b"
+            }
+        };
+        return {
+            type: "line",
+            data: {labels, datasets},
+            options: chartOptions,
+            __analyticsTimePoints: timePoints
+        };
+    }
+
+    async function loadSystemEventsChart(options = {}) {
+        if (!refs.systemChartForm || state.currentDashboardTab !== "system") {
+            return;
+        }
+        const range = systemChartRange();
+        if (!range) {
+            if (refs.systemChartStatus) {
+                refs.systemChartStatus.textContent = "Проверьте границы периода.";
+            }
+            return;
+        }
+        const requestId = ++state.systemChartRequestId;
+        if (refs.systemChartStatus) {
+            refs.systemChartStatus.textContent = "Загрузка...";
+        }
+        try {
+            if (options.refreshOptions !== false) {
+                await refreshSystemChartEventOptions();
+            }
+            if (requestId !== state.systemChartRequestId) {
+                return;
+            }
+            const params = systemChartParams(range.fromDate, range.toDate);
+            const compareMode = refs.systemChartCompare?.value || "off";
+            const durationMs = range.toDate.getTime() - range.fromDate.getTime();
+            const beforeTo = new Date(range.fromDate.getTime());
+            const beforeFrom = new Date(beforeTo.getTime() - durationMs);
+            const currentRequest = fetchJson(`${api("/universal")}?${params.toString()}`);
+            const baselineRequest = compareMode === "off"
+                ? Promise.resolve(null)
+                : fetchJson(`${api("/universal")}?${systemChartParams(beforeFrom, beforeTo).toString()}`);
+            const [current, baseline] = await Promise.all([currentRequest, baselineRequest]);
+            if (requestId !== state.systemChartRequestId) {
+                return;
+            }
+            const currentConfig = buildSystemChartConfig(current);
+            if (compareMode === "overlay" && baseline) {
+                const baselineConfig = buildSystemChartConfig(baseline, {baseline: true});
+                currentConfig.data.datasets.push(...baselineConfig.data.datasets);
+            }
+            upsertChart("chart-system-events", currentConfig);
+            if (compareMode === "split" && baseline) {
+                refs.systemChartCompareWrap?.classList.remove("d-none");
+                upsertChart("chart-system-events-compare", buildSystemChartConfig(baseline, {baseline: true}));
+            } else {
+                refs.systemChartCompareWrap?.classList.add("d-none");
+                destroyChart("chart-system-events-compare");
+            }
+            const count = Number(current?.totals?.count || 0);
+            if (refs.systemChartStatus) {
+                refs.systemChartStatus.textContent = count
+                    ? `Событий в периоде: ${formatInt(count)}`
+                    : "За выбранный период служебных событий нет.";
+            }
+        } catch (error) {
+            if (requestId !== state.systemChartRequestId) {
+                return;
+            }
+            if (refs.systemChartStatus) {
+                refs.systemChartStatus.textContent = error instanceof Error
+                    ? error.message
+                    : "Не удалось загрузить график.";
+            }
+            console.error("System events chart failed", error);
+        }
+    }
+
+    function openSystemChartHelp() {
+        if (!refs.helpModalEl || !refs.helpModalTitle || !refs.helpModalBody) {
+            return;
+        }
+        refs.helpModalTitle.textContent = "Служебные события";
+        refs.helpModalBody.textContent = "График показывает агрегированную динамику системных HTTP, asset и technical событий. Выберите метрику и одно или несколько событий; режим сравнения использует предыдущий интервал той же длительности.";
+        bootstrap.Modal.getOrCreateInstance(refs.helpModalEl).show();
+    }
+
+    function setupSystemChartIntervalSelection() {
+        const canvas = document.getElementById("chart-system-events");
+        const wrap = canvas?.closest(".analytics-system-chart-wrap");
+        const toggle = refs.systemChartIntervalToggle;
+        if (!canvas || !wrap || !toggle || wrap.dataset.systemIntervalBound === "1") {
+            return;
+        }
+        wrap.dataset.systemIntervalBound = "1";
+        const overlay = document.createElement("div");
+        overlay.className = "analytics-expanded-interval-selection d-none";
+        overlay.setAttribute("data-system-interval-selection", "1");
+        wrap.appendChild(overlay);
+
+        const panel = document.createElement("div");
+        panel.className = "analytics-expanded-interval-panel d-none";
+        panel.setAttribute("data-system-interval-panel", "1");
+        panel.innerHTML = `
+            <span data-system-interval-label></span>
+            <button type="button" class="btn btn-dark btn-sm" data-system-interval-apply>Применить</button>
+            <button type="button" class="btn btn-outline-dark btn-sm" data-system-interval-clear>Сбросить</button>
+        `;
+        wrap.appendChild(panel);
+
+        const clearSelection = () => {
+            state.systemIntervalSelection = null;
+            overlay.classList.add("d-none");
+            panel.classList.add("d-none");
+        };
+        toggle.addEventListener("click", () => {
+            state.systemIntervalSelectionEnabled = !state.systemIntervalSelectionEnabled;
+            toggle.classList.toggle("active", state.systemIntervalSelectionEnabled);
+            toggle.setAttribute("aria-pressed", state.systemIntervalSelectionEnabled ? "true" : "false");
+            if (!state.systemIntervalSelectionEnabled) {
+                clearSelection();
+            }
+        });
+        panel.querySelector("[data-system-interval-clear]")?.addEventListener("click", clearSelection);
+        panel.querySelector("[data-system-interval-apply]")?.addEventListener("click", async () => {
+            const selection = state.systemIntervalSelection;
+            if (!selection?.from || !selection?.to) {
+                return;
+            }
+            const before = currentSystemChartFilterSnapshot();
+            state.systemIntervalHistory.push(before);
+            if (refs.systemChartFrom) refs.systemChartFrom.value = selection.from;
+            if (refs.systemChartTo) refs.systemChartTo.value = selection.to;
+            syncQuickRangeSelectFromRange(refs.systemChartPreset, selection.from, selection.to);
+            state.systemActiveInterval = {
+                fromBefore: before.from || refs.from?.value || "",
+                toBefore: before.to || refs.to?.value || "",
+                from: selection.from,
+                to: selection.to,
+                sourceCanvasId: "chart-system-events"
+            };
+            markSystemChartLocalDirty();
+            clearSelection();
+            syncSystemChartIntervalUndoButton();
+            await submitSystemFilters({refreshOptions: true});
+        });
+
+        let dragging = false;
+        let startX = 0;
+        const localX = (event) => event.clientX - canvas.getBoundingClientRect().left;
+        const updateOverlay = (leftX, rightX) => {
+            const chart = state.charts["chart-system-events"];
+            const area = chart?.chartArea;
+            if (!area) {
+                return;
+            }
+            const minX = Math.max(area.left, Math.min(leftX, rightX));
+            const maxX = Math.min(area.right, Math.max(leftX, rightX));
+            const wrapRect = wrap.getBoundingClientRect();
+            const canvasRect = canvas.getBoundingClientRect();
+            overlay.style.left = `${canvasRect.left - wrapRect.left + minX}px`;
+            overlay.style.top = `${canvasRect.top - wrapRect.top + area.top}px`;
+            overlay.style.width = `${Math.max(0, maxX - minX)}px`;
+            overlay.style.height = `${Math.max(0, area.bottom - area.top)}px`;
+            overlay.classList.remove("d-none");
+        };
+        canvas.addEventListener("mousedown", (event) => {
+            if (!state.systemIntervalSelectionEnabled) {
+                return;
+            }
+            const area = state.charts["chart-system-events"]?.chartArea;
+            const x = localX(event);
+            if (!area || x < area.left || x > area.right) {
+                return;
+            }
+            event.preventDefault();
+            dragging = true;
+            startX = x;
+            updateOverlay(startX, startX);
+        });
+        window.addEventListener("mousemove", (event) => {
+            if (dragging) {
+                updateOverlay(startX, localX(event));
+            }
+        });
+        window.addEventListener("mouseup", (event) => {
+            if (!dragging) {
+                return;
+            }
+            dragging = false;
+            const chart = state.charts["chart-system-events"];
+            const selection = selectedIntervalFromPixels(chart, startX, localX(event));
+            if (!selection) {
+                clearSelection();
+                return;
+            }
+            state.systemIntervalSelection = selection;
+            const label = panel.querySelector("[data-system-interval-label]");
+            if (label) {
+                label.textContent = `Интервал: ${formatComparePeriodTime(selection.from)} — ${formatComparePeriodTime(selection.to)}`;
+            }
+            panel.classList.remove("d-none");
+        });
+    }
+
     async function loadEvents(reset) {
+        if (!reset && state.eventsLoading) {
+            return;
+        }
         if (reset) {
             state.eventsPage = 0;
         }
         const requestId = ++state.eventsRequestId;
         const requestSystemOnly = !!state.eventsSystemOnly;
+        state.eventsLoading = true;
+        if (refs.eventsLoadMore) {
+            refs.eventsLoadMore.disabled = true;
+        }
         const params = rangeParams();
-        const eventsFromIso = toIso(refs.eventsFrom?.value);
-        const eventsToIso = toIso(refs.eventsTo?.value);
+        const eventsFromIso = toIso(requestSystemOnly ? refs.systemChartFrom?.value : refs.eventsFrom?.value);
+        const eventsToIso = toIso(requestSystemOnly ? refs.systemChartTo?.value : refs.eventsTo?.value);
         if (eventsFromIso) {
             params.set("from", eventsFromIso);
         }
@@ -7019,55 +11396,82 @@
             params.set("systemEventsOnly", "true");
         }
 
-        const rawEventType = refs.eventsEventType?.value?.trim();
-        const mainEventType = refs.eventType?.value?.trim();
-        if (rawEventType) {
-            params.set("eventTypeCode", rawEventType);
-        } else if (mainEventType) {
-            params.set("eventTypeCode", mainEventType);
+        if (requestSystemOnly) {
+            selectedSystemChartEventCodes().forEach((code) => params.append("eventTypeCode", code));
+        } else {
+            const forcedEventCodes = Array.isArray(state.eventsForcedEventCodes)
+                ? state.eventsForcedEventCodes.map((code) => String(code || "").trim()).filter(Boolean)
+                : [];
+            const rawEventType = refs.eventsEventType?.value?.trim();
+            const mainEventType = refs.eventType?.value?.trim();
+            if (forcedEventCodes.length) {
+                forcedEventCodes.forEach((code) => params.append("eventTypeCode", code));
+            } else if (rawEventType) {
+                params.set("eventTypeCode", rawEventType);
+            } else if (mainEventType) {
+                params.set("eventTypeCode", mainEventType);
+            }
         }
 
-        if (refs.eventsIsError.value !== "") {
-            params.set("isError", refs.eventsIsError.value);
+        const isErrorValue = requestSystemOnly
+            ? refs.systemChartIsError?.value || ""
+            : refs.eventsIsError?.value || "";
+        if (isErrorValue !== "") {
+            params.set("isError", isErrorValue);
         }
-        if (refs.eventsErrorClass?.value?.trim()) {
+        if (String(state.eventsForcedErrorKey || "").trim()) {
+            params.set("errorKey", String(state.eventsForcedErrorKey || "").trim());
+        }
+        if (String(state.eventsForcedModuleCode || "").trim()) {
+            params.set("moduleCode", String(state.eventsForcedModuleCode || "").trim());
+        }
+        if (String(state.eventsForcedStageTypeCode || "").trim()) {
+            params.set("stageTypeCode", String(state.eventsForcedStageTypeCode || "").trim());
+        }
+        if (!requestSystemOnly && refs.eventsErrorClass?.value?.trim()) {
             params.set("errorClass", refs.eventsErrorClass.value.trim());
         }
-        if (refs.eventsMinDuration.value?.trim()) {
+        if (!requestSystemOnly && refs.eventsMinDuration.value?.trim()) {
             const minDuration = Number(refs.eventsMinDuration.value.trim());
             if (Number.isFinite(minDuration) && minDuration > 0) {
                 params.set("minDurationMs", String(Math.floor(minDuration)));
             }
         }
-        if (refs.eventsRequestPath?.value?.trim()) {
+        if (!requestSystemOnly && refs.eventsRequestPath?.value?.trim()) {
             params.set("requestPath", refs.eventsRequestPath.value.trim());
         }
-        if (refs.eventsAttributeCode.value?.trim()) {
+        if (!requestSystemOnly && refs.eventsAttributeCode.value?.trim()) {
             params.set("attributeCode", refs.eventsAttributeCode.value.trim());
         }
-        if (refs.eventsAttributeValue.value?.trim()) {
+        if (!requestSystemOnly && refs.eventsAttributeValue.value?.trim()) {
             params.set("attributeValue", refs.eventsAttributeValue.value.trim());
         }
-        if (refs.eventsMetricType.value?.trim()) {
+        if (!requestSystemOnly && refs.eventsMetricType.value?.trim()) {
             params.set("metricTypeCode", refs.eventsMetricType.value.trim());
         }
-        if (refs.eventsMetricMin.value?.trim()) {
+        if (!requestSystemOnly && refs.eventsMetricMin.value?.trim()) {
             const metricMin = Number(refs.eventsMetricMin.value.trim());
             if (Number.isFinite(metricMin)) {
                 params.set("metricMinValue", String(metricMin));
             }
         }
-        if (refs.eventsMetricMax.value?.trim()) {
+        if (!requestSystemOnly && refs.eventsMetricMax.value?.trim()) {
             const metricMax = Number(refs.eventsMetricMax.value.trim());
             if (Number.isFinite(metricMax)) {
                 params.set("metricMaxValue", String(metricMax));
             }
         }
-        if (refs.eventsSortBy.value?.trim()) {
-            params.set("sortBy", refs.eventsSortBy.value.trim());
+        const sortBy = requestSystemOnly
+            ? (refs.systemEventsSortBy?.value?.trim() || state.systemEventsSortBy)
+            : state.eventsSortBy;
+        const sortDir = requestSystemOnly
+            ? (refs.systemEventsSortDir?.value?.trim() || state.systemEventsSortDir)
+            : state.eventsSortDir;
+        if (sortBy) {
+            params.set("sortBy", sortBy);
         }
-        if (refs.eventsSortDir.value?.trim()) {
-            params.set("sortDir", refs.eventsSortDir.value.trim());
+        if (sortDir) {
+            params.set("sortDir", sortDir);
         }
 
         try {
@@ -7119,17 +11523,48 @@
             refs.eventsLoadMore.classList.add("d-none");
             const detail = error instanceof Error ? error.message : "неизвестная ошибка";
             refs.eventsTableBody.innerHTML = eventsInfoRow(`Не удалось загрузить события: ${detail}`, true);
+        } finally {
+            if (requestId === state.eventsRequestId) {
+                state.eventsLoading = false;
+                if (refs.eventsLoadMore) {
+                    refs.eventsLoadMore.disabled = !state.eventsHasMore;
+                }
+            }
         }
     }
 
     async function openEventDetails(eventUid) {
-        const data = await fetchJson(`${api("/events")}/${encodeURIComponent(eventUid)}`);
-        renderEventDetailsModal(data);
+        const requestId = ++state.eventDetailsRequestId;
+        showEventModalLoading();
+        try {
+            const data = await fetchJson(`${api("/events")}/${encodeURIComponent(eventUid)}`);
+            if (requestId !== state.eventDetailsRequestId) {
+                return;
+            }
+            renderEventDetailsModal(data);
+        } catch (error) {
+            if (requestId !== state.eventDetailsRequestId) {
+                return;
+            }
+            throw error;
+        }
     }
 
     async function openEventDetailsById(eventId) {
-        const data = await fetchJson(`${api("/events/by-id")}/${encodeURIComponent(eventId)}`);
-        renderEventDetailsModal(data);
+        const requestId = ++state.eventDetailsRequestId;
+        showEventModalLoading();
+        try {
+            const data = await fetchJson(`${api("/events/by-id")}/${encodeURIComponent(eventId)}`);
+            if (requestId !== state.eventDetailsRequestId) {
+                return;
+            }
+            renderEventDetailsModal(data);
+        } catch (error) {
+            if (requestId !== state.eventDetailsRequestId) {
+                return;
+            }
+            throw error;
+        }
     }
 
     function renderEventDetailsModal(data) {
@@ -7227,7 +11662,7 @@
                 <div class="h6 mb-1">${escapeHtml(data.eventTypeName || data.eventTypeCode || "-")}</div>
                 <div class="small text-muted">Модуль: ${escapeHtml(data.moduleName || data.moduleCode || "-")}</div>
                 <div class="small text-muted">UID: ${escapeHtml(data.eventUid)}</div>
-                <div class="small text-muted">Path: ${escapeHtml(data.requestPath || "-")} · Trace: ${escapeHtml(data.traceId || "-")}</div>
+                <div class="small text-muted">Внутренний маршрут: ${escapeHtml(data.requestPath || "-")} · Трассировка: ${escapeHtml(data.traceId || "-")}</div>
                 <div class="small text-muted">HTTP ${data.statusCode == null ? "-" : escapeHtml(String(data.statusCode))} · ${formatInt(displayDurationMs)} ms</div>
                 <div class="small text-muted">Класс ошибки: ${escapeHtml(data.errorClass || "NONE")}</div>
             </div>
@@ -7236,7 +11671,7 @@
                     <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#${overviewTabId}" type="button" role="tab">Обзор</button>
                 </li>
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#${logsTabId}" type="button" role="tab">Логи (trace)</button>
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#${logsTabId}" type="button" role="tab">Логи трассировки</button>
                 </li>
             </ul>
             <div class="tab-content pt-3">
@@ -7280,7 +11715,7 @@
                 </div>
                 <div class="tab-pane fade" id="${logsTabId}" role="tabpanel">
                     <div class="small text-muted mb-2">
-                        Нормализованные логи по Trace: <b>${escapeHtml(data.traceId || "-")}</b>. Логи полезны для детального разбора ошибки на уровне этапов.
+                        Нормализованные логи по трассировке: <b>${escapeHtml(data.traceId || "-")}</b>. Логи полезны для детального разбора ошибки на уровне этапов.
                     </div>
                     ${renderTraceLogStatus(traceLogStatus)}
                     ${renderNormalizedLogsTable(traceLogs, "По этому trace логи не найдены.", true)}
@@ -7342,7 +11777,7 @@
                     <div class="small mt-2">
                         <b>Файл:</b> ${escapeHtml(fileName)}
                         ${moduleCode ? ` · <b>Модуль:</b> ${escapeHtml(moduleCode)}` : ""}
-                        ${lineCount ? ` · <b>Строк trace:</b> ${escapeHtml(formatInt(lineCount))}` : ""}
+                        ${lineCount ? ` · <b>Строк трассировки:</b> ${escapeHtml(formatInt(lineCount))}` : ""}
                         ${warnCount ? ` · <b>WARN:</b> ${escapeHtml(formatInt(warnCount))}` : ""}
                         ${errorCount ? ` · <b>ERROR:</b> ${escapeHtml(formatInt(errorCount))}` : ""}
                     </div>
@@ -7795,6 +12230,7 @@
     }
 
     async function loadCompare() {
+        state.compareLoaded = true;
         const params = new URLSearchParams();
         const moduleCode = refs.moduleType?.value?.trim();
         if (moduleCode) {
@@ -7816,12 +12252,15 @@
 
         const data = await fetchJson(`${api("/compare")}?${params.toString()}`);
         refs.compareCards.innerHTML = renderCompareCards(data);
+        renderCompareInsights(data);
+        syncCompareResetVisibility();
+        return;
 
         const delta = data.delta || {};
         upsertChart("chart-compare-delta", {
             type: "bar",
             data: {
-                labels: ["Count %", "AVG %", "P95 %", "ErrorRate %"],
+                labels: ["Количество %", "AVG %", "P95 %", "Доля ошибок %"],
                 datasets: [{
                     label: "Изменение, %",
                     data: [
@@ -7849,7 +12288,7 @@
         const delta = data.delta || {};
         const cards = [
             {
-                title: "Count",
+                title: "Количество",
                 base: formatInt(baseline.count || 0),
                 target: formatInt(target.count || 0),
                 delta: formatDelta(delta.countPct)
@@ -7867,7 +12306,7 @@
                 delta: formatDelta(delta.p95MsPct)
             },
             {
-                title: "Error rate",
+                title: "Доля ошибок",
                 base: formatPercent(baseline.errorRate),
                 target: formatPercent(target.errorRate),
                 delta: formatDelta(delta.errorRatePct)
@@ -7883,6 +12322,278 @@
                 <div class="analytics-compare-delta ${card.delta.className}">${card.delta.text}</div>
             </article>
         `).join("");
+    }
+
+    function renderCompareInsights(data) {
+        const rows = Array.isArray(data?.events) ? data.events.map(normalizeCompareEventRow) : [];
+        if (refs.compareSummaryCard) {
+            refs.compareSummaryCard.innerHTML = renderCompareSummary(data, rows);
+        }
+        if (refs.compareDegradedTable) {
+            refs.compareDegradedTable.innerHTML = renderCompareEventDeltaTable(
+                compareDegradedRows(rows),
+                "Существенной деградации не найдено"
+            );
+        }
+        if (refs.compareImprovedTable) {
+            refs.compareImprovedTable.innerHTML = renderCompareEventDeltaTable(
+                compareImprovedRows(rows),
+                "Существенного улучшения не найдено"
+            );
+        }
+        if (refs.compareLoadTable) {
+            refs.compareLoadTable.innerHTML = renderCompareLoadTable(compareLoadRows(rows));
+        }
+        if (refs.compareErrorsTable) {
+            refs.compareErrorsTable.innerHTML = renderCompareErrorTable(compareErrorRows(rows));
+        }
+    }
+
+    function normalizeCompareEventRow(row) {
+        const baseline = row?.baseline || {};
+        const target = row?.target || {};
+        const delta = row?.delta || {};
+        return {
+            eventTypeCode: row?.eventTypeCode || "",
+            eventTypeName: row?.eventTypeName || row?.eventTypeCode || "-",
+            baseline,
+            target,
+            countDelta: toNumber(row?.countDelta),
+            errorCountDelta: toNumber(row?.errorCountDelta),
+            countPct: toNumber(delta.countPct),
+            avgPct: toNumber(delta.avgMsPct),
+            p95Pct: toNumber(delta.p95MsPct),
+            errorRatePct: toNumber(delta.errorRatePct)
+        };
+    }
+
+    function compareDegradedRows(rows) {
+        return rows
+            .filter((row) => row.p95Pct > 5 || row.avgPct > 10 || row.errorRatePct > 0 || (toNumber(row.target.count) > 0 && toNumber(row.baseline.count) === 0))
+            .sort((a, b) => (b.p95Pct - a.p95Pct) || (b.avgPct - a.avgPct) || (b.errorRatePct - a.errorRatePct) || (b.countPct - a.countPct))
+            .slice(0, 10);
+    }
+
+    function compareImprovedRows(rows) {
+        return rows
+            .filter((row) => row.p95Pct < -5 || row.avgPct < -10 || row.errorRatePct < 0 || (toNumber(row.target.count) === 0 && toNumber(row.baseline.count) > 0))
+            .sort((a, b) => (a.p95Pct - b.p95Pct) || (a.avgPct - b.avgPct) || (a.errorRatePct - b.errorRatePct))
+            .slice(0, 10);
+    }
+
+    function compareLoadRows(rows) {
+        return rows
+            .filter((row) => row.countDelta !== 0)
+            .sort((a, b) => (Math.abs(b.countDelta) - Math.abs(a.countDelta)) || (Math.abs(b.countPct) - Math.abs(a.countPct)))
+            .slice(0, 10);
+    }
+
+    function compareErrorRows(rows) {
+        return rows
+            .filter((row) => row.errorRatePct > 0 || row.errorCountDelta > 0)
+            .sort((a, b) => (b.errorRatePct - a.errorRatePct) || (b.errorCountDelta - a.errorCountDelta) || (toNumber(b.target.count) - toNumber(a.target.count)))
+            .slice(0, 10);
+    }
+
+    function renderCompareSummary(data, rows) {
+        const delta = data?.delta || {};
+        const target = data?.target || {};
+        const lines = [];
+        const countPct = toNumber(delta.countPct);
+        const avgPct = toNumber(delta.avgMsPct);
+        const p95Pct = toNumber(delta.p95MsPct);
+        const errorRatePct = toNumber(delta.errorRatePct);
+        if (countPct > 10) {
+            lines.push(`Нагрузка выросла на ${formatSignedPercent(countPct)}.`);
+        } else if (countPct < -10) {
+            lines.push(`Нагрузка снизилась на ${formatSignedPercent(Math.abs(countPct))}.`);
+        } else {
+            lines.push(`Нагрузка существенно не изменилась: ${formatSignedPercent(countPct)}.`);
+        }
+        lines.push(compareLatencySummaryLine("AVG", avgPct));
+        lines.push(compareLatencySummaryLine("P95", p95Pct));
+        if (errorRatePct > 0) {
+            lines.push(`Доля ошибок выросла на ${formatSignedPercent(errorRatePct)}: это риск.`);
+        } else if (toNumber(target.errorRate) === 0) {
+            lines.push("Ошибки не выросли.");
+        } else {
+            lines.push(`Доля ошибок существенно не изменилась: ${formatSignedPercent(errorRatePct)}.`);
+        }
+        const loadLeader = compareLoadRows(rows).find((row) => row.countDelta > 0);
+        if (loadLeader) {
+            lines.push(`Основной вклад в рост нагрузки: ${escapeHtml(loadLeader.eventTypeName)} (${formatInt(loadLeader.countDelta)} событий).`);
+        }
+        const p95Leader = compareDegradedRows(rows).find((row) => row.p95Pct > 0);
+        if (p95Leader) {
+            lines.push(`Основная деградация P95: ${escapeHtml(p95Leader.eventTypeName)} (${formatSignedPercent(p95Leader.p95Pct)}).`);
+        }
+        return `
+            <div class="analytics-compare-summary-title">Вывод сравнения</div>
+            <ul class="analytics-compare-summary-list">
+                ${lines.slice(0, 6).map((line) => `<li>${line}</li>`).join("")}
+            </ul>
+        `;
+    }
+
+    function compareLatencySummaryLine(label, value) {
+        if (value > 10) {
+            return `${label}: есть деградация, рост ${formatSignedPercent(value)}.`;
+        }
+        if (Math.abs(value) < 5) {
+            return `${label}: существенных изменений нет (${formatSignedPercent(value)}).`;
+        }
+        if (value < 0) {
+            return `${label}: улучшился на ${formatSignedPercent(Math.abs(value))}.`;
+        }
+        return `${label}: изменился на ${formatSignedPercent(value)}.`;
+    }
+
+    function renderCompareEventDeltaTable(rows, emptyText) {
+        if (!rows.length) {
+            return compareEmptyState(emptyText);
+        }
+        return `
+            <div class="table-responsive analytics-compare-table-wrap">
+                <table class="table analytics-table analytics-compare-table mb-0">
+                    <thead>
+                    <tr>
+                        <th>Событие</th>
+                        <th>Количество</th>
+                        <th>P95</th>
+                        <th>Δ P95</th>
+                        <th>AVG</th>
+                        <th>Доля ошибок</th>
+                        <th>Вывод</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    ${rows.map((row) => `
+                        <tr>
+                            <td><div class="analytics-compare-event-name" title="${escapeHtml(row.eventTypeName)}">${escapeHtml(row.eventTypeName)}</div></td>
+                            <td>${formatInt(row.baseline.count)} → ${formatInt(row.target.count)}</td>
+                            <td>${formatMs(row.baseline.p95Ms)} → ${formatMs(row.target.p95Ms)}</td>
+                            <td><span class="${compareDeltaClass(row.p95Pct, true)}">${formatSignedPercent(row.p95Pct)}</span></td>
+                            <td>${formatMs(row.baseline.avgMs)} → ${formatMs(row.target.avgMs)}</td>
+                            <td>${formatPercent(row.baseline.errorRate)} → ${formatPercent(row.target.errorRate)}</td>
+                            <td>${escapeHtml(compareRowConclusion(row))}</td>
+                        </tr>
+                    `).join("")}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    function renderCompareLoadTable(rows) {
+        if (!rows.length) {
+            return compareEmptyState("Изменения нагрузки не найдены");
+        }
+        return `
+            <div class="table-responsive analytics-compare-table-wrap">
+                <table class="table analytics-table analytics-compare-table mb-0">
+                    <thead>
+                    <tr>
+                        <th>Событие</th>
+                        <th>Количество база</th>
+                        <th>Количество текущее</th>
+                        <th>Δ количества</th>
+                        <th>P95 текущий</th>
+                        <th>Доля ошибок текущая</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    ${rows.map((row) => `
+                        <tr>
+                            <td><div class="analytics-compare-event-name" title="${escapeHtml(row.eventTypeName)}">${escapeHtml(row.eventTypeName)}</div></td>
+                            <td>${formatInt(row.baseline.count)}</td>
+                            <td>${formatInt(row.target.count)}</td>
+                            <td><span class="${compareDeltaClass(row.countPct, false)}">${formatSignedPercent(row.countPct)}</span></td>
+                            <td>${formatMs(row.target.p95Ms)}</td>
+                            <td>${formatPercent(row.target.errorRate)}</td>
+                        </tr>
+                    `).join("")}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    function renderCompareErrorTable(rows) {
+        if (!rows.length) {
+            return compareEmptyState("Роста ошибок не найдено");
+        }
+        return `
+            <div class="table-responsive analytics-compare-table-wrap">
+                <table class="table analytics-table analytics-compare-table mb-0">
+                    <thead>
+                    <tr>
+                        <th>Событие</th>
+                        <th>Доля ошибок база</th>
+                        <th>Доля ошибок текущая</th>
+                        <th>Δ доли ошибок</th>
+                        <th>Количество текущее</th>
+                        <th>P95 текущий</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    ${rows.map((row) => `
+                        <tr>
+                            <td><div class="analytics-compare-event-name" title="${escapeHtml(row.eventTypeName)}">${escapeHtml(row.eventTypeName)}</div></td>
+                            <td>${formatPercent(row.baseline.errorRate)}</td>
+                            <td>${formatPercent(row.target.errorRate)}</td>
+                            <td><span class="${compareDeltaClass(row.errorRatePct, true)}">${formatSignedPercent(row.errorRatePct)}</span></td>
+                            <td>${formatInt(row.target.count)}</td>
+                            <td>${formatMs(row.target.p95Ms)}</td>
+                        </tr>
+                    `).join("")}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    function compareEmptyState(text) {
+        return `<div class="analytics-compare-empty">${escapeHtml(text)}</div>`;
+    }
+
+    function compareDeltaClass(value, positiveIsBad) {
+        const num = toNumber(value);
+        if (Math.abs(num) < 0.0001) {
+            return "analytics-compare-delta is-neutral";
+        }
+        const bad = positiveIsBad ? num > 0 : false;
+        return `analytics-compare-delta ${bad ? "is-bad" : "is-good"}`;
+    }
+
+    function formatSignedPercent(value) {
+        const num = toNumber(value);
+        const sign = num > 0 ? "+" : "";
+        return `${sign}${num.toFixed(2)}%`;
+    }
+
+    function compareRowConclusion(row) {
+        if (toNumber(row.target.count) > 0 && toNumber(row.baseline.count) === 0) {
+            return "Появилось в текущем периоде";
+        }
+        if (toNumber(row.target.count) === 0 && toNumber(row.baseline.count) > 0) {
+            return "Исчезло в текущем периоде";
+        }
+        if (row.errorRatePct > 0) {
+            return "Рост ошибок";
+        }
+        if (row.countPct > 10 && row.p95Pct <= 10) {
+            return "Рост нагрузки";
+        }
+        if (row.p95Pct > 10 && row.errorRatePct <= 0) {
+            return "P95 вырос без роста ошибок";
+        }
+        if (toNumber(row.target.count) <= 3 && row.p95Pct > 20) {
+            return "Редкий, но тяжелый выброс";
+        }
+        if (row.p95Pct < -5 || row.avgPct < -10 || row.errorRatePct < 0) {
+            return "Улучшение метрик";
+        }
+        return "Изменение умеренное";
     }
 
     function mainParams(includeEventType = true) {
@@ -7910,6 +12621,8 @@
     }
 
     async function refreshEventTypeOptionsByScope() {
+        return refreshPeriodScopedMainOptions();
+        /*
         if (!refs.eventType && !refs.eventsEventType) {
             return;
         }
@@ -7929,9 +12642,17 @@
         const nextEvents = available.some((item) => item.code === selectedEvents) ? selectedEvents : "";
         fillSelect(refs.eventType, available, "Все события", true, nextMain);
         fillSelect(refs.eventsEventType, available, "Все события", true, nextEvents);
+        */
     }
 
     async function fetchFilterOptionsPayload(attributeCode, includeEventType = true) {
+        return fetchPeriodFilterOptions({
+            attributeCode,
+            includeEventType,
+            requestPath: refs.analyticsRequestPath?.value?.trim() || "",
+            systemEventsOnly: state.currentDashboardTab === "system"
+        });
+        /*
         const params = new URLSearchParams();
         setIfPresent(params, "from", toIso(refs.from?.value || ""));
         setIfPresent(params, "to", toIso(refs.to?.value || ""));
@@ -7952,6 +12673,7 @@
             params.set("attributeCode", attrCode);
         }
         return fetchJson(`${api("/filter-options")}?${params.toString()}`);
+        */
     }
 
     function stageMetricParams(rangeMode) {
@@ -8088,12 +12810,16 @@
         }
         syncUniversalQuickRangeFromInputs();
         state.universalAllTime = (refs.universalQuickPreset?.value || "").trim().toLowerCase() === "all";
+        renderUniversalAnalysisPeriod();
+        updateUniversalFilterResetVisibility();
         syncUniversalBeforeRangeFromAfter();
         updateUniversalCompareUi();
     }
 
     function syncUniversalQuickRangeFromInputs() {
         syncQuickRangeSelectFromRange(refs.universalQuickPreset, refs.universalFrom?.value || "", refs.universalTo?.value || "");
+        renderUniversalAnalysisPeriod();
+        updateUniversalFilterResetVisibility();
     }
 
     function updateUniversalCompareUi() {
@@ -8314,7 +13040,7 @@
 
         refs.from.value = toDateTimeLocalString(fromDate);
         refs.to.value = toDateTimeLocalString(toDate);
-        initDefaultCompareRange();
+        const compareSynced = syncCompareRangeFromMain();
         state.lastMainRangeKey = buildMainRangeKey();
         if (state.globalCompareEnabled) {
             state.globalCompareBeforeCustom = false;
@@ -8334,6 +13060,9 @@
 
         state.eventsPage = 0;
         await reloadAll();
+        if (shouldRefreshCompareAfterMainSync(compareSynced)) {
+            await loadCompare();
+        }
         if (state.globalCompareEnabled) {
             await applyGlobalCompareToAllCharts();
         }
@@ -8344,10 +13073,7 @@
         const allRange = getAllTimeLocalRange();
         refs.from.value = allRange.from;
         refs.to.value = allRange.to;
-        refs.compareBaselineFrom.value = allRange.from;
-        refs.compareBaselineTo.value = allRange.to;
-        refs.compareTargetFrom.value = allRange.from;
-        refs.compareTargetTo.value = allRange.to;
+        const compareSynced = syncCompareRangeFromMain();
         state.lastMainRangeKey = buildMainRangeKey();
         if (state.globalCompareEnabled) {
             state.globalCompareBeforeCustom = false;
@@ -8367,6 +13093,9 @@
 
         state.eventsPage = 0;
         await reloadAll();
+        if (shouldRefreshCompareAfterMainSync(compareSynced)) {
+            await loadCompare();
+        }
         if (state.globalCompareEnabled) {
             await applyGlobalCompareToAllCharts();
         }
@@ -8495,23 +13224,93 @@
     }
 
     function initDefaultCompareRange() {
-        if (!refs.from.value || !refs.to.value) {
-            return;
-        }
-        refs.compareTargetFrom.value = refs.from.value;
-        refs.compareTargetTo.value = refs.to.value;
+        syncCompareRangeFromMain({force: true});
+    }
 
+    function compareAutoRangeFromMain() {
+        if (!refs.from.value || !refs.to.value) {
+            return null;
+        }
         const fromDate = new Date(refs.from.value);
         const toDate = new Date(refs.to.value);
         if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
-            return;
+            return null;
         }
         const durationMs = Math.max(60_000, toDate.getTime() - fromDate.getTime());
         const baselineTo = new Date(fromDate.getTime());
         const baselineFrom = new Date(fromDate.getTime() - durationMs);
-        refs.compareBaselineFrom.value = toDateTimeLocalString(baselineFrom);
-        refs.compareBaselineTo.value = toDateTimeLocalString(baselineTo);
+        return {
+            baselineFrom: toDateTimeLocalString(baselineFrom),
+            baselineTo: toDateTimeLocalString(baselineTo),
+            targetFrom: refs.from.value,
+            targetTo: refs.to.value
+        };
+    }
+
+    function compareRangeMatches(range) {
+        if (!range) {
+            return false;
+        }
+        return (refs.compareBaselineFrom?.value || "") === range.baselineFrom
+            && (refs.compareBaselineTo?.value || "") === range.baselineTo
+            && (refs.compareTargetFrom?.value || "") === range.targetFrom
+            && (refs.compareTargetTo?.value || "") === range.targetTo;
+    }
+
+    function syncCompareRangeFromMain(options = {}) {
+        const range = compareAutoRangeFromMain();
+        if (!range) {
+            return false;
+        }
+        const force = !!options.force;
+        if (!force && state.compareFilterDirty && !compareRangeMatches(range)) {
+            syncCompareResetVisibility();
+            return false;
+        }
+        if (refs.compareBaselineFrom) refs.compareBaselineFrom.value = range.baselineFrom;
+        if (refs.compareBaselineTo) refs.compareBaselineTo.value = range.baselineTo;
+        if (refs.compareTargetFrom) refs.compareTargetFrom.value = range.targetFrom;
+        if (refs.compareTargetTo) refs.compareTargetTo.value = range.targetTo;
+        state.compareFilterDirty = false;
         syncCompareQuickRangeByCurrentWindow();
+        syncCompareResetVisibility();
+        return true;
+    }
+
+    function syncCompareBaselineFromTarget() {
+        const targetFrom = refs.compareTargetFrom?.value ? new Date(refs.compareTargetFrom.value) : null;
+        const targetTo = refs.compareTargetTo?.value ? new Date(refs.compareTargetTo.value) : null;
+        if (!targetFrom || !targetTo || Number.isNaN(targetFrom.getTime()) || Number.isNaN(targetTo.getTime())) {
+            return;
+        }
+        const durationMs = Math.max(60_000, targetTo.getTime() - targetFrom.getTime());
+        const baselineTo = new Date(targetFrom.getTime());
+        const baselineFrom = new Date(targetFrom.getTime() - durationMs);
+        if (refs.compareBaselineFrom) refs.compareBaselineFrom.value = toDateTimeLocalString(baselineFrom);
+        if (refs.compareBaselineTo) refs.compareBaselineTo.value = toDateTimeLocalString(baselineTo);
+    }
+
+    function markCompareFilterDirty() {
+        const autoRange = compareAutoRangeFromMain();
+        state.compareFilterDirty = !compareRangeMatches(autoRange);
+        syncCompareResetVisibility();
+    }
+
+    function syncCompareResetVisibility() {
+        const show = !!state.compareFilterDirty;
+        refs.compareReset?.classList.toggle("d-none", !show);
+        if (refs.compareReset) {
+            refs.compareReset.disabled = !show;
+        }
+    }
+
+    function shouldRefreshCompareAfterMainSync(compareSynced) {
+        return !!compareSynced && (state.currentDashboardTab === "compare" || state.compareLoaded);
+    }
+
+    async function resetCompareToMainRange() {
+        syncCompareRangeFromMain({force: true});
+        await loadCompare();
     }
 
     async function applyCompareQuickRangePreset() {
@@ -8607,6 +13406,12 @@
             }
             existingChart.data = configToRender.data;
             existingChart.options = configToRender.options;
+            if (Array.isArray(configToRender.__analyticsTimePoints)) {
+                existingChart.config._config.__analyticsTimePoints = [...configToRender.__analyticsTimePoints];
+            }
+            if (configToRender.__analyticsEffectiveBucketMinutes != null) {
+                existingChart.config._config.__analyticsEffectiveBucketMinutes = configToRender.__analyticsEffectiveBucketMinutes;
+            }
             setChartExpandedTicks(existingChart, false);
             existingChart.update("none");
             queueInitialKpiCompareScrollOffsets(canvasId);
@@ -8961,6 +13766,33 @@
         topCol.classList.toggle("is-hidden", !isVisible);
     }
 
+    function adaptiveTimeTickLabel(value, index, ticks) {
+        const scale = this;
+        const label = typeof scale?.getLabelForValue === "function"
+            ? scale.getLabelForValue(value)
+            : String(value ?? "");
+        const count = Array.isArray(ticks) ? ticks.length : 0;
+        if (count <= 0) {
+            return label;
+        }
+        const chartWidth = Number(scale?.chart?.width || scale?.width || 0);
+        const maxLabels = Math.max(3, Math.floor((chartWidth || 520) / 78));
+        const step = Math.max(1, Math.ceil(count / maxLabels));
+        return index % step === 0 || index === count - 1 ? label : "";
+    }
+
+    function tooltipPointTimeLabel(tooltipItem) {
+        const index = Number(tooltipItem?.dataIndex);
+        const chart = tooltipItem?.chart;
+        const config = chart?.config?._config || chart?.config || {};
+        const points = Array.isArray(config.__analyticsTimePoints) ? config.__analyticsTimePoints : [];
+        const pointTime = Number.isInteger(index) ? points[index] : "";
+        if (pointTime) {
+            return formatComparePeriodTime(pointTime);
+        }
+        return tooltipItem?.label || "";
+    }
+
     function baseChartOptions(yTitle) {
         const parseMaybeNumber = (value) => {
             if (value == null) {
@@ -9000,12 +13832,12 @@
             maintainAspectRatio: false,
             animation: false,
             normalized: true,
-            interaction: { intersect: false, mode: "index" },
+            interaction: { intersect: true, mode: "nearest" },
             plugins: {
                 legend: { labels: { color: "#334155" } },
                 tooltip: {
-                    mode: "index",
-                    intersect: false,
+                    mode: "nearest",
+                    intersect: true,
                     filter: (tooltipItem) => {
                         const numeric = resolveTooltipNumeric(tooltipItem);
                         if (!Number.isFinite(numeric)) {
@@ -9014,6 +13846,10 @@
                         return Math.abs(numeric) > 0.0001;
                     },
                     callbacks: {
+                        title: (tooltipItems) => {
+                            const item = Array.isArray(tooltipItems) ? tooltipItems[0] : null;
+                            return item ? tooltipPointTimeLabel(item) : "";
+                        },
                         label: (tooltipItem) => {
                             const numeric = resolveTooltipNumeric(tooltipItem);
                             if (!Number.isFinite(numeric) || Math.abs(numeric) <= 0.0001) {
@@ -9034,7 +13870,7 @@
             scales: {
                 x: {
                     grid: { color: "rgba(148,163,184,0.12)" },
-                    ticks: { color: "#64748b", autoSkip: true, maxTicksLimit: 8 }
+                    ticks: { color: "#64748b", autoSkip: false, maxTicksLimit: 1000, callback: adaptiveTimeTickLabel }
                 },
                 y: {
                     grid: { color: "rgba(148,163,184,0.14)" },
@@ -9397,7 +14233,7 @@
             loader.innerHTML = `
             <div class="analytics-panel-loader-box">
                 <div class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></div>
-                <span>Применяем фильтр...</span>
+                <span>Загрузка...</span>
             </div>
         `;
             panelEl.appendChild(loader);
@@ -9456,7 +14292,7 @@
         loader.style.height = `${Math.round(bounds.height)}px`;
     }
 
-    function setSectionLocalLoading(hostEl, boundsEls, isLoading, message = "Применяем фильтр...") {
+    function setSectionLocalLoading(hostEl, boundsEls, isLoading, message = "Загрузка...") {
         if (!hostEl) {
             return;
         }
@@ -9645,19 +14481,20 @@
 
     function getUniversalChartLoaderHosts() {
         return uniqueElements([
-            refs.universalTimelineCard,
-            refs.universalStagesCard,
-            document.getElementById("analytics-universal-event-kpi-card")
+            refs.universalKpiCard,
+            refs.universalTopEventsCard,
+            refs.universalAttributesCard,
+            refs.universalErrorsCard,
+            refs.universalModulesCard
         ]);
     }
 
     function showUniversalChartLoaders() {
-        clearPanelLoading(refs.universalPanel);
-        return showScopedSectionLoader("universal", getUniversalChartLoaderHosts());
+        return null;
     }
 
     function hideUniversalChartLoaders(token) {
-        hideScopedSectionLoader("universal", token);
+        void token;
     }
 
     async function withUniversalChartLoaders(task, options = {}) {
@@ -9758,7 +14595,7 @@
             loader.innerHTML = `
                 <div class="analytics-panel-loader-box">
                     <div class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></div>
-                    <span>Применяем фильтр...</span>
+                    <span>Загрузка...</span>
                 </div>
             `;
             container.appendChild(loader);
@@ -9773,28 +14610,11 @@
     }
 
     function ensureGlobalLoader() {
-        if (document.getElementById("analytics-global-loader")) {
-            return;
-        }
-        const loader = document.createElement("div");
-        loader.id = "analytics-global-loader";
-        loader.className = "analytics-global-loader";
-        loader.innerHTML = `
-            <div class="analytics-global-loader-box">
-                <div class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></div>
-                <span>Применяем фильтр...</span>
-            </div>
-        `;
-        document.body.appendChild(loader);
     }
 
     function setGlobalScreenLoading(isLoading) {
-        state.globalLoadingDepth = Math.max(0, (state.globalLoadingDepth || 0) + (isLoading ? 1 : -1));
-        const loader = document.getElementById("analytics-global-loader");
-        if (!loader) {
-            return;
-        }
-        loader.classList.toggle("is-visible", state.globalLoadingDepth > 0);
+        void isLoading;
+        state.globalLoadingDepth = 0;
     }
 
     function setIfPresent(params, key, value) {
@@ -10164,10 +14984,6 @@
             && localPreset !== resolveTopInlineComparePresetOrDefault()) {
             return true;
         }
-        const localBucket = String(state.expandedBucketBySource?.[canvasId] || "").trim();
-        if (localBucket && localBucket !== String(refs.bucket?.value || "").trim()) {
-            return true;
-        }
         if (hasChartLocalRangeOverride(canvasId)) {
             return true;
         }
@@ -10184,8 +15000,11 @@
         }
         const sourceCanvasId = resolveChartScenarioSourceCanvasId(canvasId);
         const wasExpanded = state.expandedChart.sourceCanvasId === canvasId;
-        resetScenarioForSource(sourceCanvasId);
-        rerenderScenarioChart(sourceCanvasId);
+        const preserveScenario = options.preserveScenario === true && !!resolveChartScenario(sourceCanvasId);
+        if (!preserveScenario) {
+            resetScenarioForSource(sourceCanvasId);
+            rerenderScenarioChart(sourceCanvasId);
+        }
         refreshAllChartScenarioPickers();
         syncChartScenarioSummary(sourceCanvasId);
         if (!INLINE_COMPARE_CHART_IDS.has(canvasId)) {
@@ -10226,6 +15045,10 @@
             } else if (!rebuilt) {
                 renderExpandedChartClone(canvasId);
             }
+        }
+        if (preserveScenario) {
+            await applyOverviewScenarioEventFilter(sourceCanvasId);
+            await refreshExpandedScenarioDetailPanel();
         }
         if (options.syncControls !== false) {
             syncInlineCompareModeResetVisibility(canvasId);
@@ -10539,7 +15362,7 @@
         }
         wrap.classList.add("is-expanded-source");
         const container = document.createElement("div");
-        container.className = "analytics-chart-wrap analytics-chart-wrap-expanded analytics-chart-wrap-inline analytics-expanded-block mt-2";
+        container.className = "analytics-chart-wrap analytics-chart-wrap-inline analytics-expanded-block mt-2";
         container.setAttribute("data-expanded-for", canvasId);
         const closeButton = document.createElement("button");
         closeButton.type = "button";
@@ -10834,39 +15657,31 @@
         const id = String(scenarioId || "").trim();
         const mapping = {
             traffic_spike: {
-                "chart-events-count": "traffic_spike",
-                "chart-event-kpi": "event_load_growth",
+                "chart-events-count": "top_events_period",
                 "chart-universal-timeline": "universal_event_analysis"
             },
             tail_latency: {
-                "chart-latency": "p95_growth",
-                "chart-event-kpi": "event_p95_degradation",
-                "chart-stage-latency": "layer_bottleneck",
+                "chart-latency": "top_latency_events",
                 "chart-stage-metric-series": "numeric_metric_degradation"
             },
             error_burst: {
-                "chart-error-rate": "error_growth",
-                "chart-event-kpi": "event_error_growth",
-                "chart-stage-errors": "stage_error_growth"
+                "chart-error-rate": "top_error_events"
             },
             release_compare: {
                 "chart-compare-delta": "release_delta",
-                "chart-latency": "p95_growth",
-                "chart-error-rate": "error_growth"
+                "chart-latency": "top_latency_events",
+                "chart-error-rate": "top_error_events"
             },
             layer_bottleneck: {
-                "chart-stage-latency": "layer_bottleneck",
                 "chart-stage-metric-series": "numeric_metric_degradation",
                 "chart-universal-stages": "universal_layer_bottleneck"
             },
             error_without_load: {
-                "chart-error-rate": "error_growth",
-                "chart-event-kpi": "event_error_growth",
+                "chart-error-rate": "top_error_events",
                 "analytics-events-table": "error_search"
             },
             errors_without_load: {
-                "chart-error-rate": "error_growth",
-                "chart-event-kpi": "event_error_growth",
+                "chart-error-rate": "top_error_events",
                 "analytics-events-table": "error_search"
             }
         };
@@ -10904,6 +15719,7 @@
 
     function resetScenarioForSource(sourceCanvasId) {
         delete state.scenarioOverriddenBySource[sourceCanvasId];
+        delete state.scenarioEventFilterBeforeBySource?.[sourceCanvasId];
         setScenarioForSource(sourceCanvasId, globalScenarioMapping()[sourceCanvasId] || "", false);
     }
 
@@ -10954,14 +15770,20 @@
         const code = scenarioCodeOf(scenario);
         config.options = config.options || {};
         config.options.plugins = config.options.plugins || {};
-        config.options.plugins.subtitle = {
-            ...(config.options.plugins.subtitle || {}),
-            display: true,
-            text: scenario.shortDescription || scenario.description || scenario.label || code,
-            color: "#1f2937",
-            font: {size: 11, weight: "600"},
-            padding: {bottom: 6}
-        };
+        if (OVERVIEW_INVESTIGATION_SCENARIO_CHART_IDS.has(resolveChartScenarioSourceCanvasId(canvasId))) {
+            delete config.options.plugins.subtitle;
+            config.options.scenarioCode = code;
+            return config;
+        } else {
+            config.options.plugins.subtitle = {
+                ...(config.options.plugins.subtitle || {}),
+                display: true,
+                text: scenario.shortDescription || scenario.description || scenario.label || code,
+                color: "#1f2937",
+                font: {size: 11, weight: "600"},
+                padding: {bottom: 6}
+            };
+        }
         const datasets = Array.isArray(config.data?.datasets) ? config.data.datasets : [];
         const keywords = scenarioFocusKeywords(code, scenario);
         let highlighted = 0;
@@ -11026,6 +15848,26 @@
     function chartScenarioToggleText(canvasId) {
         const scenario = resolveChartScenario(resolveChartScenarioSourceCanvasId(canvasId));
         return scenario ? `Сценарий · ${scenario.label || scenarioCodeOf(scenario)}` : "Без сценария";
+    }
+
+    function overviewInvestigationScenarioToggleLabel(canvasId) {
+        const sourceCanvasId = resolveChartScenarioSourceCanvasId(canvasId);
+        if (sourceCanvasId === "chart-events-count") {
+            return "Топ событий";
+        }
+        if (sourceCanvasId === "chart-latency") {
+            return "Топ задержек";
+        }
+        if (sourceCanvasId === "chart-error-rate") {
+            return "Топ ошибок";
+        }
+        return "Топ";
+    }
+
+    function overviewInvestigationScenarioCode(canvasId) {
+        const sourceCanvasId = resolveChartScenarioSourceCanvasId(canvasId);
+        const scenario = (CHART_SCENARIOS_BY_CANVAS[sourceCanvasId] || [])[0];
+        return scenario ? scenarioCodeOf(scenario) : "";
     }
 
     function ensureScenarioSummaryEl(host, canvasId, expanded) {
@@ -11148,9 +15990,6 @@
                 openGlobalScenarioHelpModal(button.getAttribute("data-global-scenario-help") || "");
             });
         });
-        refs.analysisScenarioHelp?.addEventListener("click", () => {
-            openGlobalScenarioHelpModal(refs.analysisScenario.value || options[0]?.id || "");
-        });
         document.addEventListener("click", (event) => {
             if (!event.target?.closest?.(".analytics-global-scenario-picker")) {
                 closeGlobalScenarioPicker();
@@ -11211,9 +16050,16 @@
     function refreshAllChartScenarioPickers() {
         refs.analyticsPage?.querySelectorAll("[data-chart-scenario-picker]")?.forEach((picker) => {
             const canvasId = picker.getAttribute("data-chart-scenario-picker") || "";
-            const actions = picker.closest(".analytics-chart-actions");
+            const actions = picker.closest(".analytics-chart-actions, .analytics-expanded-actions");
             if (canvasId && actions) {
                 ensureChartScenarioPicker(actions, canvasId);
+            }
+        });
+        refs.analyticsPage?.querySelectorAll("[data-overview-scenario-toggle-wrap]")?.forEach((wrap) => {
+            const canvasId = wrap.getAttribute("data-overview-scenario-toggle-wrap") || "";
+            const actions = wrap.closest(".analytics-chart-actions, .analytics-expanded-actions");
+            if (canvasId && actions) {
+                ensureOverviewInvestigationScenarioToggle(actions, canvasId);
             }
         });
     }
@@ -11248,7 +16094,684 @@
     function selectedChartScenarioCodes(canvasId) {
         const sourceCanvasId = resolveChartScenarioSourceCanvasId(canvasId);
         const code = resolveEffectiveScenarioCode(sourceCanvasId);
-        return code ? [code] : [];
+        const hasOption = (CHART_SCENARIOS_BY_CANVAS[sourceCanvasId] || [])
+            .some((item) => scenarioCodeOf(item) === code);
+        return code && hasOption ? [code] : [];
+    }
+
+    function isOverviewScenarioDetailChart(canvasId) {
+        return OVERVIEW_INVESTIGATION_SCENARIO_CHART_IDS.has(resolveChartScenarioSourceCanvasId(canvasId));
+    }
+
+    function ensureExpandedScenarioDetailPanel(container, canvasId) {
+        if (!container || !isOverviewScenarioDetailChart(canvasId)) {
+            return null;
+        }
+        let panel = container.querySelector(`[data-expanded-scenario-detail='${canvasId}']`);
+        if (!panel) {
+            panel = document.createElement("div");
+            panel.className = "analytics-expanded-scenario-detail d-none";
+            panel.setAttribute("data-expanded-scenario-detail", canvasId);
+            const scrolls = container.querySelectorAll(".analytics-expanded-scroll");
+            const compareHost = container.querySelector(".analytics-expanded-compare-host");
+            const zoomHost = container.querySelector(".analytics-expanded-zoom-host");
+            const wraps = container.querySelectorAll(".analytics-chart-wrap-expanded");
+            const anchor = scrolls.length
+                ? scrolls[scrolls.length - 1]
+                : (compareHost || zoomHost || (wraps.length ? wraps[wraps.length - 1] : null));
+            if (anchor?.parentElement === container) {
+                anchor.insertAdjacentElement("afterend", panel);
+            } else {
+                container.appendChild(panel);
+            }
+            panel.addEventListener("click", (event) => {
+                const backButton = event.target.closest("[data-scenario-detail-back]");
+                const actionButton = event.target.closest("[data-scenario-detail-bulk-action]");
+                if (backButton) {
+                    event.preventDefault();
+                    void resetScenarioDetailEventDrilldown(canvasId);
+                } else if (actionButton) {
+                    event.preventDefault();
+                    const selectedCodes = selectedScenarioDetailCheckboxCodes(panel);
+                    const action = actionButton.getAttribute("data-scenario-detail-bulk-action") || "";
+                    if (action === "details") {
+                        void openScenarioDetailDiagnostics(canvasId, selectedCodes);
+                    }
+                }
+            });
+            panel.addEventListener("change", (event) => {
+                const target = event.target;
+                if (!(target instanceof HTMLInputElement)) {
+                    return;
+                }
+                const sourceCanvasId = resolveChartScenarioSourceCanvasId(canvasId);
+                if (target.matches("[data-scenario-detail-select-all]")) {
+                    const checked = target.checked;
+                    panel.querySelectorAll("[data-scenario-detail-row-checkbox]").forEach((checkbox) => {
+                        checkbox.checked = checked;
+                    });
+                }
+                state.scenarioDetailSelectionBySource[sourceCanvasId] = selectedScenarioDetailCheckboxCodes(panel);
+                syncScenarioDetailSelectionUi(panel, canvasId);
+                void applyScenarioDetailSelectionToChart(canvasId);
+            });
+        }
+        syncExpandedScenarioDetailLayout();
+        return panel;
+    }
+
+    function syncExpandedScenarioDetailLayout() {
+        const container = state.expandedChart.containerEl;
+        if (!container) {
+            return;
+        }
+        container.style.height = "auto";
+        container.style.maxHeight = "none";
+        container.style.minHeight = "0";
+        container.style.overflow = "visible";
+        window.requestAnimationFrame(() => {
+            state.expandedChart.instance?.resize?.();
+            state.expandedChart.compareInstance?.resize?.();
+        });
+    }
+
+    function hideExpandedScenarioDetailPanel(canvasId) {
+        const container = state.expandedChart.containerEl;
+        const panel = container?.querySelector(`[data-expanded-scenario-detail='${canvasId}']`);
+        const sourceCanvasId = resolveChartScenarioSourceCanvasId(canvasId);
+        delete state.scenarioDetailDrilldownBySource[sourceCanvasId];
+        delete state.scenarioDetailBeforeDrilldownBySource[sourceCanvasId];
+        if (panel) {
+            panel.classList.add("d-none");
+            panel.innerHTML = "";
+        }
+        syncExpandedScenarioDetailLayout();
+    }
+
+    function scenarioDetailTitle(canvasId) {
+        if (canvasId === "chart-latency") {
+            return "События, сформировавшие задержку";
+        }
+        if (canvasId === "chart-error-rate") {
+            return "События, сформировавшие ошибки";
+        }
+        return "События, сформировавшие поток";
+    }
+
+    function currentScenarioDetailRanges(canvasId) {
+        const active = state.activeAnalysisInterval;
+        if (active?.from && active?.to) {
+            return {
+                from: active.from,
+                to: active.to,
+                labelPrefix: "Интервал"
+            };
+        }
+        const ranges = resolveExpandedRangesForMode(canvasId, resolveExpandedCompareMode(canvasId) !== "off");
+        return {
+            from: ranges.afterFrom || refs.from?.value || "",
+            to: ranges.afterTo || refs.to?.value || "",
+            labelPrefix: "Период"
+        };
+    }
+
+    function scenarioDetailSortRows(canvasId, rows) {
+        const metric = getExpandedLatencyMetricMode(canvasId);
+        const valueOf = (row) => {
+            if (canvasId === "chart-latency") {
+                if (metric === "avg") return toNumberSafe(row.avgMs);
+                if (metric === "p99") return toNumberSafe(row.p99Ms);
+                return toNumberSafe(row.p95);
+            }
+            if (canvasId === "chart-error-rate") {
+                return toNumberSafe(row.err);
+            }
+            return toNumberSafe(row.count);
+        };
+        return [...rows].sort((left, right) => {
+            const primary = valueOf(right) - valueOf(left);
+            if (primary !== 0) return primary;
+            if (canvasId === "chart-error-rate") {
+                const errorDelta = toNumberSafe(right.errorCount) - toNumberSafe(left.errorCount);
+                if (errorDelta !== 0) return errorDelta;
+            }
+            const countDelta = toNumberSafe(right.count) - toNumberSafe(left.count);
+            if (countDelta !== 0) return countDelta;
+            return String(left.label || "").localeCompare(String(right.label || ""), "ru", {sensitivity: "base"});
+        });
+    }
+
+    function scenarioDetailSelectedEventCodes(canvasId) {
+        const eventState = getExpandedEventFilterState(canvasId);
+        return Array.isArray(eventState.codes) ? eventState.codes.filter(Boolean) : [];
+    }
+
+    function scenarioDetailDrilldownCode(canvasId) {
+        return String(state.scenarioDetailDrilldownBySource?.[resolveChartScenarioSourceCanvasId(canvasId)] || "").trim();
+    }
+
+    function selectedScenarioDetailCheckboxCodes(panel) {
+        return Array.from(panel?.querySelectorAll("[data-scenario-detail-row-checkbox]:checked") || [])
+            .map((checkbox) => String(checkbox.value || "").trim())
+            .filter(Boolean);
+    }
+
+    function scenarioDetailSelectionFor(canvasId) {
+        const sourceCanvasId = resolveChartScenarioSourceCanvasId(canvasId);
+        return new Set((state.scenarioDetailSelectionBySource?.[sourceCanvasId] || [])
+            .map((code) => String(code || "").trim())
+            .filter(Boolean));
+    }
+
+    function syncScenarioDetailSelectionUi(panel, canvasId) {
+        const checkboxes = Array.from(panel?.querySelectorAll("[data-scenario-detail-row-checkbox]") || []);
+        const selectedCodes = selectedScenarioDetailCheckboxCodes(panel);
+        const selected = new Set(selectedCodes);
+        checkboxes.forEach((checkbox) => {
+            checkbox.closest("tr")?.classList.toggle("is-selected", selected.has(String(checkbox.value || "").trim()));
+        });
+        const selectAll = panel?.querySelector("[data-scenario-detail-select-all]");
+        if (selectAll) {
+            selectAll.checked = checkboxes.length > 0 && selectedCodes.length === checkboxes.length;
+            selectAll.indeterminate = selectedCodes.length > 0 && selectedCodes.length < checkboxes.length;
+        }
+        const bar = panel?.querySelector("[data-scenario-detail-action-bar]");
+        const count = panel?.querySelector("[data-scenario-detail-selected-count]");
+        if (bar) {
+            bar.classList.toggle("d-none", selectedCodes.length === 0);
+        }
+        if (count) {
+            count.textContent = `Выбрано: ${formatInt(selectedCodes.length)}`;
+        }
+        state.scenarioDetailSelectionBySource[resolveChartScenarioSourceCanvasId(canvasId)] = selectedCodes;
+    }
+
+    function scenarioDetailHeaderHtml(canvasId, ranges, rowsCount, stateText = "") {
+        const drilldownCode = scenarioDetailDrilldownCode(canvasId);
+        const drilldownLabel = drilldownCode
+            ? (state.dictionaries?.eventTypes || []).find((item) => item.code === drilldownCode)?.name || drilldownCode
+            : "";
+        return `
+            <div class="analytics-expanded-scenario-detail-head">
+                <div class="analytics-expanded-scenario-detail-head-main">
+                    <div class="analytics-expanded-scenario-detail-title">
+                        <span>${escapeHtml(scenarioDetailTitle(canvasId))}</span>
+                    </div>
+                    <div class="analytics-expanded-scenario-detail-period">${escapeHtml(ranges.labelPrefix)}: ${escapeHtml(formatComparePeriodTime(ranges.from))} — ${escapeHtml(formatComparePeriodTime(ranges.to))}${drilldownLabel ? ` · ${escapeHtml(drilldownLabel)}` : ""}</div>
+                </div>
+                <span class="analytics-expanded-scenario-detail-state">${stateText || `${formatInt(rowsCount)} событий`}</span>
+            </div>
+        `;
+    }
+
+    function renderScenarioDetailTable(canvasId, rows, totalCount) {
+        const limited = scenarioDetailSortRows(canvasId, rows).slice(0, 10);
+        if (!limited.length) {
+            return `<div class="analytics-expanded-scenario-detail-empty">Детализация недоступна для текущего набора данных</div>`;
+        }
+        const share = (row) => totalCount > 0 ? `${((toNumberSafe(row.count) / totalCount) * 100).toFixed(1)}%` : "0%";
+        const selected = scenarioDetailSelectionFor(canvasId);
+        const selectCell = (row) => {
+            const code = String(row.key || "").trim();
+            const checked = selected.has(code) ? " checked" : "";
+            return `
+                <td class="analytics-scenario-detail-check-cell">
+                    <input class="form-check-input" type="checkbox" value="${escapeHtml(code)}" data-scenario-detail-row-checkbox aria-label="Выбрать событие"${checked}>
+                </td>
+            `;
+        };
+        const headerCheck = `<th class="analytics-scenario-detail-check-cell"><input class="form-check-input" type="checkbox" data-scenario-detail-select-all aria-label="Выбрать все видимые события"></th>`;
+        if (canvasId === "chart-latency") {
+            return `
+                <table class="table table-sm align-middle analytics-expanded-scenario-detail-table mb-0">
+                    <thead><tr>${headerCheck}<th>Событие</th><th>Модуль</th><th class="text-end">Количество</th><th class="text-end">AVG</th><th class="text-end">P95</th><th class="text-end">P99</th><th class="text-end">Доля ошибок</th></tr></thead>
+                    <tbody>
+                        ${limited.map((row) => `<tr>
+                            ${selectCell(row)}
+                            <td>${escapeHtml(row.label || row.key)}</td>
+                            <td class="text-muted">-</td>
+                            <td class="text-end">${formatInt(row.count)}</td>
+                            <td class="text-end">${formatMs(row.avgMs)}</td>
+                            <td class="text-end">${formatMs(row.p95)}</td>
+                            <td class="text-end">${formatMs(row.p99Ms)}</td>
+                            <td class="text-end">${formatPercent(row.err)}</td>
+                        </tr>`).join("")}
+                    </tbody>
+                </table>`;
+        }
+        if (canvasId === "chart-error-rate") {
+            return `
+                <table class="table table-sm align-middle analytics-expanded-scenario-detail-table mb-0">
+                    <thead><tr>${headerCheck}<th>Событие</th><th>Модуль</th><th class="text-end">Количество</th><th class="text-end">Ошибок</th><th class="text-end">Успешных</th><th class="text-end">Доля ошибок</th><th class="text-end">AVG/P95</th></tr></thead>
+                    <tbody>
+                        ${limited.map((row) => `<tr>
+                            ${selectCell(row)}
+                            <td>${escapeHtml(row.label || row.key)}</td>
+                            <td class="text-muted">-</td>
+                            <td class="text-end">${formatInt(row.count)}</td>
+                            <td class="text-end">${formatInt(row.errorCount)}</td>
+                            <td class="text-end">${formatInt(row.successCount)}</td>
+                            <td class="text-end">${formatPercent(row.err)}</td>
+                            <td class="text-end">${formatMs(row.avgMs)} / ${formatMs(row.p95)}</td>
+                        </tr>`).join("")}
+                    </tbody>
+                </table>`;
+        }
+        return `
+            <table class="table table-sm align-middle analytics-expanded-scenario-detail-table mb-0">
+                <thead><tr>${headerCheck}<th>Событие</th><th>Модуль</th><th class="text-end">Количество</th><th class="text-end">Доля</th><th class="text-end">AVG</th><th class="text-end">P95</th><th class="text-end">Доля ошибок</th></tr></thead>
+                <tbody>
+                    ${limited.map((row) => `<tr>
+                        ${selectCell(row)}
+                        <td>${escapeHtml(row.label || row.key)}</td>
+                        <td class="text-muted">-</td>
+                        <td class="text-end">${formatInt(row.count)}</td>
+                        <td class="text-end">${share(row)}</td>
+                        <td class="text-end">${formatMs(row.avgMs)}</td>
+                        <td class="text-end">${formatMs(row.p95)}</td>
+                        <td class="text-end">${formatPercent(row.err)}</td>
+                    </tr>`).join("")}
+                </tbody>
+            </table>`;
+    }
+
+    function scenarioDetailActionBarHtml() {
+        return `
+            <div class="analytics-scenario-detail-action-bar d-none" data-scenario-detail-action-bar>
+                <span class="analytics-scenario-detail-selected-count" data-scenario-detail-selected-count>Выбрано: 0</span>
+                <button type="button" class="btn btn-sm btn-dark" data-scenario-detail-bulk-action="details">Подробнее</button>
+            </div>
+        `;
+    }
+
+    async function refreshExpandedScenarioDetailPanel() {
+        const canvasId = state.expandedChart.sourceCanvasId || "";
+        const container = state.expandedChart.containerEl;
+        if (!container || !isOverviewScenarioDetailChart(canvasId)) {
+            return;
+        }
+        const scenario = resolveChartScenario(canvasId);
+        if (!scenario) {
+            hideExpandedScenarioDetailPanel(canvasId);
+            return;
+        }
+        const panel = ensureExpandedScenarioDetailPanel(container, canvasId);
+        if (!panel) {
+            return;
+        }
+        const requestId = ++state.scenarioDetailRequestId;
+        const ranges = currentScenarioDetailRanges(canvasId);
+        panel.classList.remove("d-none");
+        panel.innerHTML = `
+            ${scenarioDetailHeaderHtml(canvasId, ranges, 0, "Загрузка...")}
+        `;
+        try {
+            const drilldownCode = scenarioDetailDrilldownCode(canvasId);
+            const rows = drilldownCode
+                ? await loadExpandedEventKpiRowsForRange(ranges.from, ranges.to, {
+                    eventTypeCode: drilldownCode,
+                    categories: [drilldownCode]
+                })
+                : await loadExpandedEventKpiRowsForRange(ranges.from, ranges.to);
+            if (requestId !== state.scenarioDetailRequestId || state.expandedChart.sourceCanvasId !== canvasId) {
+                return;
+            }
+            const totalCount = rows.reduce((sum, row) => sum + toNumberSafe(row.count), 0);
+            panel.innerHTML = `
+                ${scenarioDetailHeaderHtml(canvasId, ranges, rows.length)}
+                <div class="analytics-expanded-scenario-detail-table-wrap">
+                    ${renderScenarioDetailTable(canvasId, rows, totalCount)}
+                </div>
+                ${scenarioDetailActionBarHtml()}
+            `;
+            syncScenarioDetailSelectionUi(panel, canvasId);
+            syncExpandedScenarioDetailLayout();
+        } catch (error) {
+            if (requestId !== state.scenarioDetailRequestId) {
+                return;
+            }
+            console.error("Scenario detail panel failed", error);
+            panel.innerHTML = `
+                ${scenarioDetailHeaderHtml(canvasId, ranges, 0, "Ошибка")}
+                <div class="analytics-expanded-scenario-detail-empty">Не удалось загрузить детализацию сценария</div>
+            `;
+        }
+    }
+
+    async function selectScenarioDetailEvent(canvasId, eventCode) {
+        const code = String(eventCode || "").trim();
+        if (!code || !isOverviewScenarioDetailChart(canvasId)) {
+            return;
+        }
+        await selectScenarioDetailEvents(canvasId, [code]);
+    }
+
+    async function selectScenarioDetailEvents(canvasId, eventCodes = []) {
+        const codes = Array.from(new Set((eventCodes || [])
+            .map((code) => String(code || "").trim())
+            .filter(Boolean)));
+        if (!codes.length || !isOverviewScenarioDetailChart(canvasId)) {
+            return;
+        }
+        const sourceCanvasId = resolveChartScenarioSourceCanvasId(canvasId);
+        const previousState = getExpandedEventFilterState(canvasId);
+        state.scenarioDetailBeforeDrilldownBySource[sourceCanvasId] = {
+            includeOverall: !!previousState.includeOverall,
+            codes: Array.isArray(previousState.codes) ? [...previousState.codes] : []
+        };
+        state.scenarioDetailDrilldownBySource[sourceCanvasId] = codes.length === 1 ? codes[0] : "";
+        const eventState = getExpandedEventFilterState(canvasId);
+        eventState.includeOverall = false;
+        eventState.codes = codes;
+        syncExpandedEventFilterControls(canvasId);
+        const ranges = currentScenarioDetailRanges(canvasId);
+        const normalized = normalizeCompareRangesByAfter(ranges.from, ranges.to, "", "");
+        await renderExpandedChartByRanges(canvasId, normalized, getExpandedEventRenderOptions(canvasId));
+        state.expandedChart.customRangeActive = true;
+        await refreshExpandedScenarioDetailPanel();
+    }
+
+    async function applyScenarioDetailSelectionToChart(canvasId) {
+        if (!isOverviewScenarioDetailChart(canvasId) || !resolveChartScenario(canvasId)) {
+            return;
+        }
+        const sourceCanvasId = resolveChartScenarioSourceCanvasId(canvasId);
+        const selectedCodes = (state.scenarioDetailSelectionBySource?.[sourceCanvasId] || [])
+            .map((code) => String(code || "").trim())
+            .filter(Boolean);
+        if (!selectedCodes.length) {
+            const eventState = getExpandedEventFilterState(canvasId);
+            const scenarioCodes = await resolveOverviewScenarioEventCodes(sourceCanvasId);
+            eventState.includeOverall = false;
+            eventState.codes = Array.from(new Set(scenarioCodes));
+            syncExpandedEventFilterControls(canvasId);
+            const ranges = currentScenarioDetailRanges(canvasId);
+            const normalized = normalizeCompareRangesByAfter(ranges.from, ranges.to, "", "");
+            await renderExpandedChartByRanges(canvasId, normalized, {
+                ...getExpandedEventRenderOptions(canvasId),
+                skipScenarioDetailRefresh: true
+            });
+            state.expandedChart.customRangeActive = true;
+            return;
+        }
+        const eventState = getExpandedEventFilterState(canvasId);
+        if (!state.scenarioEventFilterBeforeBySource?.[sourceCanvasId]) {
+            if (!state.scenarioEventFilterBeforeBySource) {
+                state.scenarioEventFilterBeforeBySource = {};
+            }
+            state.scenarioEventFilterBeforeBySource[sourceCanvasId] = cloneExpandedEventFilterState(eventState);
+        }
+        eventState.includeOverall = false;
+        eventState.codes = Array.from(new Set(selectedCodes));
+        syncExpandedEventFilterControls(canvasId);
+        const ranges = currentScenarioDetailRanges(canvasId);
+        const normalized = normalizeCompareRangesByAfter(ranges.from, ranges.to, "", "");
+        await renderExpandedChartByRanges(canvasId, normalized, {
+            ...getExpandedEventRenderOptions(canvasId),
+            skipScenarioDetailRefresh: true
+        });
+        state.expandedChart.customRangeActive = true;
+    }
+
+    async function resetScenarioDetailEventDrilldown(canvasId) {
+        if (!isOverviewScenarioDetailChart(canvasId)) {
+            return;
+        }
+        const sourceCanvasId = resolveChartScenarioSourceCanvasId(canvasId);
+        const previousState = state.scenarioDetailBeforeDrilldownBySource?.[sourceCanvasId];
+        delete state.scenarioDetailDrilldownBySource[sourceCanvasId];
+        delete state.scenarioDetailBeforeDrilldownBySource[sourceCanvasId];
+        const eventState = getExpandedEventFilterState(canvasId);
+        eventState.includeOverall = previousState ? !!previousState.includeOverall : true;
+        eventState.codes = previousState && Array.isArray(previousState.codes) ? [...previousState.codes] : [];
+        syncExpandedEventFilterControls(canvasId);
+        const ranges = currentScenarioDetailRanges(canvasId);
+        const normalized = normalizeCompareRangesByAfter(ranges.from, ranges.to, "", "");
+        await renderExpandedChartByRanges(canvasId, normalized, getExpandedEventRenderOptions(canvasId));
+        state.expandedChart.customRangeActive = true;
+        await refreshExpandedScenarioDetailPanel();
+    }
+
+    async function openScenarioDetailRaw(canvasId, eventCode) {
+        const code = String(eventCode || "").trim();
+        if (!code) {
+            return;
+        }
+        const ranges = currentScenarioDetailRanges(canvasId);
+        if (refs.eventsFrom) refs.eventsFrom.value = ranges.from || "";
+        if (refs.eventsTo) refs.eventsTo.value = ranges.to || "";
+        if (refs.eventsEventType) refs.eventsEventType.value = code;
+        if (canvasId === "chart-error-rate" && refs.eventsIsError) {
+            refs.eventsIsError.value = "true";
+        }
+        syncQuickRangeSelectFromRange(refs.eventsQuickRange, refs.eventsFrom?.value || "", refs.eventsTo?.value || "");
+        setDashboardViewTab("raw", true);
+        await refreshRawEventTypeOptionsForMode(code);
+        if (refs.eventsEventType) refs.eventsEventType.value = code;
+        await loadEvents(true);
+    }
+
+    function ensureUniversalEventOptionsForCodes(eventCodes = []) {
+        if (!refs.universalEventTypeList) {
+            return;
+        }
+        const existing = new Set(Array.from(refs.universalEventTypeList.options || [])
+            .map((option) => String(option.value || "").trim())
+            .filter(Boolean));
+        const eventTypes = Array.isArray(state.dictionaries?.eventTypes) ? state.dictionaries.eventTypes : [];
+        eventCodes.forEach((code) => {
+            const normalized = String(code || "").trim();
+            if (!normalized || existing.has(normalized)) {
+                return;
+            }
+            const eventType = eventTypes.find((item) => String(item?.code || "").trim() === normalized);
+            const option = document.createElement("option");
+            option.value = normalized;
+            option.textContent = String(eventType?.name || normalized).trim() || normalized;
+            refs.universalEventTypeList.appendChild(option);
+            existing.add(normalized);
+        });
+    }
+
+    async function openScenarioDetailDiagnostics(canvasId, eventCodes = []) {
+        const codes = Array.from(new Set((eventCodes || [])
+            .map((code) => String(code || "").trim())
+            .filter(Boolean)));
+        if (!codes.length || !isOverviewScenarioDetailChart(canvasId)) {
+            return;
+        }
+        const ranges = currentScenarioDetailRanges(canvasId);
+        state.universalDiagnosticsDrilldownContext = {
+            eventCodes: [...codes],
+            from: ranges.from || "",
+            to: ranges.to || ""
+        };
+        if (refs.universalFrom) refs.universalFrom.value = ranges.from || "";
+        if (refs.universalTo) refs.universalTo.value = ranges.to || "";
+        if (refs.universalBucket) refs.universalBucket.value = refs.bucket?.value || "";
+        ensureUniversalEventOptionsForCodes(codes);
+        setSelectedUniversalEventCodes(codes, {overallWhenEmpty: false});
+        if (refs.universalEventOverall) {
+            refs.universalEventOverall.checked = false;
+        }
+        state.universalAnalysisMode = codes.length === 1 ? "single-event" : "multi-event";
+        syncUniversalQuickRangeFromInputs();
+        syncUniversalBeforeRangeFromAfter();
+        syncUniversalFilterModeUi();
+        updateUniversalFilterResetVisibility();
+        setDashboardViewTab("universal", true);
+        showUniversalChartLoaders();
+        if (typeof state.submitUniversalFilters === "function") {
+            await state.submitUniversalFilters({action: "scenario_detail_diagnostics"});
+        }
+    }
+
+    async function openUniversalRawEvents({
+        eventCode = "",
+        attributeCode = "",
+        attributeValue = "",
+        errorKey = "",
+        errorsOnly = false,
+        systemEvent = false,
+        moduleCode = "",
+        stageTypeCode = ""
+    } = {}) {
+        const selectedEventCode = String(eventCode || "").trim();
+        const selectedAttributeCode = String(attributeCode || "").trim();
+        const selectedAttributeValue = String(attributeValue || "").trim();
+        const selectedErrorKey = String(errorKey || "").trim();
+        const selectedModuleCode = String(moduleCode || "").trim();
+        const selectedStageTypeCode = String(stageTypeCode || "").trim();
+        const forceErrorsOnly = !!errorsOnly || !!selectedErrorKey;
+        const ranges = resolveUniversalCompareRanges();
+        const afterFrom = ranges.afterFrom || refs.universalFrom?.value || refs.from?.value || "";
+        const afterTo = ranges.afterTo || refs.universalTo?.value || refs.to?.value || "";
+        if (refs.eventsFrom) refs.eventsFrom.value = afterFrom;
+        if (refs.eventsTo) refs.eventsTo.value = afterTo;
+        syncQuickRangeSelectFromRange(refs.eventsQuickRange, refs.eventsFrom?.value || "", refs.eventsTo?.value || "");
+
+        const universalEventCodes = Array.from(selectedUniversalEventCodes());
+        const forcedEventCodes = selectedEventCode
+            ? [selectedEventCode]
+            : universalEventCodes.map((code) => String(code || "").trim()).filter(Boolean);
+        const rawEventCode = forcedEventCodes.length === 1 ? forcedEventCodes[0] : "";
+        state.eventsForcedEventCodes = forcedEventCodes;
+        state.eventsForcedErrorKey = selectedErrorKey;
+        state.eventsForcedModuleCode = selectedModuleCode;
+        state.eventsForcedStageTypeCode = selectedStageTypeCode;
+        if (systemEvent) {
+            state.systemChartLocalDirty = true;
+            if (refs.systemChartFrom) refs.systemChartFrom.value = afterFrom;
+            if (refs.systemChartTo) refs.systemChartTo.value = afterTo;
+            if (refs.systemChartIsError) refs.systemChartIsError.value = forceErrorsOnly ? "true" : "";
+            setDashboardViewTab("system", true);
+            await refreshSystemChartEventOptions({preserveSelection: false});
+            const matchingOption = selectedEventCode
+                ? Array.from(refs.systemChartEventsList?.options || [])
+                    .find((option) => String(option.value || "").trim() === selectedEventCode)
+                : null;
+            Array.from(refs.systemChartEventsList?.options || []).forEach((option) => {
+                option.selected = option === matchingOption;
+            });
+            if (refs.systemChartEventsAll) {
+                refs.systemChartEventsAll.checked = !matchingOption;
+            }
+            updateSystemChartEventsLabel();
+            await loadEvents(true);
+            return;
+        }
+        if (refs.eventsEventType) refs.eventsEventType.value = rawEventCode;
+        if (refs.eventsIsError) refs.eventsIsError.value = forceErrorsOnly ? "true" : "";
+        if (refs.eventsErrorClass) refs.eventsErrorClass.value = "";
+        if (refs.eventsMetricType) refs.eventsMetricType.value = "";
+        if (refs.eventsMetricMin) refs.eventsMetricMin.value = "";
+        if (refs.eventsMetricMax) refs.eventsMetricMax.value = "";
+        if (refs.eventsMinDuration) refs.eventsMinDuration.value = "";
+        if (refs.eventsRequestPath) refs.eventsRequestPath.value = "";
+        if (refs.eventsAttributeCode) refs.eventsAttributeCode.value = selectedAttributeCode;
+        if (refs.eventsAttributeValue) refs.eventsAttributeValue.value = selectedAttributeValue;
+        if (selectedAttributeCode) {
+            refs.eventsAdvancedWrap?.classList.remove("d-none");
+            refs.eventsAdvancedToggle?.setAttribute("aria-expanded", "true");
+        }
+        updateEventsErrorClassVisibility();
+        setDashboardViewTab("raw", true);
+        await refreshRawEventTypeOptionsForMode(rawEventCode);
+        if (refs.eventsEventType) refs.eventsEventType.value = rawEventCode;
+        await loadEvents(true);
+    }
+
+    function syncExpandedEventFilterControls(canvasId) {
+        const controls = state.expandedChart.containerEl?.querySelector(".analytics-expanded-graph-controls");
+        if (!controls) {
+            return;
+        }
+        const eventState = getExpandedEventFilterState(canvasId);
+        const eventCodesEl = controls.querySelector("[data-event-codes]");
+        const eventOverallToggleEl = controls.querySelector("[data-event-overall-toggle]");
+        const eventToggleEl = controls.querySelector("[data-event-popup-toggle]");
+        if (eventOverallToggleEl) {
+            eventOverallToggleEl.checked = !!eventState.includeOverall;
+        }
+        if (eventCodesEl) {
+            const allCodes = getExpandedEventOptions(canvasId).map((item) => item.code);
+            const selectedCodes = Array.isArray(eventState.codes) ? eventState.codes : [];
+            const allSelected = allCodes.length > 0 && selectedCodes.length === allCodes.length
+                && allCodes.every((code) => selectedCodes.includes(code));
+            syncMultiSelectValues(eventCodesEl, [
+                ...(allSelected ? ["__all__"] : []),
+                ...(eventState.includeOverall ? ["__overall__"] : []),
+                ...selectedCodes
+            ]);
+        }
+        if (eventToggleEl) {
+            const count = Array.isArray(eventState.codes) ? eventState.codes.length : 0;
+            eventToggleEl.textContent = eventState.includeOverall || count === 0
+                ? "События: все"
+                : `События (${count})`;
+        }
+        const latencyMetricEl = controls.querySelector("[data-expanded-latency-metric]");
+        if (latencyMetricEl) {
+            const count = Array.isArray(eventState.codes) ? eventState.codes.length : 0;
+            latencyMetricEl.classList.toggle("d-none", count <= 0);
+            latencyMetricEl.disabled = count <= 1;
+        }
+    }
+
+    async function resolveOverviewScenarioEventCodes(canvasId) {
+        if (!isOverviewScenarioDetailChart(canvasId) || !resolveChartScenario(canvasId)) {
+            return [];
+        }
+        const ranges = currentScenarioDetailRanges(canvasId);
+        const rows = await loadExpandedEventKpiRowsForRange(ranges.from, ranges.to);
+        return scenarioDetailSortRows(canvasId, rows)
+            .slice(0, 10)
+            .map((row) => String(row.key || "").trim())
+            .filter((code) => code);
+    }
+
+    async function applyOverviewScenarioEventFilter(sourceCanvasId) {
+        if (!isOverviewScenarioDetailChart(sourceCanvasId)) {
+            return false;
+        }
+        const resolvedSourceCanvasId = resolveChartScenarioSourceCanvasId(sourceCanvasId);
+        delete state.scenarioDetailDrilldownBySource[resolvedSourceCanvasId];
+        delete state.scenarioDetailBeforeDrilldownBySource[resolvedSourceCanvasId];
+        const scenario = resolveChartScenario(sourceCanvasId);
+        const scenarioCode = scenarioCodeOf(scenario);
+        const requestId = ++state.scenarioDetailRequestId;
+        const eventState = getExpandedEventFilterState(sourceCanvasId);
+        if (!scenario) {
+            restoreExpandedEventFilterState(
+                sourceCanvasId,
+                state.scenarioEventFilterBeforeBySource?.[resolvedSourceCanvasId]
+            );
+            delete state.scenarioEventFilterBeforeBySource?.[resolvedSourceCanvasId];
+        } else {
+            if (!state.scenarioEventFilterBeforeBySource) {
+                state.scenarioEventFilterBeforeBySource = {};
+            }
+            if (!state.scenarioEventFilterBeforeBySource[resolvedSourceCanvasId]) {
+                state.scenarioEventFilterBeforeBySource[resolvedSourceCanvasId] = cloneExpandedEventFilterState(eventState);
+            }
+            const codes = await resolveOverviewScenarioEventCodes(sourceCanvasId);
+            if (requestId !== state.scenarioDetailRequestId || scenarioCodeOf(resolveChartScenario(sourceCanvasId)) !== scenarioCode) {
+                return true;
+            }
+            eventState.includeOverall = false;
+            eventState.codes = codes;
+        }
+        syncExpandedEventFilterControls(sourceCanvasId);
+        if (state.expandedChart.sourceCanvasId === sourceCanvasId && state.expandedChart.containerEl) {
+            const ranges = resolveExpandedRangesForMode(sourceCanvasId, resolveExpandedCompareMode(sourceCanvasId) !== "off");
+            await renderExpandedChartByRanges(sourceCanvasId, ranges, getExpandedEventRenderOptions(sourceCanvasId));
+            state.expandedRangesBySource[sourceCanvasId] = {...ranges};
+            if (resolveExpandedCompareMode(sourceCanvasId) === "split" && sourceCanvasId !== "chart-event-kpi") {
+                await applyStoredExpandedRangesToCharts(sourceCanvasId);
+            }
+            state.expandedChart.customRangeActive = !!scenario;
+        }
+        return true;
     }
 
     async function applyChartScenario(canvasId, scenarioId, checked) {
@@ -11269,6 +16792,8 @@
             rerenderScenarioChart(sourceCanvasId);
             refreshAllChartScenarioPickers();
             syncInlineCompareModeResetVisibility(sourceCanvasId);
+            await applyOverviewScenarioEventFilter(sourceCanvasId);
+            await refreshExpandedScenarioDetailPanel();
             if (checked && shouldScenarioPreferCompareOverlay(code) && INLINE_COMPARE_CHART_IDS.has(sourceCanvasId)) {
                 await applyInlineCompareMode(sourceCanvasId, "overlay", {override: true});
                 await applyInlineComparePresetToChart(sourceCanvasId);
@@ -11330,16 +16855,16 @@
         const checklist = Array.isArray(scenario?.checklist) && scenario.checklist.length
             ? scenario.checklist
             : [
-                "Сначала проверьте Count, чтобы понять размер выборки.",
-                "Затем сравните P95 и Error rate в том же периоде.",
+                "Сначала проверьте количество событий, чтобы понять размер выборки.",
+                "Затем сравните P95 и долю ошибок в том же периоде.",
                 "Откройте соседние графики, чтобы понять, проблема локальная или общая.",
-                "Подтвердите вывод Raw-событиями и Trace ID."
+                "Подтвердите вывод сырыми событиями и идентификатором трассировки."
             ];
         return {
             whenToUse: description || `Используйте сценарий «${label}», когда на графике виден подозрительный рост, провал или отличие До/После.`,
             whatItFinds: details || "Сценарий помогает превратить график в проверяемую гипотезу: что изменилось, где искать причину и какие данные нужны для подтверждения.",
             route: checklist.map((item) => String(item || "").trim()).filter(Boolean),
-            falseAlarm: scenario?.falseAlarm || "Не делайте вывод сразу, если выборка маленькая, периоды До/После отличаются по нагрузке или включены разные фильтры. Сначала проверьте Count и повторяемость в нескольких bucket."
+            falseAlarm: scenario?.falseAlarm || "Не делайте вывод сразу, если выборка маленькая, периоды До/После отличаются по нагрузке или включены разные фильтры. Сначала проверьте количество событий и повторяемость в нескольких интервалах."
         };
     }
 
@@ -11351,11 +16876,19 @@
             cleanupOverviewMiniChartActions(actions, canvasId);
             return;
         }
+        if (
+            isExpandedChartActions(actions)
+            && OVERVIEW_INVESTIGATION_SCENARIO_CHART_IDS.has(resolveChartScenarioSourceCanvasId(canvasId))
+        ) {
+            ensureOverviewInvestigationScenarioToggle(actions, canvasId);
+            return;
+        }
+        const options = resolveChartScenarioOptions(canvasId);
+        if (!options.length) {
+            actions.querySelector(`[data-chart-scenario-picker='${canvasId}']`)?.remove();
+            return;
+        }
         if (!actions.querySelector(`[data-chart-scenario-picker='${canvasId}']`)) {
-            const options = resolveChartScenarioOptions(canvasId);
-            if (!options.length) {
-                return;
-            }
             const expandedPicker = isExpandedChartActions(actions);
             const picker = document.createElement("div");
             picker.className = expandedPicker
@@ -11490,6 +17023,63 @@
             });
             state.chartScenarioOutsideBound = true;
         }
+    }
+
+    function ensureOverviewInvestigationScenarioToggle(actions, canvasId) {
+        if (!actions || !canvasId) {
+            return;
+        }
+        actions.querySelector(`[data-chart-scenario-picker='${canvasId}']`)?.remove();
+        const sourceCanvasId = resolveChartScenarioSourceCanvasId(canvasId);
+        const scenarioCode = overviewInvestigationScenarioCode(sourceCanvasId);
+        if (!scenarioCode) {
+            actions.querySelector(`[data-overview-scenario-toggle-wrap='${canvasId}']`)?.remove();
+            return;
+        }
+        let wrap = actions.querySelector(`[data-overview-scenario-toggle-wrap='${canvasId}']`);
+        if (!wrap) {
+            wrap = document.createElement("div");
+            wrap.className = "analytics-overview-scenario-toggle-wrap";
+            wrap.setAttribute("data-overview-scenario-toggle-wrap", canvasId);
+            wrap.innerHTML = `
+                <label class="analytics-overview-scenario-toggle">
+                    <input type="checkbox"
+                           class="analytics-overview-scenario-toggle-input"
+                           data-overview-scenario-toggle="${escapeHtml(canvasId)}"
+                           value="${escapeHtml(scenarioCode)}">
+                    <span class="analytics-overview-scenario-toggle-pill">
+                        <span class="analytics-overview-scenario-toggle-check" aria-hidden="true">✓</span>
+                        <span>${escapeHtml(overviewInvestigationScenarioToggleLabel(sourceCanvasId))}</span>
+                    </span>
+                </label>
+                <button type="button"
+                        class="btn btn-outline-secondary analytics-chart-scenario-help-btn analytics-overview-scenario-help-btn"
+                        data-overview-scenario-help="${escapeHtml(canvasId)}"
+                        title="Подсказка по сценарию"
+                        aria-label="Подсказка по сценарию">?</button>
+            `;
+            actions.appendChild(wrap);
+            const input = wrap.querySelector(`[data-overview-scenario-toggle='${canvasId}']`);
+            input?.addEventListener("change", async () => {
+                await applyChartScenario(canvasId, scenarioCode, !!input.checked);
+                ensureOverviewInvestigationScenarioToggle(actions, canvasId);
+            });
+            wrap.querySelector(`[data-overview-scenario-help='${canvasId}']`)
+                ?.addEventListener("click", (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    openChartScenarioHelpModal(canvasId, scenarioCode);
+                });
+        }
+        const selected = new Set(selectedChartScenarioCodes(sourceCanvasId));
+        const checked = selected.has(scenarioCode);
+        const input = wrap.querySelector(`[data-overview-scenario-toggle='${canvasId}']`);
+        const pill = wrap.querySelector(".analytics-overview-scenario-toggle-pill");
+        if (input) {
+            input.checked = checked;
+        }
+        pill?.classList.toggle("active", checked);
+        syncChartScenarioSummary(canvasId);
     }
 
     function isInlineGhostEnabled(canvasId) {
@@ -11660,11 +17250,122 @@
     }
 
     function resolveExpandedBucket(canvasId) {
-        const local = (state.expandedBucketBySource[canvasId] || "").trim();
-        if (local) {
-            return local;
-        }
         return (refs.bucket?.value || "").trim();
+    }
+
+    function formatBucketLabel(bucketValue) {
+        const value = String(bucketValue || "").trim();
+        const labels = {
+            "1": "1 минута",
+            "2": "2 минуты",
+            "5": "5 минут",
+            "15": "15 минут",
+            "30": "30 минут",
+            "60": "1 час",
+            "120": "2 часа",
+            "180": "3 часа",
+            "360": "6 часов",
+            "720": "12 часов",
+            "1440": "1 день"
+        };
+        return labels[value] || (value ? `${value} минут` : "Авто");
+    }
+
+    function effectiveBucketFromConfig(config) {
+        const candidates = [
+            config?.__analyticsEffectiveBucketMinutes,
+            config?.options?.__analyticsEffectiveBucketMinutes,
+            config?.config?._config?.__analyticsEffectiveBucketMinutes
+        ];
+        const value = candidates
+            .map((item) => Number(item))
+            .find((item) => Number.isFinite(item) && item > 0);
+        return value ? String(value) : inferEffectiveBucketMinutesFromConfig(config);
+    }
+
+    function inferEffectiveBucketMinutesFromConfig(config) {
+        const points = Array.isArray(config?.__analyticsTimePoints)
+            ? config.__analyticsTimePoints
+            : (Array.isArray(config?.config?._config?.__analyticsTimePoints) ? config.config._config.__analyticsTimePoints : []);
+        if (!points.length) {
+            return "";
+        }
+        const diffs = [];
+        for (let index = 1; index < points.length; index += 1) {
+            const previousMs = new Date(points[index - 1]).getTime();
+            const currentMs = new Date(points[index]).getTime();
+            if (Number.isFinite(previousMs) && Number.isFinite(currentMs) && currentMs > previousMs) {
+                diffs.push(currentMs - previousMs);
+            }
+        }
+        if (!diffs.length) {
+            return "";
+        }
+        diffs.sort((left, right) => left - right);
+        const medianMs = diffs[Math.floor(diffs.length / 2)];
+        const minutes = Math.round(medianMs / 60_000);
+        return minutes > 0 ? String(minutes) : "";
+    }
+
+    function updateExpandedBucketLabels(selectEl, effectiveBucketMinutes = "") {
+        if (!selectEl) {
+            return;
+        }
+        const effectiveLabel = formatBucketLabel(effectiveBucketMinutes);
+        Array.from(selectEl.options || []).forEach((option) => {
+            const value = String(option.value || "").trim();
+            option.textContent = value
+                ? formatBucketLabel(value)
+                : (effectiveBucketMinutes ? `Авто (${effectiveLabel})` : "Авто");
+        });
+    }
+
+    function clearExpandedBucketOverrides() {
+        state.expandedBucketBySource = {};
+    }
+
+    function syncAllExpandedBucketControls(effectiveBucketMinutes = "") {
+        const globalBucket = (refs.bucket?.value || "").trim();
+        refs.analyticsPage?.querySelectorAll("[data-expanded-bucket]").forEach((selectEl) => {
+            if (Array.from(selectEl.options || []).some((option) => option.value === globalBucket)) {
+                selectEl.value = globalBucket;
+            }
+            updateExpandedBucketLabels(selectEl, globalBucket ? "" : effectiveBucketMinutes);
+        });
+    }
+
+    function setGlobalBucketFromChart(bucketValue) {
+        const normalized = String(bucketValue || "").trim();
+        if (refs.bucket && Array.from(refs.bucket.options || []).some((option) => option.value === normalized)) {
+            refs.bucket.value = normalized;
+        }
+        clearExpandedBucketOverrides();
+        if (refs.universalBucket) {
+            refs.universalBucket.value = normalized;
+        }
+        if (!state.systemChartLocalDirty
+            && refs.systemChartBucket
+            && Array.from(refs.systemChartBucket.options || []).some((option) => option.value === normalized)) {
+            refs.systemChartBucket.value = normalized;
+        }
+        syncAllExpandedBucketControls();
+    }
+
+    function syncExpandedBucketLabelFromConfig(canvasId, config) {
+        if (state.expandedChart.sourceCanvasId !== canvasId || !state.expandedChart.containerEl) {
+            return;
+        }
+        const selectEl = state.expandedChart.containerEl.querySelector("[data-expanded-bucket]");
+        const selectedValue = String(refs.bucket?.value || "").trim();
+        if (selectEl) {
+            selectEl.value = selectedValue;
+        }
+        updateExpandedBucketLabels(selectEl, selectedValue ? "" : effectiveBucketFromConfig(config));
+    }
+
+    function shouldPreserveManualBucketPoints(bucketValue) {
+        const value = String(bucketValue || "").trim();
+        return /^(1|2|5|15|30|60|120|180|360|720|1440)$/.test(value);
     }
 
     function inlineCompareParams(_presetCode, canvasId = "") {
@@ -12514,8 +18215,9 @@
         if (!chart.options.scales.x.ticks) {
             chart.options.scales.x.ticks = {};
         }
-        chart.options.scales.x.ticks.autoSkip = true;
-        chart.options.scales.x.ticks.maxTicksLimit = expanded ? 20 : 8;
+        chart.options.scales.x.ticks.autoSkip = false;
+        chart.options.scales.x.ticks.maxTicksLimit = 1000;
+        chart.options.scales.x.ticks.callback = adaptiveTimeTickLabel;
     }
 
     function getGridColumnCount(gridEl) {
@@ -12680,7 +18382,7 @@
         }
     }
 
-    function renderExpandedChartClone(canvasId) {
+    function renderExpandedChartClone(canvasId, options = {}) {
         if (!canvasId) {
             return;
         }
@@ -12711,8 +18413,9 @@
                 config.options.scales.x.ticks.autoSkip = false;
                 config.options.scales.x.ticks.maxTicksLimit = 1000;
             } else {
-                config.options.scales.x.ticks.autoSkip = true;
-                config.options.scales.x.ticks.maxTicksLimit = 20;
+                config.options.scales.x.ticks.autoSkip = false;
+                config.options.scales.x.ticks.maxTicksLimit = 1000;
+                config.options.scales.x.ticks.callback = adaptiveTimeTickLabel;
             }
         }
         if (config.options.plugins?.decimation) {
@@ -12722,6 +18425,7 @@
             state.expandedChart.instance.destroy();
         }
         state.expandedChart.instance = new Chart(expandedCanvas.getContext("2d"), config);
+        syncExpandedBucketLabelFromConfig(canvasId, config);
 
         if (state.expandedChart.compareInstance) {
             state.expandedChart.compareInstance.destroy();
@@ -12736,7 +18440,12 @@
             )
             : null;
         const compareExpandedCanvas = container.querySelector(`[data-expanded-compare-for='${canvasId}']`);
+        const skipScenarioDetailRefresh = options.skipScenarioDetailRefresh
+            || state.preserveChartUiStateDuringMainSubmit;
         if (!compareSourceConfig || !compareExpandedCanvas) {
+            if (!skipScenarioDetailRefresh) {
+                void refreshExpandedScenarioDetailPanel();
+            }
             return;
         }
         const compareConfig = cloneChartConfig(compareSourceConfig);
@@ -12748,14 +18457,18 @@
                 compareConfig.options.scales.x.ticks.autoSkip = false;
                 compareConfig.options.scales.x.ticks.maxTicksLimit = 1000;
             } else {
-                compareConfig.options.scales.x.ticks.autoSkip = true;
-                compareConfig.options.scales.x.ticks.maxTicksLimit = 20;
+                compareConfig.options.scales.x.ticks.autoSkip = false;
+                compareConfig.options.scales.x.ticks.maxTicksLimit = 1000;
+                compareConfig.options.scales.x.ticks.callback = adaptiveTimeTickLabel;
             }
         }
         if (compareConfig.options.plugins?.decimation) {
             compareConfig.options.plugins.decimation.samples = 260;
         }
         state.expandedChart.compareInstance = new Chart(compareExpandedCanvas.getContext("2d"), compareConfig);
+        if (!skipScenarioDetailRefresh) {
+            void refreshExpandedScenarioDetailPanel();
+        }
     }
 
     function setupExpandedZoomControls(container) {
@@ -12972,6 +18685,24 @@
         return state.expandedEventFilterBySource[canvasId];
     }
 
+    function cloneExpandedEventFilterState(filterState) {
+        return {
+            includeOverall: !!filterState?.includeOverall,
+            codes: Array.isArray(filterState?.codes)
+                ? filterState.codes.map((code) => String(code || "").trim()).filter((code) => code)
+                : []
+        };
+    }
+
+    function restoreExpandedEventFilterState(canvasId, snapshot) {
+        const eventState = getExpandedEventFilterState(canvasId);
+        eventState.includeOverall = snapshot ? !!snapshot.includeOverall : true;
+        eventState.codes = Array.isArray(snapshot?.codes)
+            ? snapshot.codes.map((code) => String(code || "").trim()).filter((code) => code)
+            : [];
+        return eventState;
+    }
+
     function getExpandedEventOptions(canvasId) {
         const stored = state.expandedEventOptionsBySource?.[canvasId];
         if (Array.isArray(stored) && stored.length) {
@@ -13165,6 +18896,71 @@
         return 100;
     }
 
+    async function refreshPeriodScopedMainOptions() {
+        if (!refs.moduleType && !refs.eventType) {
+            return;
+        }
+        const systemEventsOnly = state.currentDashboardTab === "system";
+        let selectedModule = (refs.moduleType?.value || "").trim();
+        const selectedMain = (refs.eventType?.value || "").trim();
+        let payload = await fetchPeriodFilterOptions({
+            moduleCode: selectedModule,
+            systemEventsOnly
+        });
+        const modules = normalizeOptionList(payload?.modules);
+        if (selectedModule && !modules.some((item) => item.code === selectedModule)) {
+            selectedModule = "";
+            payload = await fetchPeriodFilterOptions({systemEventsOnly});
+        }
+        const available = normalizeOptionList(payload?.eventTypes);
+        const nextMain = available.some((item) => item.code === selectedMain) ? selectedMain : "";
+        fillSelect(refs.moduleType, modules, "Все модули", true, selectedModule);
+        fillSelect(
+            refs.eventType,
+            available,
+            systemEventsOnly ? "Все служебные" : "Все события",
+            true,
+            nextMain
+        );
+        await refreshRawEventTypeOptionsForMode(refs.eventsEventType?.value || "");
+    }
+
+    async function fetchPeriodFilterOptions(options = {}) {
+        const params = new URLSearchParams();
+        setIfPresent(params, "from", toIso(options.fromValue ?? refs.from?.value ?? ""));
+        setIfPresent(params, "to", toIso(options.toValue ?? refs.to?.value ?? ""));
+        const moduleCode = String(options.moduleCode ?? refs.moduleType?.value ?? "").trim();
+        if (moduleCode) {
+            params.set("moduleCode", moduleCode);
+        }
+        const eventTypeCode = String(options.eventTypeCode ?? refs.eventType?.value ?? "").trim();
+        if (options.includeEventType !== false && eventTypeCode) {
+            params.set("eventTypeCode", eventTypeCode);
+        }
+        const requestPath = String(options.requestPath || "").trim();
+        if (requestPath) {
+            params.set("requestPath", requestPath);
+        }
+        const attrCode = String(options.attributeCode || "").trim();
+        if (attrCode) {
+            params.set("attributeCode", attrCode);
+        }
+        if (options.systemEventsOnly) {
+            params.set("systemEventsOnly", "true");
+        }
+        return fetchJson(`${api("/filter-options")}?${params.toString()}`);
+    }
+
+    function normalizeOptionList(options) {
+        return (Array.isArray(options) ? options : [])
+            .map((item) => ({
+                code: String(item?.code || "").trim(),
+                name: String(item?.name || item?.code || "").trim()
+            }))
+            .filter((item) => item.code.length > 0)
+            .sort((a, b) => a.name.localeCompare(b.name, "ru"));
+    }
+
     function attachAnalyticsTimePoints(config, sourceTimePoints, sampled) {
         const indexes = Array.isArray(sampled?.indexes) ? sampled.indexes : [];
         const points = Array.isArray(sourceTimePoints) ? sourceTimePoints : [];
@@ -13180,6 +18976,7 @@
         if (!refs.analyticsPage || !interval?.from || !interval?.to) {
             existing?.remove();
             syncExpandedIntervalCancelButtons();
+            syncSystemChartIntervalUndoButton();
             return;
         }
         const text = `Интервал анализа: ${formatComparePeriodTime(interval.from)} — ${formatComparePeriodTime(interval.to)}`;
@@ -13192,34 +18989,180 @@
                 <span data-active-analysis-interval-text></span>
                 <button type="button" class="analytics-active-interval-reset" data-active-analysis-interval-reset aria-label="Сбросить интервал анализа">×</button>
             `;
-            const anchor = refs.analyticsPage.querySelector("[data-analytics-view='overview']");
-            refs.analyticsPage.insertBefore(chip, anchor || refs.analyticsPage.firstChild);
             chip.querySelector("[data-active-analysis-interval-reset]")?.addEventListener("click", () => {
                 void resetActiveAnalysisInterval();
             });
+        }
+        const universalHost = document.getElementById("universal-active-interval-host");
+        if (universalHost && chip.parentElement !== universalHost) {
+            universalHost.appendChild(chip);
+        } else if (!chip.parentElement) {
+            const anchor = refs.analyticsPage.querySelector("[data-analytics-view='overview']");
+            refs.analyticsPage.insertBefore(chip, anchor || refs.analyticsPage.firstChild);
         }
         const textEl = chip.querySelector("[data-active-analysis-interval-text]");
         if (textEl) {
             textEl.textContent = text;
         }
         syncExpandedIntervalCancelButtons();
+        syncSystemChartIntervalUndoButton();
     }
 
-    async function resetActiveAnalysisInterval() {
-        const current = state.activeAnalysisInterval;
-        if (!current) {
+    function cloneActiveAnalysisInterval(interval) {
+        return interval ? {...interval} : null;
+    }
+
+    function analysisIntervalHistoryHasEntries() {
+        return Array.isArray(state.analysisIntervalHistory) && state.analysisIntervalHistory.length > 0;
+    }
+
+    function pushAnalysisIntervalHistoryEntry(snapshot = {}) {
+        if (!Array.isArray(state.analysisIntervalHistory)) {
+            state.analysisIntervalHistory = [];
+        }
+        const ranges = snapshot.ranges && snapshot.ranges.afterFrom && snapshot.ranges.afterTo
+            ? normalizeCompareRangesByAfter(
+                snapshot.ranges.afterFrom,
+                snapshot.ranges.afterTo,
+                snapshot.ranges.beforeFrom,
+                snapshot.ranges.beforeTo
+            )
+            : null;
+        state.analysisIntervalHistory.push({
+            sourceCanvasId: snapshot.sourceCanvasId || state.expandedChart.sourceCanvasId || "",
+            from: snapshot.from || ranges?.afterFrom || refs.from?.value || "",
+            to: snapshot.to || ranges?.afterTo || refs.to?.value || "",
+            ranges,
+            bucket: snapshot.bucket,
+            preset: snapshot.preset,
+            presetOverridden: snapshot.presetOverridden,
+            compareMode: snapshot.compareMode,
+            compareOverridden: snapshot.compareOverridden,
+            eventFilter: snapshot.eventFilter ? cloneExpandedEventFilterState(snapshot.eventFilter) : null,
+            latencyMetric: snapshot.latencyMetric,
+            stageLatencyEventMetric: snapshot.stageLatencyEventMetric,
+            activeInterval: cloneActiveAnalysisInterval(state.activeAnalysisInterval)
+        });
+    }
+
+    function restoreExpandedIntervalHistorySnapshot(snapshot) {
+        const canvasId = snapshot?.sourceCanvasId || state.expandedChart.sourceCanvasId || "";
+        if (!canvasId) {
+            return;
+        }
+        if (snapshot.ranges?.afterFrom && snapshot.ranges?.afterTo) {
+            state.expandedRangesBySource[canvasId] = {...snapshot.ranges};
+        }
+        if (snapshot.bucket !== undefined) {
+            state.expandedBucketBySource[canvasId] = String(snapshot.bucket || "").trim();
+        }
+        if (snapshot.preset !== undefined) {
+            state.inlineComparePresetBySource[canvasId] = String(snapshot.preset || "").trim();
+            state.inlineComparePresetOverriddenBySource[canvasId] = snapshot.presetOverridden === true;
+        }
+        if (snapshot.compareMode !== undefined) {
+            state.inlineCompareModeBySource[canvasId] = String(snapshot.compareMode || "off").trim().toLowerCase();
+            state.inlineCompareModeOverriddenBySource[canvasId] = snapshot.compareOverridden === true;
+        }
+        restoreExpandedEventFilterState(canvasId, snapshot.eventFilter);
+        if (snapshot.latencyMetric) {
+            state.expandedLatencyMetricBySource[canvasId] = String(snapshot.latencyMetric).trim().toLowerCase();
+        }
+        if (snapshot.stageLatencyEventMetric) {
+            state.expandedStageLatencyEventMetricBySource[canvasId] = String(snapshot.stageLatencyEventMetric).trim().toLowerCase();
+        }
+    }
+
+    function syncExpandedRangeForAnalysisInterval(canvasId, from, to) {
+        if (!canvasId || canvasId === "chart-system-events") {
+            return;
+        }
+        state.expandedRangesBySource[canvasId] = normalizeCompareRangesByAfter(from || "", to || "", "", "");
+    }
+
+    function syncAllOverviewExpandedRangesForAnalysisInterval(from, to) {
+        OVERVIEW_INVESTIGATION_SCENARIO_CHART_IDS.forEach((canvasId) => {
+            syncExpandedRangeForAnalysisInterval(canvasId, from, to);
+        });
+    }
+
+    async function undoActiveAnalysisIntervalStep() {
+        if (!analysisIntervalHistoryHasEntries()) {
             syncExpandedIntervalCancelButtons();
             return;
         }
-        if (refs.from) refs.from.value = current.fromBefore || "";
-        if (refs.to) refs.to.value = current.toBefore || "";
-        state.activeAnalysisInterval = null;
+        const currentSourceCanvasId = state.activeAnalysisInterval?.sourceCanvasId || "";
+        const previous = state.analysisIntervalHistory.pop();
+        if (refs.from) refs.from.value = previous.from || "";
+        if (refs.to) refs.to.value = previous.to || "";
+        restoreExpandedIntervalHistorySnapshot(previous);
+        state.activeAnalysisInterval = cloneActiveAnalysisInterval(previous.activeInterval);
+        if (state.activeAnalysisInterval?.sourceCanvasId) {
+            syncAllOverviewExpandedRangesForAnalysisInterval(
+                state.activeAnalysisInterval.from || "",
+                state.activeAnalysisInterval.to || ""
+            );
+        } else if (!previous.ranges?.afterFrom || !previous.ranges?.afterTo) {
+            syncAllOverviewExpandedRangesForAnalysisInterval(previous.from || "", previous.to || "");
+        }
         Object.keys(state.expandedIntervalSelectionBySource || {}).forEach((canvasId) => {
             clearExpandedIntervalSelection(canvasId);
         });
         ensureActiveAnalysisIntervalChip();
         syncExpandedIntervalCancelButtons();
         await submitMainFiltersPreservingExpandedUiState();
+        await reapplyExpandedScenarioDetailSelectionOrScenario(currentSourceCanvasId);
+        await refreshExpandedScenarioDetailPanel();
+    }
+
+    async function resetActiveAnalysisInterval() {
+        const current = state.activeAnalysisInterval;
+        if (!current) {
+            state.analysisIntervalHistory = [];
+            syncExpandedIntervalCancelButtons();
+            syncSystemChartIntervalUndoButton();
+            return;
+        }
+        if (current.sourceCanvasId === "chart-system-events") {
+            await undoSystemChartInterval();
+            return;
+        }
+        const original = Array.isArray(state.analysisIntervalHistory) && state.analysisIntervalHistory.length
+            ? state.analysisIntervalHistory[0]
+            : null;
+        if (refs.from) refs.from.value = original?.from || current.fromBefore || "";
+        if (refs.to) refs.to.value = original?.to || current.toBefore || "";
+        syncAllOverviewExpandedRangesForAnalysisInterval(refs.from?.value || "", refs.to?.value || "");
+        state.activeAnalysisInterval = null;
+        state.analysisIntervalHistory = [];
+        Object.keys(state.expandedIntervalSelectionBySource || {}).forEach((canvasId) => {
+            clearExpandedIntervalSelection(canvasId);
+        });
+        ensureActiveAnalysisIntervalChip();
+        syncExpandedIntervalCancelButtons();
+        await submitMainFiltersPreservingExpandedUiState();
+        await reapplyExpandedScenarioDetailSelectionOrScenario(current.sourceCanvasId);
+        await refreshExpandedScenarioDetailPanel();
+    }
+
+    async function reapplyExpandedScenarioDetailSelectionOrScenario(canvasId) {
+        const sourceCanvasId = resolveChartScenarioSourceCanvasId(canvasId || state.expandedChart.sourceCanvasId || "");
+        const selectedCodes = (state.scenarioDetailSelectionBySource?.[sourceCanvasId] || [])
+            .map((code) => String(code || "").trim())
+            .filter(Boolean);
+        if (selectedCodes.length) {
+            await applyScenarioDetailSelectionToChart(sourceCanvasId);
+            return;
+        }
+        await reapplyExpandedScenarioDetailAfterIntervalChange(sourceCanvasId);
+    }
+
+    async function reapplyExpandedScenarioDetailAfterIntervalChange(canvasId) {
+        const sourceCanvasId = resolveChartScenarioSourceCanvasId(canvasId || state.expandedChart.sourceCanvasId || "");
+        if (!sourceCanvasId || !isOverviewScenarioDetailChart(sourceCanvasId) || !resolveChartScenario(sourceCanvasId)) {
+            return;
+        }
+        await applyOverviewScenarioEventFilter(sourceCanvasId);
     }
 
     async function submitMainFiltersPreservingExpandedUiState() {
@@ -13250,7 +19193,7 @@
     }
 
     function syncExpandedIntervalCancelButtons() {
-        const hasActiveInterval = !!state.activeAnalysisInterval?.from && !!state.activeAnalysisInterval?.to;
+        const hasActiveInterval = analysisIntervalHistoryHasEntries();
         document
             .querySelectorAll("[data-active-analysis-interval-cancel]")
             .forEach((button) => button.classList.toggle("d-none", !hasActiveInterval));
@@ -13271,10 +19214,38 @@
         const fromMs = new Date(fromRaw).getTime();
         const toMs = new Date(toRaw).getTime();
         if (labels.length > 1 && Number.isFinite(fromMs) && Number.isFinite(toMs) && fromMs < toMs) {
-            const step = (toMs - fromMs) / (labels.length - 1);
+            const step = (toMs - fromMs) / labels.length;
             return labels.map((_, index) => new Date(fromMs + step * index).toISOString());
         }
         return labels;
+    }
+
+    function expandedChartAfterRangeMs() {
+        const canvasId = state.expandedChart.sourceCanvasId || "";
+        const ranges = state.expandedRangesBySource?.[canvasId] || {};
+        const fromMs = new Date(ranges.afterFrom || refs.from?.value || "").getTime();
+        const toMs = new Date(ranges.afterTo || refs.to?.value || "").getTime();
+        return {
+            fromMs: Number.isFinite(fromMs) ? fromMs : NaN,
+            toMs: Number.isFinite(toMs) ? toMs : NaN
+        };
+    }
+
+    function inferTimePointStepMs(points, index) {
+        const currentMs = new Date(points[index]).getTime();
+        const nextMs = index + 1 < points.length ? new Date(points[index + 1]).getTime() : NaN;
+        if (Number.isFinite(currentMs) && Number.isFinite(nextMs) && nextMs > currentMs) {
+            return nextMs - currentMs;
+        }
+        const previousMs = index > 0 ? new Date(points[index - 1]).getTime() : NaN;
+        if (Number.isFinite(currentMs) && Number.isFinite(previousMs) && currentMs > previousMs) {
+            return currentMs - previousMs;
+        }
+        const {fromMs, toMs} = expandedChartAfterRangeMs();
+        if (Number.isFinite(fromMs) && Number.isFinite(toMs) && toMs > fromMs && points.length > 0) {
+            return (toMs - fromMs) / points.length;
+        }
+        return 60_000;
     }
 
     function selectedIntervalFromPixels(chart, startX, endX) {
@@ -13288,17 +19259,25 @@
         if (maxX - minX < 8) {
             return null;
         }
-        const toIndex = (x) => {
+        const toStartIndex = (x) => {
             const ratio = (x - area.left) / Math.max(1, area.right - area.left);
-            return Math.max(0, Math.min(points.length - 1, Math.round(ratio * (points.length - 1))));
+            return Math.max(0, Math.min(points.length - 1, Math.floor(ratio * (points.length - 1))));
         };
-        const leftIndex = toIndex(minX);
-        const rightIndex = toIndex(maxX);
-        if (leftIndex === rightIndex) {
-            return null;
-        }
-        const fromDate = new Date(points[Math.min(leftIndex, rightIndex)]);
-        const toDate = new Date(points[Math.max(leftIndex, rightIndex)]);
+        const toEndIndex = (x) => {
+            const ratio = (x - area.left) / Math.max(1, area.right - area.left);
+            return Math.max(0, Math.min(points.length - 1, Math.ceil(ratio * (points.length - 1))));
+        };
+        const leftIndex = Math.min(toStartIndex(minX), toEndIndex(maxX));
+        const rightIndex = Math.max(toStartIndex(minX), toEndIndex(maxX));
+        const fromDate = new Date(points[leftIndex]);
+        const nextBoundaryMs = rightIndex + 1 < points.length
+            ? new Date(points[rightIndex + 1]).getTime()
+            : new Date(points[rightIndex]).getTime() + inferTimePointStepMs(points, rightIndex);
+        const {toMs: rangeToMs} = expandedChartAfterRangeMs();
+        const boundedToMs = Number.isFinite(rangeToMs) && rangeToMs > fromDate.getTime()
+            ? Math.min(nextBoundaryMs, rangeToMs)
+            : nextBoundaryMs;
+        const toDate = new Date(boundedToMs);
         if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime()) || fromDate >= toDate) {
             return null;
         }
@@ -13308,7 +19287,7 @@
         };
     }
 
-    function setupExpandedIntervalSelection(container, canvasId) {
+    function setupExpandedIntervalSelection(container, canvasId, context = {}) {
         if (!container || !isTimeRangeSelectableExpandedChart(canvasId)) {
             return;
         }
@@ -13339,7 +19318,7 @@
             cancelButton.setAttribute("aria-label", "Отменить применённый интервал");
             cancelButton.textContent = "Отменить";
             cancelButton.addEventListener("click", () => {
-                void resetActiveAnalysisInterval();
+                void undoActiveAnalysisIntervalStep();
             });
             actions.insertBefore(cancelButton, reset || actions.lastChild);
             syncExpandedIntervalCancelButtons();
@@ -13374,20 +19353,46 @@
                 if (!selection?.from || !selection?.to) {
                     return;
                 }
+                const previousRanges = typeof context.readRangesFromUi === "function"
+                    ? context.readRangesFromUi()
+                    : normalizeCompareRangesByAfter(refs.from?.value || "", refs.to?.value || "", "", "");
+                const previousAfterFrom = previousRanges.afterFrom || refs.from?.value || "";
+                const previousAfterTo = previousRanges.afterTo || refs.to?.value || "";
+                const eventFilterState = context.eventFilterState || getExpandedEventFilterState(canvasId);
+                pushAnalysisIntervalHistoryEntry({
+                    sourceCanvasId: canvasId,
+                    from: previousAfterFrom,
+                    to: previousAfterTo,
+                    ranges: previousRanges,
+                    bucket: context.bucketEl?.value || "",
+                    preset: context.presetEl?.value || "",
+                    presetOverridden: !!state.inlineComparePresetOverriddenBySource?.[canvasId],
+                    compareMode: resolveExpandedCompareMode(canvasId),
+                    compareOverridden: !!state.inlineCompareModeOverriddenBySource?.[canvasId],
+                    eventFilter: cloneExpandedEventFilterState(eventFilterState),
+                    latencyMetric: getExpandedLatencyMetricMode(canvasId),
+                    stageLatencyEventMetric: getExpandedStageLatencyEventMetricMode(canvasId)
+                });
                 state.activeAnalysisInterval = {
-                    fromBefore: refs.from?.value || "",
-                    toBefore: refs.to?.value || "",
+                    fromBefore: previousAfterFrom,
+                    toBefore: previousAfterTo,
                     from: selection.from,
                     to: selection.to,
                     sourceCanvasId: canvasId
                 };
                 if (refs.from) refs.from.value = selection.from;
                 if (refs.to) refs.to.value = selection.to;
-                state.expandedRangesBySource[canvasId] = normalizeCompareRangesByAfter(selection.from, selection.to, "", "");
+                syncAllOverviewExpandedRangesForAnalysisInterval(selection.from, selection.to);
+                if (typeof context.writeRangesToUi === "function") {
+                    context.writeRangesToUi(state.expandedRangesBySource[canvasId]);
+                }
+                state.expandedChart.customRangeActive = true;
                 clearExpandedIntervalSelection(canvasId);
                 ensureActiveAnalysisIntervalChip();
                 syncExpandedIntervalCancelButtons();
                 await submitMainFiltersPreservingExpandedUiState();
+                await reapplyExpandedScenarioDetailSelectionOrScenario(canvasId);
+                await refreshExpandedScenarioDetailPanel();
             });
         }
 
@@ -13496,7 +19501,10 @@
                     </div>
             ` : "";
         const bucketOptionsHtml = Array.from(refs.bucket?.options || [])
-            .map((option) => `<option value="${escapeHtml(option.value || "")}" ${(option.value || "") === bucketValue ? "selected" : ""}>${escapeHtml(option.textContent || "")}</option>`)
+            .map((option) => {
+                const value = String(option.value || "").trim();
+                return `<option value="${escapeHtml(value)}" ${value === bucketValue ? "selected" : ""}>${escapeHtml(formatBucketLabel(value))}</option>`;
+            })
             .join("");
         const selectedEventCount = Array.isArray(eventFilterState.codes) ? eventFilterState.codes.length : 0;
         const showLatencyMetricSelect = supportsLatencyMetricSelect && selectedEventCount > 0;
@@ -13521,7 +19529,7 @@
                 </div>
                 <div class="analytics-expanded-actions" data-expanded-actions>
                     ${supportsLatencyMetricSelect ? `
-                    <select class="form-select form-select-sm analytics-expanded-latency-metric ${showLatencyMetricSelect ? "" : "d-none"}" data-expanded-latency-metric ${selectedEventCount <= 1 ? "disabled" : ""} aria-label="Метрика latency">
+                    <select class="form-select form-select-sm analytics-expanded-latency-metric ${showLatencyMetricSelect ? "" : "d-none"}" data-expanded-latency-metric ${selectedEventCount <= 1 ? "disabled" : ""} aria-label="Метрика времени отклика">
                         <option value="avg" ${selectedLatencyMetric === "avg" ? "selected" : ""}>AVG</option>
                         <option value="p95" ${selectedLatencyMetric === "p95" ? "selected" : ""}>P95</option>
                         <option value="p99" ${selectedLatencyMetric === "p99" ? "selected" : ""}>P99</option>
@@ -13539,7 +19547,7 @@
                             ${INLINE_COMPARE_MODE_OPTIONS.map((item) => `<option value="${item.value}" ${item.value === compareModeResolved ? "selected" : ""}>${item.label}</option>`).join("")}
                         </select>
                     </label>
-                    <select class="form-select form-select-sm analytics-inline-bucket" data-expanded-bucket aria-label="Bucket">
+                    <select class="form-select form-select-sm analytics-inline-bucket" data-expanded-bucket aria-label="Интервал">
                         ${bucketOptionsHtml}
                     </select>
                     <button type="button" class="btn btn-outline-dark analytics-chart-icon-btn d-none" data-expanded-reset title="Сбросить к верхнему фильтру" aria-label="Сбросить к верхнему фильтру">
@@ -13561,6 +19569,7 @@
 
         const presetEl = controls.querySelector("[data-expanded-preset]");
         const bucketEl = controls.querySelector("[data-expanded-bucket]");
+        updateExpandedBucketLabels(bucketEl);
         const resetEl = controls.querySelector("[data-expanded-reset]");
         const compareModeEl = controls.querySelector("[data-expanded-compare-mode]");
         const actionsEl = controls.querySelector(".analytics-expanded-actions");
@@ -13569,11 +19578,14 @@
         if (scenarioPickerEl && resetEl) {
             actionsEl.insertBefore(scenarioPickerEl, resetEl);
         }
+        const overviewScenarioToggleEl = actionsEl?.querySelector(`[data-overview-scenario-toggle-wrap='${canvasId}']`);
+        if (overviewScenarioToggleEl && resetEl) {
+            actionsEl.insertBefore(overviewScenarioToggleEl, resetEl);
+        }
         const closeButtonEl = container.querySelector(".analytics-expanded-close-btn");
         if (closeButtonEl && actionsEl) {
             actionsEl.appendChild(closeButtonEl);
         }
-        setupExpandedIntervalSelection(container, canvasId);
         const toolbarLeft = controls.querySelector("[data-expanded-toolbar-left]");
         const rangesRow = controls.querySelector("[data-expanded-ranges-row]");
         const beforeSummaryEl = controls.querySelector("[data-expanded-before-summary]");
@@ -13633,6 +19645,13 @@
             syncQuickRangeSelectFromRange(presetEl, normalized.afterFrom, normalized.afterTo);
             updateExpandedBeforeSummary(normalized);
         };
+        setupExpandedIntervalSelection(container, canvasId, {
+            readRangesFromUi,
+            writeRangesToUi,
+            bucketEl,
+            presetEl,
+            eventFilterState
+        });
         const refreshExpandedEventOptions = async () => {
             if (!supportsExpandedEventFilter || !eventCodesEl) {
                 return;
@@ -13709,7 +19728,13 @@
                 || (currentRanges.afterTo || "") !== (defaults.afterTo || "");
             const eventChanged = supportsExpandedEventFilter
                 && (!eventFilterState.includeOverall || eventFilterState.codes.length > 0);
-            const hasOverride = hasChartLocalOverride(canvasId) || presetChanged || dateChanged || bucketChanged || eventChanged;
+            const localMode = String(state.inlineCompareModeBySource?.[canvasId] || "").trim().toLowerCase();
+            const compareChanged = !!state.inlineCompareModeOverriddenBySource?.[canvasId]
+                && isValidInlineCompareMode(localMode)
+                && localMode !== resolveGlobalInlineCompareMode();
+            const metricChanged = (latencyMetricEl && getExpandedLatencyMetricMode(canvasId) !== "p95")
+                || (stageLatencyEventMetricEl && getExpandedStageLatencyEventMetricMode(canvasId) !== "p95");
+            const hasOverride = compareChanged || presetChanged || dateChanged || bucketChanged || eventChanged || metricChanged;
             resetEl?.classList.toggle("d-none", !hasOverride);
             refs.analyticsPage?.querySelectorAll(`[data-inline-compare-reset='${canvasId}']`)
                 ?.forEach((button) => {
@@ -13792,6 +19817,10 @@
                         latencyMetric: getExpandedLatencyMetricMode(canvasId),
                         stageLatencyEventMetric: getExpandedStageLatencyEventMetricMode(canvasId)
                     });
+                    state.expandedRangesBySource[canvasId] = {...ranges};
+                    if (resolveExpandedCompareMode(canvasId) === "split" && canvasId !== "chart-event-kpi") {
+                        await applyStoredExpandedRangesToCharts(canvasId);
+                    }
                     state.expandedChart.customRangeActive = true;
                 } finally {
                     setChartActionLoading(canvasId, false);
@@ -13902,10 +19931,14 @@
         resetEl?.addEventListener("click", async () => {
             setChartActionLoading(canvasId, true);
             try {
+                const sourceCanvasId = resolveChartScenarioSourceCanvasId(canvasId);
                 if (supportsExpandedEventFilter) {
                     eventFilterState.includeOverall = true;
                     eventFilterState.codes = [];
                 }
+                delete state.scenarioDetailDrilldownBySource[sourceCanvasId];
+                delete state.scenarioDetailBeforeDrilldownBySource[sourceCanvasId];
+                delete state.scenarioEventFilterBeforeBySource?.[sourceCanvasId];
                 if (latencyMetricEl) {
                     state.expandedLatencyMetricBySource[canvasId] = "p95";
                 }
@@ -13913,6 +19946,15 @@
                     state.expandedStageLatencyEventMetricBySource[canvasId] = "p95";
                 }
                 await resetChartLocalOverride(canvasId);
+                if (!container.isConnected || state.expandedChart.containerEl !== container) {
+                    updateCompareButtonsState();
+                    return;
+                }
+                await refreshExpandedEventOptions();
+                syncExpandedEventToggleLabel();
+                syncLatencyMetricVisibility();
+                syncStageLatencyMetricVisibility();
+                syncResetVisibility();
                 updateCompareButtonsState();
             } finally {
                 setChartActionLoading(canvasId, false);
@@ -13926,15 +19968,19 @@
         bucketEl?.addEventListener("change", async () => {
             setChartActionLoading(canvasId, true);
             try {
-                state.expandedBucketBySource[canvasId] = (bucketEl.value || "").trim();
-                state.expandedChart.customRangeActive = false;
+                setGlobalBucketFromChart(bucketEl.value || "");
                 syncResetVisibility();
-                if (canvasId !== "chart-event-kpi") {
-                    await applyInlineComparePresetToChart(canvasId);
-                    await applyStoredExpandedRangesToCharts(canvasId);
-                }
+                await submitMainFiltersPreservingExpandedUiState();
+                const ranges = readRangesFromUi();
+                await renderExpandedChartByRanges(
+                    canvasId,
+                    normalizeCompareRangesByAfter(ranges.afterFrom, ranges.afterTo, ranges.beforeFrom, ranges.beforeTo),
+                    {
+                        ...getExpandedEventRenderOptions(canvasId),
+                        skipScenarioDetailRefresh: true
+                    }
+                );
                 await refreshExpandedEventOptions();
-                renderExpandedChartClone(canvasId);
                 await rerenderExpandedEventFilterIfNeeded();
             } finally {
                 setChartActionLoading(canvasId, false);
@@ -14006,6 +20052,7 @@
                     state.expandedChart.instance.destroy();
                 }
                 state.expandedChart.instance = new Chart(expandedCanvas.getContext("2d"), config);
+                syncExpandedBucketLabelFromConfig(canvasId, config);
                 if (canvasId !== "chart-event-kpi") {
                     upsertChart(canvasId, config);
                 }
@@ -14200,6 +20247,7 @@
         }
         const compareMode = resolveExpandedCompareMode(canvasId);
         const isOverlayMode = compareMode === "overlay";
+        const bucketOverride = resolveExpandedBucket(canvasId);
         const primaryCanvas = container.querySelector(`#chart-expanded-${canvasId}`);
         const compareCanvas = container.querySelector(`[data-expanded-compare-for='${canvasId}']`);
         if (!primaryCanvas) {
@@ -14222,6 +20270,7 @@
                     const afterConfig = buildEventKpiSingleChartConfig(afterRows, options);
                     state.expandedChart.compareInstance = new Chart(compareCanvas.getContext("2d"), beforeConfig);
                     state.expandedChart.instance = new Chart(primaryCanvas.getContext("2d"), afterConfig);
+                    syncExpandedBucketLabelFromConfig(canvasId, afterConfig);
                     return;
                 }
                 if (isOverlayMode) {
@@ -14230,10 +20279,12 @@
                         preserveCurrentOrder: true
                     });
                     state.expandedChart.instance = new Chart(primaryCanvas.getContext("2d"), overlayConfig);
+                    syncExpandedBucketLabelFromConfig(canvasId, overlayConfig);
                     return;
                 }
                 const afterConfig = buildEventKpiSingleChartConfig(afterRows, options);
                 state.expandedChart.instance = new Chart(primaryCanvas.getContext("2d"), afterConfig);
+                syncExpandedBucketLabelFromConfig(canvasId, afterConfig);
                 return;
             }
             if (compareMode === "split" && compareCanvas) {
@@ -14245,6 +20296,7 @@
                 const afterConfig = buildEventKpiSingleChartConfig(afterRows, options);
                 state.expandedChart.compareInstance = new Chart(compareCanvas.getContext("2d"), beforeConfig);
                 state.expandedChart.instance = new Chart(primaryCanvas.getContext("2d"), afterConfig);
+                syncExpandedBucketLabelFromConfig(canvasId, afterConfig);
                 return;
             }
             if (isOverlayMode) {
@@ -14257,14 +20309,16 @@
                     preserveCurrentOrder: true
                 });
                 state.expandedChart.instance = new Chart(primaryCanvas.getContext("2d"), overlayConfig);
+                syncExpandedBucketLabelFromConfig(canvasId, overlayConfig);
                 return;
             }
             const afterRows = await loadExpandedEventKpiRowsForRange(ranges.afterFrom, ranges.afterTo, options);
             const afterConfig = buildEventKpiSingleChartConfig(afterRows, options);
             state.expandedChart.instance = new Chart(primaryCanvas.getContext("2d"), afterConfig);
+            syncExpandedBucketLabelFromConfig(canvasId, afterConfig);
             return;
         }
-        const afterConfig = await buildChartConfigByRange(canvasId, ranges.afterFrom, ranges.afterTo, compareCanvas ? "После" : "Период", undefined, options);
+        const afterConfig = await buildChartConfigByRange(canvasId, ranges.afterFrom, ranges.afterTo, compareCanvas ? "После" : "Период", bucketOverride, options);
         if (!compareCanvas) {
             if (state.expandedChart.compareInstance) {
                 state.expandedChart.compareInstance.destroy();
@@ -14277,7 +20331,7 @@
                     ranges.beforeFrom,
                     ranges.beforeTo
                 );
-                const beforeConfig = await buildChartConfigByRange(canvasId, normalizedRanges.beforeFrom, normalizedRanges.beforeTo, "До", undefined, options);
+                const beforeConfig = await buildChartConfigByRange(canvasId, normalizedRanges.beforeFrom, normalizedRanges.beforeTo, "До", bucketOverride, options);
                 if (isInlineGhostEnabled(canvasId) && Array.isArray(beforeConfig?.data?.datasets)) {
                     const ghostDatasets = beforeConfig.data.datasets.map((item) => buildGhostDataset(item, canvasId));
                     afterConfig.data = afterConfig.data || {};
@@ -14288,12 +20342,16 @@
                 state.expandedChart.instance.destroy();
             }
             state.expandedChart.instance = new Chart(primaryCanvas.getContext("2d"), afterConfig);
+            syncExpandedBucketLabelFromConfig(canvasId, afterConfig);
             if (canvasId !== "chart-event-kpi") {
                 upsertChart(canvasId, afterConfig);
             }
+            if (!options.skipScenarioDetailRefresh) {
+                void refreshExpandedScenarioDetailPanel();
+            }
             return;
         }
-        const beforeConfig = await buildChartConfigByRange(canvasId, ranges.beforeFrom, ranges.beforeTo, "До", undefined, options);
+        const beforeConfig = await buildChartConfigByRange(canvasId, ranges.beforeFrom, ranges.beforeTo, "До", bucketOverride, options);
         if (isOverlayMode && isInlineGhostEnabled(canvasId) && Array.isArray(beforeConfig?.data?.datasets)) {
             const ghostDatasets = beforeConfig.data.datasets.map((item) => buildGhostDataset(item, canvasId));
             afterConfig.data = afterConfig.data || {};
@@ -14307,6 +20365,10 @@
         }
         state.expandedChart.compareInstance = new Chart(compareCanvas.getContext("2d"), beforeConfig);
         state.expandedChart.instance = new Chart(primaryCanvas.getContext("2d"), afterConfig);
+        syncExpandedBucketLabelFromConfig(canvasId, afterConfig);
+        if (!options.skipScenarioDetailRefresh) {
+            void refreshExpandedScenarioDetailPanel();
+        }
     }
 
     async function loadExpandedEventKpiRowsForRange(fromLocal, toLocal, options = {}) {
@@ -14323,6 +20385,7 @@
                 params.delete("bucketMinutes");
             }
         }
+        const chartMaxPoints = shouldPreserveManualBucketPoints(params.get("bucketMinutes")) ? 0 : MAX_CHART_POINTS;
         const fromIso = toIso(fromLocal);
         const toIsoValue = toIso(toLocal);
         if (fromIso) {
@@ -14334,6 +20397,10 @@
             params.set("to", toIsoValue);
         } else {
             params.delete("to");
+        }
+        const eventTypeCode = String(options.eventTypeCode || "").trim();
+        if (eventTypeCode) {
+            params.set("eventTypeCode", eventTypeCode);
         }
         const data = await fetchJson(`${api("/overview")}?${params.toString()}`);
         return buildEventKpiRows(data?.eventBreakdown || [], options.categories);
@@ -14362,6 +20429,7 @@
         } else {
             params.delete("to");
         }
+        const chartMaxPoints = shouldPreserveManualBucketPoints(params.get("bucketMinutes")) ? 0 : MAX_CHART_POINTS;
         const labelSuffix = "";
         const withSuffix = (label) => label;
         if (lowerId.startsWith("chart-stage-")) {
@@ -14382,6 +20450,9 @@
                 return {eventCode, payload};
             });
             const [overallData, ...eventPayloads] = await Promise.all([overallPromise, ...eventPromises]);
+            const effectiveBucketMinutes = overallData?.bucketMinutes
+                || eventPayloads.find((item) => item?.payload?.bucketMinutes)?.payload?.bucketMinutes
+                || "";
             const overallRows = overallData?.stages || [];
             const eventRowsByCode = new Map(eventPayloads.map((item) => [item.eventCode, item.payload?.stages || []]));
             const labelSet = new Set();
@@ -14453,14 +20524,15 @@
                         labels,
                         datasets
                     },
-                    options: barChartOptions("ms")
+                    options: barChartOptions("ms"),
+                    __analyticsEffectiveBucketMinutes: effectiveBucketMinutes
                 };
             }
             const errorDatasets = [];
             const eventColorByCode = buildDistinctEventColors(stageEventCodes);
             if (stageEventCodes.length === 0) {
                 errorDatasets.push({
-                    label: withSuffix("Error rate") + ", %",
+                    label: withSuffix("Доля ошибок") + ", %",
                     data: labels.map((label) => {
                         const row = new Map(overallRows.map((item) => [item.stageTypeName || item.stageTypeCode, item])).get(label);
                         return toPercentNumber(row?.errorRate);
@@ -14471,7 +20543,7 @@
             } else {
                 if (options.includeOverall) {
                     errorDatasets.push({
-                        label: "Error rate (общая), %",
+                        label: "Доля ошибок (общая), %",
                         data: labels.map((label) => {
                             const row = new Map(overallRows.map((item) => [item.stageTypeName || item.stageTypeCode, item])).get(label);
                             return toPercentNumber(row?.errorRate);
@@ -14485,7 +20557,7 @@
                     const eventName = (state.dictionaries?.eventTypes || []).find((item) => item.code === eventCode)?.name || eventCode;
                     const color = eventColorByCode.get(eventCode) || "#b91c1c";
                     errorDatasets.push({
-                        label: `${eventName}, Error rate %`,
+                        label: `${eventName}, доля ошибок %`,
                         data: labels.map((label) => {
                             const row = new Map(eventRows.map((item) => [item.stageTypeName || item.stageTypeCode, item])).get(label);
                             return toPercentNumber(row?.errorRate);
@@ -14501,10 +20573,12 @@
                     labels,
                     datasets: errorDatasets
                 },
-                options: barChartOptions("%")
+                options: barChartOptions("%"),
+                __analyticsEffectiveBucketMinutes: effectiveBucketMinutes
             };
         }
         const data = await fetchJson(`${api("/overview")}?${params.toString()}`);
+        const effectiveBucketMinutes = data?.bucketMinutes || "";
         const labels = (data.series || []).map((point) => formatTime(point.time));
         const timePoints = (data.series || []).map((point) => point.time || "");
         const countSeries = (data.series || []).map((point) => point.count || 0);
@@ -14519,7 +20593,7 @@
                     overallSeries: countSeries
                 });
             }
-            const sampled = downsampleSeries(labels, [countSeries], MAX_CHART_POINTS);
+            const sampled = downsampleSeries(labels, [countSeries], chartMaxPoints);
             return {
                 type: "line",
                 data: {
@@ -14535,7 +20609,8 @@
                     }]
                 },
                 options: baseChartOptions("Количество"),
-                __analyticsTimePoints: sampled.indexes.map((index) => timePoints[index]).filter(Boolean)
+                __analyticsTimePoints: sampled.indexes.map((index) => timePoints[index]).filter(Boolean),
+                __analyticsEffectiveBucketMinutes: effectiveBucketMinutes
             };
         }
         if (canvasId === "chart-latency") {
@@ -14550,7 +20625,7 @@
                     const singleAvg = (payload?.series || []).map((point) => point.avgMs || 0);
                     const singleP95 = (payload?.series || []).map((point) => point.p95Ms || 0);
                     const singleP99 = (payload?.series || []).map((point) => point.p99Ms || 0);
-                    const sampledSingle = downsampleSeries(singleLabels, [singleAvg, singleP95, singleP99], MAX_CHART_POINTS);
+                    const sampledSingle = downsampleSeries(singleLabels, [singleAvg, singleP95, singleP99], chartMaxPoints);
                     const singleName = (state.dictionaries?.eventTypes || []).find((item) => item.code === singleCode)?.name || singleCode;
                     return {
                         type: "line",
@@ -14563,7 +20638,8 @@
                             ]
                         },
                         options: baseChartOptions("ms"),
-                        __analyticsTimePoints: sampledSingle.indexes.map((index) => singleTimePoints[index]).filter(Boolean)
+                        __analyticsTimePoints: sampledSingle.indexes.map((index) => singleTimePoints[index]).filter(Boolean),
+                        __analyticsEffectiveBucketMinutes: payload?.bucketMinutes || effectiveBucketMinutes
                     };
                 }
                 return await buildExpandedEventSeriesChartConfig(params, options.eventCodes, "latency", labelSuffix, {
@@ -14572,7 +20648,7 @@
                     latencyMetric: options.latencyMetric
                 });
             }
-            const sampled = downsampleSeries(labels, [avgSeries, p95Series, p99Series], MAX_CHART_POINTS);
+            const sampled = downsampleSeries(labels, [avgSeries, p95Series, p99Series], chartMaxPoints);
             return {
                 type: "line",
                 data: {
@@ -14584,7 +20660,8 @@
                     ]
                 },
                 options: baseChartOptions("ms"),
-                __analyticsTimePoints: sampled.indexes.map((index) => timePoints[index]).filter(Boolean)
+                __analyticsTimePoints: sampled.indexes.map((index) => timePoints[index]).filter(Boolean),
+                __analyticsEffectiveBucketMinutes: effectiveBucketMinutes
             };
         }
         if (canvasId === "chart-error-rate") {
@@ -14594,13 +20671,13 @@
                     overallSeries: errSeries
                 });
             }
-            const sampled = downsampleSeries(labels, [errSeries], MAX_CHART_POINTS);
+            const sampled = downsampleSeries(labels, [errSeries], chartMaxPoints);
             return {
                 type: "line",
                 data: {
                     labels: sampled.labels,
                     datasets: [{
-                        label: withSuffix("Error rate") + ", %",
+                        label: withSuffix("Доля ошибок") + ", %",
                         data: sampled.datasets[0] || [],
                         borderColor: colors.red,
                         backgroundColor: "rgba(185,28,28,0.16)",
@@ -14610,12 +20687,15 @@
                     }]
                 },
                 options: baseChartOptions("%"),
-                __analyticsTimePoints: sampled.indexes.map((index) => timePoints[index]).filter(Boolean)
+                __analyticsTimePoints: sampled.indexes.map((index) => timePoints[index]).filter(Boolean),
+                __analyticsEffectiveBucketMinutes: effectiveBucketMinutes
             };
         }
-        return buildEventKpiSingleChartConfig(buildEventKpiRows(data.eventBreakdown || []), {
+        const eventKpiConfig = buildEventKpiSingleChartConfig(buildEventKpiRows(data.eventBreakdown || []), {
             labelSuffix
         });
+        eventKpiConfig.__analyticsEffectiveBucketMinutes = effectiveBucketMinutes;
+        return eventKpiConfig;
     }
 
     async function buildExpandedEventSeriesChartConfig(baseParams, eventCodes, mode, labelSuffix, options = {}) {
@@ -14634,8 +20714,10 @@
             const payload = await fetchJson(`${api("/overview")}?${params.toString()}`);
             return {code, payload};
         }));
+        const effectiveBucketMinutes = responses.find((item) => item?.payload?.bucketMinutes)?.payload?.bucketMinutes || "";
         const labelsRaw = (responses[0]?.payload?.series || []).map((point) => formatTime(point.time));
         const timePointsRaw = (responses[0]?.payload?.series || []).map((point) => point.time || "");
+        const chartMaxPoints = shouldPreserveManualBucketPoints(baseParams?.get?.("bucketMinutes")) ? 0 : MAX_CHART_POINTS;
         const colorByCode = buildDistinctEventColors(selectedCodes);
         const datasetsRaw = responses.map(({code, payload}, index) => {
             const points = payload?.series || [];
@@ -14681,7 +20763,7 @@
                 borderDash: [5, 3]
             });
         }
-        const sampled = downsampleSeries(labelsRaw, datasetsRaw.map((item) => item.data), MAX_CHART_POINTS);
+        const sampled = downsampleSeries(labelsRaw, datasetsRaw.map((item) => item.data), chartMaxPoints);
         const datasets = datasetsRaw.map((item, index) => ({...item, data: sampled.datasets[index] || []}));
         return {
             type: "line",
@@ -14690,7 +20772,8 @@
                 datasets
             },
             options: baseChartOptions(mode === "error" ? "%" : (mode === "latency" ? "P95, ms" : "Количество")),
-            __analyticsTimePoints: sampled.indexes.map((index) => timePointsRaw[index]).filter(Boolean)
+            __analyticsTimePoints: sampled.indexes.map((index) => timePointsRaw[index]).filter(Boolean),
+            __analyticsEffectiveBucketMinutes: effectiveBucketMinutes
         };
     }
 
@@ -14710,6 +20793,9 @@
             }
             const panel = target.closest(".analytics-panel");
             const head = panel?.querySelector(".analytics-panel-head");
+            if (target.closest("[data-analytics-view='universal']")) {
+                return;
+            }
             if (!panel || !head || head.querySelector(`[data-help-target='${targetId}']`)) {
                 return;
             }
@@ -14824,6 +20910,9 @@
 
     function attachParameterHelpButton(target, helpCode, binding = {}) {
         if (!target || !helpCode || !ANALYTICS_PARAMETER_HELP_REGISTRY[helpCode]) {
+            return;
+        }
+        if (target.closest("[data-analytics-view='universal']")) {
             return;
         }
         const host = target.closest(
@@ -15381,6 +21470,22 @@
         }
     }
 
+    function showEventModalLoading() {
+        if (!refs.eventModalBody) {
+            return;
+        }
+        refs.eventModalBody.innerHTML = `
+            <div class="d-flex align-items-center gap-2 py-3">
+                <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                <span class="small text-muted">Загрузка деталей события...</span>
+            </div>
+        `;
+        if (typeof bootstrap !== "undefined" && bootstrap.Modal) {
+            const modal = bootstrap.Modal.getOrCreateInstance(refs.eventModalEl);
+            modal.show();
+        }
+    }
+
     function localizeUnit(unit) {
         if (!unit) {
             return "";
@@ -15476,7 +21581,9 @@
             key: String(row?.eventTypeCode || row?.eventTypeName || "").trim(),
             label: String(row?.eventTypeName || row?.eventTypeCode || "-").trim() || "-",
             count: Number(row?.count || 0),
+            avgMs: Number(row?.avgMs || 0),
             p95: Number(row?.p95Ms || 0),
+            p99Ms: Number(row?.p99Ms || 0),
             err: toPercentNumber(row?.errorRate)
         })).filter((row) => row.key);
         const byKey = new Map();
@@ -15488,15 +21595,23 @@
                 byKey.set(row.key, {
                     ...row,
                     count,
+                    avgTotalMs: toNumberSafe(row.avgMs) * count,
+                    avgMs: toNumberSafe(row.avgMs),
                     p95: toNumberSafe(row.p95),
+                    p99Ms: toNumberSafe(row.p99Ms),
                     err: toNumberSafe(row.err),
-                    errorCount
+                    errorCount,
+                    successCount: Math.max(0, count - errorCount)
                 });
                 return;
             }
+            existing.avgTotalMs += toNumberSafe(row.avgMs) * count;
             existing.count += count;
+            existing.avgMs = existing.count > 0 ? existing.avgTotalMs / existing.count : Math.max(toNumberSafe(existing.avgMs), toNumberSafe(row.avgMs));
             existing.p95 = Math.max(toNumberSafe(existing.p95), toNumberSafe(row.p95));
+            existing.p99Ms = Math.max(toNumberSafe(existing.p99Ms), toNumberSafe(row.p99Ms));
             existing.errorCount += errorCount;
+            existing.successCount = Math.max(0, existing.count - existing.errorCount);
             existing.err = existing.count > 0
                 ? Number(((existing.errorCount / existing.count) * 100).toFixed(4))
                 : Math.max(toNumberSafe(existing.err), toNumberSafe(row.err));
@@ -15511,9 +21626,11 @@
             .map((key) => {
                 const row = byKey.get(key);
                 if (!row) {
-                    return {key, label: key, count: 0, p95: 0, err: 0};
+                    return {key, label: key, count: 0, avgMs: 0, p95: 0, p99Ms: 0, err: 0, errorCount: 0, successCount: 0};
                 }
-                const {errorCount: _errorCount, ...cleanRow} = row;
+                const {avgTotalMs: _avgTotalMs, ...cleanRow} = row;
+                cleanRow.errorCount = Math.round(toNumberSafe(cleanRow.errorCount));
+                cleanRow.successCount = Math.round(toNumberSafe(cleanRow.successCount));
                 return cleanRow;
             })
             .sort(compareEventKpiRowsByCurrent);

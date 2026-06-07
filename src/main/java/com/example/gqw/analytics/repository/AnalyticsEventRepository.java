@@ -187,6 +187,34 @@ public interface AnalyticsEventRepository extends JpaRepository<AnalyticsEvent, 
         @Param("moduleCode") String moduleCode
     );
 
+    @Query("""
+        select distinct e.moduleCode from AnalyticsEvent e
+        where e.startedAt between :from and :to
+          and e.moduleCode is not null
+          and e.eventTypeCode in :eventTypeCodes
+          and (:requestPath is null or lower(coalesce(cast(e.requestPath as string), '')) like lower(concat('%', :requestPath, '%')))
+        order by e.moduleCode asc
+        """)
+    List<String> findDistinctModuleCodesByScope(
+        @Param("from") Instant from,
+        @Param("to") Instant to,
+        @Param("eventTypeCodes") java.util.Collection<String> eventTypeCodes,
+        @Param("requestPath") String requestPath
+    );
+
+    @Query("""
+        select distinct e.moduleCode from AnalyticsEvent e
+        where e.startedAt between :from and :to
+          and e.moduleCode is not null
+          and e.eventTypeCode in :eventTypeCodes
+        order by e.moduleCode asc
+        """)
+    List<String> findDistinctModuleCodesByScopeNoPath(
+        @Param("from") Instant from,
+        @Param("to") Instant to,
+        @Param("eventTypeCodes") java.util.Collection<String> eventTypeCodes
+    );
+
     @Query(
         value = """
             select e from AnalyticsEvent e
@@ -278,9 +306,19 @@ public interface AnalyticsEventRepository extends JpaRepository<AnalyticsEvent, 
               join analytics.event_type et on et.code = e.event_type_code
              where e.started_at between :from and :to
                and et.is_system = :systemEventsOnly
-               and (:eventTypeCode is null or e.event_type_code = :eventTypeCode)
+               and (:eventTypeFilterEnabled = false or e.event_type_code in (:eventTypeCodes))
                and (:moduleCode is null or e.module_code = :moduleCode)
+               and (
+                    :stageTypeCode is null
+                    or exists (
+                        select 1
+                          from analytics.stage stage_filter
+                         where stage_filter.event_id = e.id
+                           and stage_filter.stage_type_code = :stageTypeCode
+                    )
+               )
                and (:isError is null or e.is_error = :isError)
+               and (:errorKey is null or concat(coalesce(e.status_code, 0), '|', coalesce(nullif(trim(e.error_message), ''), 'UNKNOWN')) = :errorKey)
                and (:minDurationMs is null or e.duration_ms >= :minDurationMs)
                and (:requestPath is null or lower(coalesce(e.request_path, '')) like lower(concat('%', :requestPath, '%')))
                and (
@@ -395,9 +433,19 @@ public interface AnalyticsEventRepository extends JpaRepository<AnalyticsEvent, 
               join analytics.event_type et on et.code = e.event_type_code
              where e.started_at between :from and :to
                and et.is_system = :systemEventsOnly
-               and (:eventTypeCode is null or e.event_type_code = :eventTypeCode)
+               and (:eventTypeFilterEnabled = false or e.event_type_code in (:eventTypeCodes))
                and (:moduleCode is null or e.module_code = :moduleCode)
+               and (
+                    :stageTypeCode is null
+                    or exists (
+                        select 1
+                          from analytics.stage stage_filter
+                         where stage_filter.event_id = e.id
+                           and stage_filter.stage_type_code = :stageTypeCode
+                    )
+               )
                and (:isError is null or e.is_error = :isError)
+               and (:errorKey is null or concat(coalesce(e.status_code, 0), '|', coalesce(nullif(trim(e.error_message), ''), 'UNKNOWN')) = :errorKey)
                and (:minDurationMs is null or e.duration_ms >= :minDurationMs)
                and (:requestPath is null or lower(coalesce(e.request_path, '')) like lower(concat('%', :requestPath, '%')))
                and (
@@ -480,9 +528,12 @@ public interface AnalyticsEventRepository extends JpaRepository<AnalyticsEvent, 
     Page<AnalyticsEvent> searchEventsScoped(
         @Param("from") Instant from,
         @Param("to") Instant to,
-        @Param("eventTypeCode") String eventTypeCode,
+        @Param("eventTypeFilterEnabled") boolean eventTypeFilterEnabled,
+        @Param("eventTypeCodes") java.util.Collection<String> eventTypeCodes,
         @Param("moduleCode") String moduleCode,
+        @Param("stageTypeCode") String stageTypeCode,
         @Param("isError") Boolean isError,
+        @Param("errorKey") String errorKey,
         @Param("errorClass") String errorClass,
         @Param("minDurationMs") Integer minDurationMs,
         @Param("requestPath") String requestPath,

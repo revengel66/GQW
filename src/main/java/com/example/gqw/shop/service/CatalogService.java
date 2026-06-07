@@ -1,5 +1,7 @@
 package com.example.gqw.shop.service;
 
+import com.example.gqw.analytics.aop.TrackAnalyticsMetric;
+import com.example.gqw.analytics.aop.TrackAnalyticsStageMetric;
 import com.example.gqw.shop.entity.Category;
 import com.example.gqw.shop.entity.FilterOption;
 import com.example.gqw.shop.entity.Product;
@@ -114,6 +116,8 @@ public class CatalogService {
         return nodes;
     }
 
+
+  
     @Transactional(readOnly = true)
     public List<Product> latestProducts() {
         return productRepository.findTop20ByIsPublishedTrueOrderByCreatedAtDesc();

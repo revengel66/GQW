@@ -6,6 +6,7 @@ import com.example.gqw.analytics.web.dto.AnalyticsApiDto.EventListResponse;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -31,8 +32,10 @@ public class AnalyticsEventController {
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
         @RequestParam(required = false) String moduleCode,
-        @RequestParam(required = false) String eventTypeCode,
+        @RequestParam(required = false) List<String> eventTypeCode,
+        @RequestParam(required = false) String stageTypeCode,
         @RequestParam(required = false) Boolean isError,
+        @RequestParam(required = false) String errorKey,
         @RequestParam(required = false) String errorClass,
         @RequestParam(required = false) Integer minDurationMs,
         @RequestParam(required = false) String requestPath,
@@ -53,7 +56,9 @@ public class AnalyticsEventController {
             range.to(),
             moduleCode,
             eventTypeCode,
+            stageTypeCode,
             isError,
+            errorKey,
             errorClass,
             minDurationMs,
             requestPath,

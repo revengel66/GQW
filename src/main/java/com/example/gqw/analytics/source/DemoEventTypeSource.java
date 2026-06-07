@@ -79,6 +79,22 @@ public class DemoEventTypeSource implements EventTypeSource {
         reviewAdd.setModuleCode(EventType.DEFAULT_MODULE_CODE);
         reviewAdd.setIsActive(true);
 
+        EventType frontendJsError = new EventType();
+        frontendJsError.setCode("FRONTEND_JS_ERROR");
+        frontendJsError.setName("JavaScript error");
+        frontendJsError.setDescription("Client-side JavaScript error captured by frontend analytics.");
+        frontendJsError.setModuleCode(EventType.DEFAULT_MODULE_CODE);
+        frontendJsError.setIsSystem(true);
+        frontendJsError.setIsActive(true);
+
+        EventType httpRequestError = new EventType();
+        httpRequestError.setCode("HTTP_REQUEST_ERROR");
+        httpRequestError.setName("HTTP request error");
+        httpRequestError.setDescription("Technical HTTP request error captured by fallback tracking.");
+        httpRequestError.setModuleCode(EventType.DEFAULT_MODULE_CODE);
+        httpRequestError.setIsSystem(true);
+        httpRequestError.setIsActive(true);
+
         return List.of(
             viewCatalog,
             viewCategory,
@@ -89,7 +105,9 @@ public class DemoEventTypeSource implements EventTypeSource {
             login,
             register,
             supportRequest,
-            reviewAdd
+            reviewAdd,
+            frontendJsError,
+            httpRequestError
         );
     }
 }

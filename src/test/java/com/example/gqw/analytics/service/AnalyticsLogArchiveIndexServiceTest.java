@@ -57,6 +57,7 @@ class AnalyticsLogArchiveIndexServiceTest {
     void archiveTraceReadRespectsMaxLinesPerTrace() throws Exception {
         settingsService.update(Map.of(
             AnalyticsRuntimeSettingsService.KEY_LOG_ARCHIVE_ALLOWED_DIRECTORY, tempDir.toString(),
+            AnalyticsRuntimeSettingsService.KEY_LOG_ARCHIVE_READ_ENABLED, "true",
             AnalyticsRuntimeSettingsService.KEY_LOG_ARCHIVE_READ_MAX_LINES, "500",
             AnalyticsRuntimeSettingsService.KEY_LOG_INDEX_MAX_LINES_PER_TRACE, "10"
         ), "test");
@@ -110,7 +111,7 @@ class AnalyticsLogArchiveIndexServiceTest {
     }
 
     @Test
-    void traceLookupReturnsArchivePendingIndexWhenDateArchiveExistsButTraceIsNotIndexed() throws Exception {
+    void traceLookupDoesNotScanArchiveCandidatesWhenTraceIsNotIndexed() throws Exception {
         settingsService.update(Map.of(
             AnalyticsRuntimeSettingsService.KEY_LOG_ARCHIVE_ALLOWED_DIRECTORY, tempDir.toString()
         ), "test");
@@ -130,10 +131,9 @@ class AnalyticsLogArchiveIndexServiceTest {
             Instant.parse("2026-06-03T12:00:01Z")
         );
 
-        assertEquals("ARCHIVE_PENDING_INDEX", result.status().status());
-        assertTrue(result.status().fileName().contains("SHOP.2026-06-03.10.log.gz"));
-        assertTrue(result.status().summary().contains("SHOP.2026-06-03.10.log.gz"));
-        assertFalse(result.status().message().contains("не найдены ни в текущих файлах"));
+        assertEquals("NOT_FOUND", result.status().status());
+        assertEquals(null, result.status().fileName());
+        assertEquals(null, result.status().summary());
         assertTrue(result.rows().isEmpty());
     }
 

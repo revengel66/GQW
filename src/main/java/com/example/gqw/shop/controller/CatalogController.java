@@ -2,6 +2,7 @@ package com.example.gqw.shop.controller;
 
 import com.example.gqw.analytics.aop.TrackAnalyticsAttribute;
 import com.example.gqw.analytics.aop.TrackAnalyticsEvent;
+import com.example.gqw.analytics.aop.TrackAnalyticsMetric;
 import com.example.gqw.shop.entity.Product;
 import com.example.gqw.shop.entity.Review;
 import com.example.gqw.shop.service.CatalogService;
@@ -36,7 +37,9 @@ public class CatalogController {
     }
 
     @GetMapping("/")
-    @TrackAnalyticsEvent(code = "HOME_VIEW")
+    @TrackAnalyticsEvent(
+        code = "HOME_VIEW"
+    )
     public String home(Model model) {
         model.addAttribute("featuredCategories", catalogService.featuredTopCategories(4));
         List<Product> products = catalogService.latestProducts();

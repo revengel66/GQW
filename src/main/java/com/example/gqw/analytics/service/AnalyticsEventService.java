@@ -52,7 +52,7 @@ public class AnalyticsEventService {
     ) {
         String resolvedCode = codeResolverService.resolveEventTypeCode(eventTypeCode);
         var type = eventTypeRepository.findById(resolvedCode)
-            .orElseGet(() -> autoCreateEventType(resolvedCode));
+            .orElseThrow(() -> new IllegalArgumentException("Unknown event type: " + resolvedCode));
         if (!Boolean.TRUE.equals(type.getIsActive())) {
             throw new IllegalArgumentException("Inactive event type: " + resolvedCode);
         }
@@ -64,9 +64,19 @@ public class AnalyticsEventService {
         event.setEventTypeCode(resolvedCode);
         String moduleCode = normalizeModuleCode(type.getModuleCode());
         if (!moduleExists(moduleCode)) {
+            log.warn(
+                "Analytics event type {} references unknown module {}; falling back to preferred/default module",
+                resolvedCode,
+                moduleCode
+            );
             moduleCode = resolvePreferredModuleCode(resolvedCode);
         }
         if (moduleCode == null || moduleCode.isBlank() || !moduleExists(moduleCode)) {
+            log.warn(
+                "Analytics event type {} has no valid module after fallback; using default module {}",
+                resolvedCode,
+                EventType.DEFAULT_MODULE_CODE
+            );
             moduleCode = EventType.DEFAULT_MODULE_CODE;
         }
         event.setModuleCode(moduleCode);

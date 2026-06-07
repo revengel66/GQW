@@ -125,11 +125,11 @@ public class AnalyticsStageMetricRollupService {
         Instant from,
         Instant to,
         String moduleCode,
-        String eventTypeCode,
+        Collection<String> eventTypeCodes,
         String stageTypeCode
     ) {
         if (!isEnabled()) {
-            return queryRawMetricSummaries(from, to, moduleCode, eventTypeCode, stageTypeCode);
+            return queryRawMetricSummaries(from, to, moduleCode, eventTypeCodes, stageTypeCode);
         }
 
         int sourceGranularity = chooseSourceGranularityMinutes(from, to, 1440);
@@ -142,10 +142,10 @@ public class AnalyticsStageMetricRollupService {
 
         List<MetricSummaryPoint> result = new ArrayList<>();
         if (cutoff.isAfter(from)) {
-            result.addAll(queryRollupMetricSummaries(from, cutoff, moduleCode, eventTypeCode, stageTypeCode, sourceGranularity));
+            result.addAll(queryRollupMetricSummaries(from, cutoff, moduleCode, eventTypeCodes, stageTypeCode, sourceGranularity));
         }
         if (tailMergeEnabled && to.isAfter(cutoff)) {
-            result.addAll(queryRawMetricSummaries(cutoff, to, moduleCode, eventTypeCode, stageTypeCode));
+            result.addAll(queryRawMetricSummaries(cutoff, to, moduleCode, eventTypeCodes, stageTypeCode));
         }
         return mergeMetricSummaries(result);
     }
@@ -155,7 +155,7 @@ public class AnalyticsStageMetricRollupService {
         Instant from,
         Instant to,
         String moduleCode,
-        String eventTypeCode,
+        Collection<String> eventTypeCodes,
         String stageTypeCode,
         String metricTypeCode,
         int targetBucketMinutes
@@ -165,7 +165,7 @@ public class AnalyticsStageMetricRollupService {
                 from,
                 to,
                 moduleCode,
-                eventTypeCode,
+                eventTypeCodes,
                 stageTypeCode,
                 metricTypeCode,
                 targetBucketMinutes
@@ -186,7 +186,7 @@ public class AnalyticsStageMetricRollupService {
                 from,
                 cutoff,
                 moduleCode,
-                eventTypeCode,
+                eventTypeCodes,
                 stageTypeCode,
                 metricTypeCode,
                 sourceGranularity,
@@ -198,7 +198,7 @@ public class AnalyticsStageMetricRollupService {
                 cutoff,
                 to,
                 moduleCode,
-                eventTypeCode,
+                eventTypeCodes,
                 stageTypeCode,
                 metricTypeCode,
                 targetBucketMinutes
@@ -212,7 +212,7 @@ public class AnalyticsStageMetricRollupService {
         Instant from,
         Instant to,
         String moduleCode,
-        String eventTypeCode,
+        Collection<String> eventTypeCodes,
         String stageTypeCode,
         String metricTypeCode,
         int limit
@@ -221,10 +221,14 @@ public class AnalyticsStageMetricRollupService {
             .addValue("fromTs", asTimestamp(from))
             .addValue("toTs", asTimestamp(to))
             .addValue("moduleCode", moduleCode, Types.VARCHAR)
-            .addValue("eventTypeCode", eventTypeCode, Types.VARCHAR)
             .addValue("stageTypeCode", stageTypeCode, Types.VARCHAR)
             .addValue("metricTypeCode", metricTypeCode, Types.VARCHAR)
             .addValue("limit", Math.max(1, limit));
+        String eventTypeClause = "";
+        if (eventTypeCodes != null && !eventTypeCodes.isEmpty()) {
+            params.addValue("eventTypeCodes", eventTypeCodes);
+            eventTypeClause = " and e.event_type_code in (:eventTypeCodes) ";
+        }
 
         return jdbcTemplate.query(
             """
@@ -240,9 +244,11 @@ public class AnalyticsStageMetricRollupService {
                     where sm.recorded_at >= :fromTs
                       and sm.recorded_at < :toTs
                       and (:moduleCode is null or e.module_code = :moduleCode)
-                      and (:eventTypeCode is null or e.event_type_code = :eventTypeCode)
                       and (:stageTypeCode is null or s.stage_type_code = :stageTypeCode)
                       and (:metricTypeCode is null or sm.metric_type_code = :metricTypeCode)
+            """
+                + eventTypeClause
+                + """
                 ) v
                 where v.value is not null
                 group by value
@@ -361,7 +367,7 @@ public class AnalyticsStageMetricRollupService {
         Instant from,
         Instant to,
         String moduleCode,
-        String eventTypeCode,
+        Collection<String> eventTypeCodes,
         String stageTypeCode,
         int sourceGranularityMinutes
     ) {
@@ -370,8 +376,12 @@ public class AnalyticsStageMetricRollupService {
             .addValue("toTs", asTimestamp(to))
             .addValue("sourceGranularity", sourceGranularityMinutes)
             .addValue("moduleCode", moduleCode, Types.VARCHAR)
-            .addValue("eventTypeCode", eventTypeCode, Types.VARCHAR)
             .addValue("stageTypeCode", stageTypeCode, Types.VARCHAR);
+        String eventTypeClause = "";
+        if (eventTypeCodes != null && !eventTypeCodes.isEmpty()) {
+            params.addValue("eventTypeCodes", eventTypeCodes);
+            eventTypeClause = " and r.event_type_code in (:eventTypeCodes) ";
+        }
 
         return jdbcTemplate.query(
             """
@@ -389,8 +399,10 @@ public class AnalyticsStageMetricRollupService {
                   and r.bucket_start >= :fromTs
                   and r.bucket_start < :toTs
                   and (:moduleCode is null or r.module_code = :moduleCode)
-                  and (:eventTypeCode is null or r.event_type_code = :eventTypeCode)
                   and (:stageTypeCode is null or r.stage_type_code = :stageTypeCode)
+            """
+                + eventTypeClause
+                + """
                 group by r.metric_type_code
                 order by sum(r.sample_count) desc, r.metric_type_code asc
             """,
@@ -403,7 +415,7 @@ public class AnalyticsStageMetricRollupService {
         Instant from,
         Instant to,
         String moduleCode,
-        String eventTypeCode,
+        Collection<String> eventTypeCodes,
         String stageTypeCode
     ) {
         if (!to.isAfter(from)) {
@@ -414,8 +426,12 @@ public class AnalyticsStageMetricRollupService {
             .addValue("fromTs", asTimestamp(from))
             .addValue("toTs", asTimestamp(to))
             .addValue("moduleCode", moduleCode, Types.VARCHAR)
-            .addValue("eventTypeCode", eventTypeCode, Types.VARCHAR)
             .addValue("stageTypeCode", stageTypeCode, Types.VARCHAR);
+        String eventTypeClause = "";
+        if (eventTypeCodes != null && !eventTypeCodes.isEmpty()) {
+            params.addValue("eventTypeCodes", eventTypeCodes);
+            eventTypeClause = " and e.event_type_code in (:eventTypeCodes) ";
+        }
 
         return jdbcTemplate.query(
             """
@@ -440,9 +456,11 @@ public class AnalyticsStageMetricRollupService {
                 where sm.recorded_at >= :fromTs
                   and sm.recorded_at < :toTs
                   and (:moduleCode is null or e.module_code = :moduleCode)
-                  and (:eventTypeCode is null or e.event_type_code = :eventTypeCode)
                   and (:stageTypeCode is null or s.stage_type_code = :stageTypeCode)
                   and sm.metric_type_code is not null
+            """
+                + eventTypeClause
+                + """
                 group by sm.metric_type_code
                 order by count(*) desc, sm.metric_type_code asc
             """,
@@ -455,7 +473,7 @@ public class AnalyticsStageMetricRollupService {
         Instant from,
         Instant to,
         String moduleCode,
-        String eventTypeCode,
+        Collection<String> eventTypeCodes,
         String stageTypeCode,
         String metricTypeCode,
         int sourceGranularityMinutes,
@@ -468,9 +486,13 @@ public class AnalyticsStageMetricRollupService {
             .addValue("targetBucketMinutes", targetBucketMinutes)
             .addValue("originTs", asTimestamp(DATE_BIN_ORIGIN))
             .addValue("moduleCode", moduleCode, Types.VARCHAR)
-            .addValue("eventTypeCode", eventTypeCode, Types.VARCHAR)
             .addValue("stageTypeCode", stageTypeCode, Types.VARCHAR)
             .addValue("metricTypeCode", metricTypeCode, Types.VARCHAR);
+        String eventTypeClause = "";
+        if (eventTypeCodes != null && !eventTypeCodes.isEmpty()) {
+            params.addValue("eventTypeCodes", eventTypeCodes);
+            eventTypeClause = " and r.event_type_code in (:eventTypeCodes) ";
+        }
 
         return jdbcTemplate.query(
             """
@@ -489,9 +511,11 @@ public class AnalyticsStageMetricRollupService {
                   and r.bucket_start < :toTs
                   and r.numeric_count > 0
                   and (:moduleCode is null or r.module_code = :moduleCode)
-                  and (:eventTypeCode is null or r.event_type_code = :eventTypeCode)
                   and (:stageTypeCode is null or r.stage_type_code = :stageTypeCode)
                   and (:metricTypeCode is null or r.metric_type_code = :metricTypeCode)
+            """
+                + eventTypeClause
+                + """
                 group by 1
                 order by 1 asc
             """,
@@ -504,7 +528,7 @@ public class AnalyticsStageMetricRollupService {
         Instant from,
         Instant to,
         String moduleCode,
-        String eventTypeCode,
+        Collection<String> eventTypeCodes,
         String stageTypeCode,
         String metricTypeCode,
         int targetBucketMinutes
@@ -519,9 +543,13 @@ public class AnalyticsStageMetricRollupService {
             .addValue("targetBucketMinutes", targetBucketMinutes)
             .addValue("originTs", asTimestamp(DATE_BIN_ORIGIN))
             .addValue("moduleCode", moduleCode, Types.VARCHAR)
-            .addValue("eventTypeCode", eventTypeCode, Types.VARCHAR)
             .addValue("stageTypeCode", stageTypeCode, Types.VARCHAR)
             .addValue("metricTypeCode", metricTypeCode, Types.VARCHAR);
+        String eventTypeClause = "";
+        if (eventTypeCodes != null && !eventTypeCodes.isEmpty()) {
+            params.addValue("eventTypeCodes", eventTypeCodes);
+            eventTypeClause = " and e.event_type_code in (:eventTypeCodes) ";
+        }
 
         return jdbcTemplate.query(
             """
@@ -547,9 +575,11 @@ public class AnalyticsStageMetricRollupService {
                   and sm.recorded_at < :toTs
                   and sm.metric_value_num is not null
                   and (:moduleCode is null or e.module_code = :moduleCode)
-                  and (:eventTypeCode is null or e.event_type_code = :eventTypeCode)
                   and (:stageTypeCode is null or s.stage_type_code = :stageTypeCode)
                   and (:metricTypeCode is null or sm.metric_type_code = :metricTypeCode)
+            """
+                + eventTypeClause
+                + """
                 group by 1
                 order by 1 asc
             """,

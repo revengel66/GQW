@@ -85,7 +85,7 @@ public class AnalyticsLogArchiveIndexService {
 
     @Scheduled(cron = "0 * * * * *")
     public void scheduledIndexTick() {
-        if (!runtimeSettingsService.getBoolean(AnalyticsRuntimeSettingsService.KEY_LOG_INDEX_ENABLED, true)) {
+        if (!runtimeSettingsService.getBoolean(AnalyticsRuntimeSettingsService.KEY_LOG_INDEX_ENABLED, false)) {
             return;
         }
         int intervalMinutes = runtimeSettingsService.getInt(
@@ -292,7 +292,7 @@ public class AnalyticsLogArchiveIndexService {
         if (lookup == null || !isArchiveReadable(lookup)) {
             return List.of();
         }
-        if (!runtimeSettingsService.getBoolean(AnalyticsRuntimeSettingsService.KEY_LOG_ARCHIVE_READ_ENABLED, true)) {
+        if (!runtimeSettingsService.getBoolean(AnalyticsRuntimeSettingsService.KEY_LOG_ARCHIVE_READ_ENABLED, false)) {
             return List.of();
         }
         int maxLines = runtimeSettingsService.getInt(
@@ -333,7 +333,18 @@ public class AnalyticsLogArchiveIndexService {
                     continue;
                 }
                 Instant timestamp = parseTimestamp(matcher.group("ts"));
-                rows.add(toDto(timestamp, matcher, path.toString(), lineNo));
+                EventLogEntryDto dto = AnalyticsLogViewService.normalizedLogEntryDto(
+                    timestamp,
+                    trim(matcher.group("level")),
+                    trim(matcher.group("logger")),
+                    matcher.group("msg"),
+                    trim(matcher.group("trace")),
+                    trim(matcher.group("event")),
+                    trim(matcher.group("module"))
+                );
+                if (!"SKIP".equalsIgnoreCase(dto.status())) {
+                    rows.add(dto);
+                }
             }
         } catch (IOException ignored) {
             return List.of();
@@ -1148,28 +1159,6 @@ public class AnalyticsLogArchiveIndexService {
             input = new GZIPInputStream(new BufferedInputStream(input));
         }
         return new BufferedReader(new java.io.InputStreamReader(input, StandardCharsets.UTF_8));
-    }
-
-    private EventLogEntryDto toDto(Instant timestamp, Matcher matcher, String filePath, long lineNo) {
-        String level = trim(matcher.group("level"));
-        String message = matcher.group("msg");
-        String status = normalizeLevel(level, message);
-        Integer duration = parseDuration(message);
-        return new EventLogEntryDto(
-            timestamp,
-            level,
-            status,
-            inferLayer(matcher.group("logger"), message),
-            shortLogger(matcher.group("logger")),
-            null,
-            duration,
-            message,
-            message,
-            trim(matcher.group("logger")),
-            trim(matcher.group("trace")),
-            trim(matcher.group("event")),
-            trim(matcher.group("module"))
-        );
     }
 
     private boolean isArchiveReadable(IndexedTraceLookup lookup) {

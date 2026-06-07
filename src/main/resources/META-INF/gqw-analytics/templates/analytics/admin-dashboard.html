@@ -8,19 +8,12 @@
     <title>Analytics Admin · Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-    <link rel="stylesheet" th:href="@{/analytics/css/app.css(v='20260604-06')}">
+    <link rel="stylesheet" th:href="@{/analytics/css/app.css(v='20260606-06')}">
 </head>
 <body>
 <th:block
     th:replace="~{analytics/fragments/admin-header :: adminHeader(activeTab=${analyticsActiveTab}, showSettingsButton=${true}, authenticated=${true})}"></th:block>
 <main class="container container-wide py-4 analytics-page">
-    <nav class="admin-breadcrumb mb-3" aria-label="breadcrumb">
-        <ol class="breadcrumb mb-0">
-            <li class="breadcrumb-item"><a th:href="@{/analytics-admin/dictionaries}">Справочники</a></li>
-            <li class="breadcrumb-item active" aria-current="page">Дашборд</li>
-        </ol>
-    </nav>
-
     <div class="analytics-filter-hotspot" aria-hidden="true"></div>
     <button class="btn btn-dark analytics-filter-fab" type="button" aria-label="Фильтры">
         <i class="bi bi-funnel"></i>
@@ -46,18 +39,18 @@
                 </div>
                 <div class="analytics-filter-row analytics-filter-row-2">
                     <div class="analytics-filter-field">
-                        <label class="form-label mb-1">Бакет, мин</label>
+                        <label class="form-label mb-1">Интервал, мин</label>
                         <select class="form-select" id="analytics-bucket">
                             <option value="">Авто</option>
-                            <option value="1">1</option>
-                            <option value="2">2</option>
-                            <option value="5">5</option>
-                            <option value="15">15</option>
-                            <option value="30">30</option>
-                            <option value="60">60</option>
-                            <option value="180">180</option>
-                            <option value="360">360</option>
-                            <option value="1440">1440</option>
+                            <option value="1">1 &#1084;&#1080;&#1085;</option>
+                            <option value="2">2 &#1084;&#1080;&#1085;</option>
+                            <option value="5">5 &#1084;&#1080;&#1085;</option>
+                            <option value="15">15 &#1084;&#1080;&#1085;</option>
+                            <option value="30">30 &#1084;&#1080;&#1085;</option>
+                            <option value="60">1 &#1095;&#1072;&#1089;</option>
+                            <option value="180">3 &#1095;&#1072;&#1089;&#1072;</option>
+                            <option value="360">6 &#1095;&#1072;&#1089;&#1086;&#1074;</option>
+                            <option value="1440">1 &#1076;&#1077;&#1085;&#1100;</option>
                         </select>
                     </div>
                     <div class="analytics-filter-field">
@@ -109,20 +102,19 @@
                         <select class="form-select" id="analytics-event-type"></select>
                     </div>
                 </div>
-                <div class="analytics-filter-row analytics-filter-row-1">
+                <div class="analytics-filter-row analytics-filter-row-1 d-none" aria-hidden="true">
                     <div class="analytics-filter-field">
                         <label class="form-label mb-1">Общий сценарий анализа</label>
                         <div class="d-flex align-items-center gap-2">
                             <select class="form-select" id="analytics-analysis-scenario">
                                 <option value="">Не выбран</option>
                                 <option value="traffic_spike">Пиковая нагрузка</option>
-                                <option value="tail_latency">Проблема хвоста latency</option>
+                                <option value="tail_latency">Проблема хвоста времени отклика</option>
                                 <option value="error_burst">Всплеск ошибок</option>
                                 <option value="release_compare">До/после релиза</option>
                                 <option value="layer_bottleneck">Узкое место по слоям</option>
                                 <option value="error_without_load">Ошибки без роста нагрузки</option>
                             </select>
-                            <button class="btn btn-outline-secondary analytics-chart-icon-btn" type="button" id="analytics-analysis-scenario-help" title="Описание общего сценария" aria-label="Описание общего сценария">?</button>
                         </div>
                     </div>
                 </div>
@@ -196,27 +188,37 @@
             </button>
         </div>
     </section>
-
-    <section class="analytics-view-tabs mb-4">
-        <div class="nav nav-pills analytics-subtabs" role="tablist" aria-label="Вкладки аналитики">
-            <button class="nav-link active" type="button" id="analytics-tab-overview" data-analytics-tab="overview">Обзор</button>
-            <button class="nav-link" type="button" id="analytics-tab-universal" data-analytics-tab="universal">Универсальный анализ</button>
-            <button class="nav-link" type="button" id="analytics-tab-metrics" data-analytics-tab="metrics">Метрики</button>
-            <button class="nav-link" type="button" id="analytics-tab-raw" data-analytics-tab="raw">Raw события</button>
-            <button class="nav-link" type="button" id="analytics-tab-system" data-analytics-tab="system">Служебные события</button>
-            <button class="nav-link" type="button" id="analytics-tab-compare" data-analytics-tab="compare">Сравнение</button>
-        </div>
-    </section>
-
-    <section class="glass-card analytics-panel p-3 p-lg-4 mb-4" data-analytics-view="universal" hidden>
+    <section class="glass-card analytics-panel analytics-panel-wrap p-3 p-lg-4 mb-4" data-analytics-view="universal" hidden>
         <div class="analytics-panel-head mb-3">
-            <div class="analytics-panel-title">Универсальный анализ по атрибуту</div>
-            <div class="analytics-panel-sub">Сценарии расследования: событие, слой, атрибут, значение и сравнение до/после</div>
+            <div class="analytics-panel-title analytics-panel-title-big">Диагностика</div>
         </div>
+        <div class="analytics-active-interval-host" id="universal-active-interval-host"></div>
+        <section class="analytics-kpi-grid analytics-universal-kpi-grid mb-3" id="analytics-universal-kpi-card">
+            <article class="glass-card analytics-kpi-card p-3">
+                <div class="analytics-kpi-label">Количество</div>
+                <div class="analytics-kpi-value" id="universal-kpi-count">0</div>
+            </article>
+            <article class="glass-card analytics-kpi-card p-3">
+                <div class="analytics-kpi-label">AVG, ms</div>
+                <div class="analytics-kpi-value" id="universal-kpi-avg">0</div>
+            </article>
+            <article class="glass-card analytics-kpi-card p-3">
+                <div class="analytics-kpi-label">P95, ms</div>
+                <div class="analytics-kpi-value" id="universal-kpi-p95">0</div>
+            </article>
+            <article class="glass-card analytics-kpi-card p-3">
+                <div class="analytics-kpi-label">P99, ms</div>
+                <div class="analytics-kpi-value" id="universal-kpi-p99">0</div>
+            </article>
+            <article class="glass-card analytics-kpi-card p-3">
+                <div class="analytics-kpi-label">Доля ошибок</div>
+                <div class="analytics-kpi-value" id="universal-kpi-error-rate">0%</div>
+            </article>
+        </section>
         <form class="analytics-universal-form mb-3" id="analytics-universal-form">
             <div class="analytics-universal-main-row analytics-universal-main-row-compact">
                 <div class="analytics-universal-field analytics-universal-field-event">
-                    <label class="form-label mb-1">События</label>
+                    <label class="form-label mb-1" for="universal-event-type-toggle">События</label>
                     <div class="analytics-universal-events-inline">
                         <button class="btn btn-outline-secondary analytics-universal-events-toggle" type="button" id="universal-event-type-toggle" aria-expanded="false">
                             События
@@ -233,32 +235,55 @@
                     </div>
                 </div>
                 <div class="analytics-universal-field analytics-universal-field-stage">
-                    <label class="form-label mb-1">Слой</label>
-                    <select class="form-select" id="universal-stage-type"></select>
-                </div>
-                <div class="analytics-universal-field analytics-universal-field-metrics">
-                    <label class="form-label mb-1">Метрики</label>
-                    <div class="analytics-universal-metrics-inline">
-                        <button class="btn btn-outline-secondary analytics-universal-metrics-toggle" type="button" id="universal-series-metric-toggle" aria-expanded="false">
-                            Метрики таймлайна
+                    <label class="form-label mb-1" for="universal-stage-toggle">Этапы</label>
+                    <div class="analytics-universal-stage-inline">
+                        <button class="btn btn-outline-secondary analytics-universal-stage-toggle" type="button" id="universal-stage-toggle" aria-expanded="false">
+                            Все этапы
                         </button>
-                        <div class="analytics-universal-metrics-popup d-none" id="universal-series-metric-popup">
-                            <select class="form-select" id="universal-series-metric-list" multiple size="8">
-                                <option value="count" selected>Count</option>
-                                <option value="avg" selected>AVG</option>
-                                <option value="p95" selected>P95</option>
-                                <option value="error" selected>Error rate</option>
-                            </select>
+                        <div class="analytics-universal-stage-popup d-none" id="universal-stage-popup">
+                            <label class="form-check analytics-universal-stage-all">
+                                <input class="form-check-input" type="checkbox" id="universal-stage-all" checked>
+                                <span class="form-check-label">Все этапы</span>
+                            </label>
+                            <div class="analytics-universal-stage-list" id="universal-stage-list"></div>
                         </div>
+                        <select class="d-none" id="universal-stage-type" multiple aria-hidden="true" tabindex="-1"></select>
                     </div>
                 </div>
-                <div class="analytics-universal-field analytics-universal-field-series-check">
-                    <label class="form-label mb-1 d-none d-lg-block">&nbsp;</label>
-                    <label class="form-check analytics-universal-layers-check">
-                        <input class="form-check-input" type="checkbox" data-universal-series="stages" checked>
-                        <span class="form-check-label">Слои</span>
-                    </label>
+                <div class="analytics-universal-field analytics-universal-field-date">
+                    <label class="form-label mb-1" for="universal-period-from-input">Период с</label>
+                    <input class="form-control analytics-universal-date-input" type="datetime-local"
+                       id="universal-period-from-input" aria-label="Период диагностики с">
                 </div>
+                <div class="analytics-universal-field analytics-universal-field-date">
+                    <label class="form-label mb-1" for="universal-period-to-input">&#1055;&#1077;&#1088;&#1080;&#1086;&#1076; &#1087;&#1086;</label>
+                    <input class="form-control analytics-universal-date-input" type="datetime-local"
+                       id="universal-period-to-input" aria-label="Период диагностики по">
+                </div>
+                <div class="analytics-universal-field analytics-universal-field-preset">
+                    <label class="form-label mb-1" for="universal-analysis-preset">&#1055;&#1088;&#1077;&#1089;&#1077;&#1090;</label>
+                    <select class="form-select analytics-universal-preset-select" id="universal-analysis-preset"
+                        aria-label="Пресет периода диагностики" title="Пресет периода">
+                    <option value="">—</option>
+                    <option value="15m">15 минут</option>
+                    <option value="30m">30 минут</option>
+                    <option value="1h">1 час</option>
+                    <option value="3h">3 часа</option>
+                    <option value="6h">6 часов</option>
+                    <option value="12h">12 часов</option>
+                    <option value="24h">24 часа</option>
+                    <option value="1w">1 неделя</option>
+                    <option value="1mo">1 месяц</option>
+                    <option value="3mo">3 месяца</option>
+                    <option value="6mo">6 месяцев</option>
+                    <option value="1y">1 год</option>
+                    <option value="all">Все время</option>
+                    </select>
+                </div>
+                <button class="btn btn-outline-secondary analytics-universal-filter-reset d-none" type="button" id="universal-filter-reset"
+                        title="Сбросить события и этапы" aria-label="Сбросить события и этапы">
+                    <i class="bi bi-arrow-counterclockwise"></i>
+                </button>
             </div>
 
             <input type="hidden" id="universal-attr-code" value="">
@@ -275,46 +300,269 @@
             <div class="d-none" id="universal-before-wrap-to"></div>
             <div class="small text-muted d-none" id="universal-before-summary"></div>
         </form>
-        <div class="analytics-grid analytics-grid-2 mb-3" id="analytics-universal-grid">
-            <div class="glass-card p-2" id="analytics-universal-timeline-card">
-                <div class="d-flex align-items-center justify-content-between mb-1">
-                    <div class="small text-muted">Таймлайн</div>
+
+        <section class="glass-card analytics-panel analytics-universal-data-card analytics-universal-research-card p-3 p-lg-4 mb-3" id="analytics-universal-top-events-card">
+            <div class="analytics-panel-head mb-3">
+                <div>
+                    <div class="analytics-panel-title">ТОП событий</div>
+                    <div class="analytics-panel-sub">События в текущем фильтре универсального анализа</div>
                 </div>
-                <div class="analytics-chart-wrap">
-                    <canvas id="chart-universal-timeline" height="150"></canvas>
+                <div class="analytics-universal-block-actions">
+                    <form class="analytics-universal-block-search" id="universal-top-search-form">
+                        <input class="form-control form-control-sm" id="universal-top-search-input" type="search"
+                               placeholder="Поиск события" autocomplete="off">
+                        <button class="btn btn-sm btn-outline-dark" type="submit">Найти</button>
+                        <button class="btn btn-sm btn-outline-secondary analytics-universal-search-reset d-none" type="button"
+                                data-universal-top-sort-reset title="Сбросить локальный выбор и сортировку"
+                                aria-label="Сбросить локальный выбор и сортировку">
+                            <i class="bi bi-arrow-counterclockwise"></i>
+                        </button>
+                    </form>
                 </div>
             </div>
-            <div class="glass-card p-2" id="analytics-universal-stages-card">
-                <div class="d-flex align-items-center justify-content-between mb-1">
-                    <div class="small text-muted">Слои</div>
-                    <div class="d-flex align-items-center gap-2">
-                        <div class="analytics-universal-stage-metrics-inline">
-                            <button class="btn btn-outline-secondary analytics-universal-stage-metrics-toggle" type="button" id="universal-stage-metric-toggle" aria-expanded="false">
-                                Метрики слоёв
-                            </button>
-                            <div class="analytics-universal-stage-metrics-popup d-none" id="universal-stage-metric-popup">
-                                <select class="form-select" id="universal-stage-metric-list" multiple size="6">
-                                    <option value="avg" selected>AVG</option>
-                                    <option value="p95" selected>P95</option>
-                                    <option value="error">Error rate</option>
-                                </select>
-                            </div>
-                        </div>
+            <div class="analytics-universal-severity-stats mb-2" id="universal-top-events-severity"></div>
+            <div class="analytics-universal-analysis-grid analytics-universal-event-analysis has-event-root-cause" id="universal-event-analysis">
+                <div class="analytics-universal-analysis-main analytics-universal-event-main">
+                    <div class="analytics-universal-top-table-wrap">
+                        <table class="table table-sm align-middle analytics-table analytics-universal-top-table analytics-universal-data-table analytics-universal-event-table">
+                            <thead>
+                            <tr>
+                                <th><button class="analytics-table-sort-btn" type="button" data-universal-top-sort="event">Событие <span data-sort-icon></span></button></th>
+                                <th class="text-end"><button class="analytics-table-sort-btn justify-content-end" type="button" data-universal-top-sort="count">Количество <span data-sort-icon></span></button></th>
+                                <th class="text-end"><button class="analytics-table-sort-btn justify-content-end" type="button" data-universal-top-sort="avg">AVG <span data-sort-icon></span></button></th>
+                                <th class="text-end"><button class="analytics-table-sort-btn justify-content-end" type="button" data-universal-top-sort="p95">P95 <span data-sort-icon></span></button></th>
+                                <th class="text-end"><button class="analytics-table-sort-btn justify-content-end" type="button" data-universal-top-sort="error">Доля ошибок <span data-sort-icon></span></button></th>
+                                <th class="text-end">Журнал</th>
+                            </tr>
+                            </thead>
+                            <tbody id="universal-top-events-body">
+                            <tr>
+                                <td colspan="6" class="text-muted text-center py-3">Нет данных для выбранного фильтра</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="analytics-universal-top-actions">
+                        <button class="btn btn-sm btn-outline-dark" type="button" id="universal-top-events-more">Показать ещё</button>
+                        <button class="btn btn-sm btn-outline-secondary d-none" type="button" id="universal-top-events-collapse">Свернуть</button>
+                        <span class="small text-muted" id="universal-top-events-count"></span>
                     </div>
                 </div>
-                <div class="analytics-chart-wrap">
-                    <canvas id="chart-universal-stages" height="150"></canvas>
+                <aside class="analytics-universal-root-cause analytics-universal-event-root-cause" id="universal-event-root-cause-panel">
+                    <div class="analytics-universal-root-cause-head">
+                        <div>
+                            <div class="analytics-universal-root-cause-title" id="universal-event-root-cause-title">Причины проблем в ТОП событиях</div>
+                        </div>
+                    </div>
+                    <div class="analytics-universal-root-cause-body" id="universal-event-root-cause-body"></div>
+                </aside>
+            </div>
+        </section>
+
+        <section class="glass-card analytics-panel analytics-universal-data-card analytics-universal-attributes-card p-3 p-lg-4 mb-3" id="analytics-universal-attributes-card">
+            <div class="analytics-panel-head mb-3">
+                <div>
+                    <div class="analytics-panel-title">Анализ атрибутов</div>
+                    <div class="analytics-panel-sub">Частые значения атрибутов в выбранных событиях</div>
+                </div>
+                <div class="analytics-universal-attribute-head-actions">
+                    <form class="analytics-universal-attribute-search" id="universal-attribute-search-form">
+                        <input class="form-control form-control-sm" id="universal-attribute-search-input" type="search"
+                               placeholder="Поиск атрибута или значения" autocomplete="off">
+                        <button class="btn btn-sm btn-outline-dark" type="submit" id="universal-attribute-search-submit">Найти</button>
+                        <button class="btn btn-sm btn-outline-secondary analytics-universal-search-reset d-none" type="button"
+                                data-universal-attribute-sort-reset title="Сбросить локальный выбор и сортировку"
+                                aria-label="Сбросить локальный выбор и сортировку">
+                            <i class="bi bi-arrow-counterclockwise"></i>
+                        </button>
+                    </form>
+                    <div class="analytics-universal-attribute-loader d-none" id="universal-attribute-loader">
+                        <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                        Загрузка
+                    </div>
                 </div>
             </div>
-        </div>
-        <div class="glass-card p-2 mb-2" id="analytics-universal-event-kpi-card">
-            <div class="d-flex align-items-center justify-content-between mb-1">
-                <div class="small text-muted">KPI по типам событий</div>
+            <div class="analytics-universal-attribute-toolbar mb-3">
+                <select class="d-none" id="universal-attribute-select" aria-hidden="true" tabindex="-1">
+                    <option value="">Нет доступных атрибутов</option>
+                </select>
+                <div class="small text-danger d-none" id="universal-attribute-error"></div>
+                <div class="small text-muted d-none" id="universal-attribute-search-message"></div>
             </div>
-            <div class="analytics-chart-wrap">
-                <canvas id="chart-universal-event-kpi" height="220"></canvas>
+            <div class="analytics-universal-attribute-overview mb-3">
+                <div class="analytics-universal-attribute-summary">
+                    <button class="analytics-universal-attribute-toggle" type="button" id="universal-attribute-picker-toggle" aria-expanded="false">
+                        <span id="universal-attribute-summary">Активный атрибут</span>
+                        <span class="analytics-universal-attribute-toggle-action">Сменить атрибут</span>
+                    </button>
+                </div>
+                <div class="analytics-universal-attribute-cards" id="universal-attribute-cards">
+                    <div class="analytics-universal-placeholder">Нет доступных атрибутов</div>
+                </div>
             </div>
-        </div>
+            <div class="analytics-universal-severity-stats mb-2" id="universal-attribute-severity"></div>
+            <div class="analytics-universal-analysis-grid analytics-universal-attribute-analysis">
+                <div class="analytics-universal-analysis-main analytics-universal-attribute-main">
+                    <div class="analytics-universal-top-table-wrap">
+                        <table class="table table-sm align-middle analytics-table analytics-universal-top-table analytics-universal-data-table analytics-universal-attribute-table">
+                            <thead>
+                            <tr>
+                                <th><button class="analytics-table-sort-btn" type="button" data-universal-attribute-sort="value">Значение <span data-sort-icon></span></button></th>
+                                <th class="text-end"><button class="analytics-table-sort-btn justify-content-end" type="button" data-universal-attribute-sort="count">Количество <span data-sort-icon></span></button></th>
+                                <th class="text-end">Покрытие %</th>
+                                <th class="text-end"><button class="analytics-table-sort-btn justify-content-end" type="button" data-universal-attribute-sort="share">Доля % <span data-sort-icon></span></button></th>
+                                <th class="text-end"><button class="analytics-table-sort-btn justify-content-end" type="button" data-universal-attribute-sort="avg">AVG <span data-sort-icon></span></button></th>
+                                <th class="text-end"><button class="analytics-table-sort-btn justify-content-end" type="button" data-universal-attribute-sort="p95">P95 <span data-sort-icon></span></button></th>
+                                <th class="text-end"><button class="analytics-table-sort-btn justify-content-end" type="button" data-universal-attribute-sort="error">Доля ошибок <span data-sort-icon></span></button></th>
+                                <th class="text-end">Журнал</th>
+                            </tr>
+                            </thead>
+                            <tbody id="universal-attribute-values-body">
+                            <tr>
+                                <td colspan="8" class="text-muted text-center py-3">Выберите атрибут</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="analytics-universal-top-actions">
+                        <button class="btn btn-sm btn-outline-dark d-none" type="button" id="universal-attribute-more">Показать ещё</button>
+                        <button class="btn btn-sm btn-outline-secondary d-none" type="button" id="universal-attribute-collapse">Свернуть</button>
+                        <span class="small text-muted" id="universal-attribute-count"></span>
+                    </div>
+                </div>
+                <aside class="analytics-universal-root-cause" id="universal-root-cause-panel">
+                    <div class="analytics-universal-root-cause-head">
+                        <div>
+                            <div class="analytics-universal-root-cause-title" id="universal-root-cause-title">Атрибут</div>
+                        </div>
+                    </div>
+                    <div class="analytics-universal-root-cause-body" id="universal-root-cause-body">
+                        <div class="analytics-universal-placeholder">Выберите атрибут, чтобы увидеть вероятные причины</div>
+                    </div>
+                </aside>
+            </div>
+        </section>
+
+        <section class="glass-card analytics-panel analytics-universal-data-card analytics-universal-errors-card p-3 p-lg-4 mb-3" id="analytics-universal-errors-card">
+            <div class="analytics-panel-head mb-3">
+                <div>
+                    <div class="analytics-panel-title">Анализ ошибок</div>
+                    <div class="analytics-panel-sub">Ошибки в текущем фильтре универсального анализа</div>
+                </div>
+                <div class="analytics-universal-block-actions">
+                    <form class="analytics-universal-block-search" id="universal-error-search-form">
+                        <input class="form-control form-control-sm" id="universal-error-search-input" type="search"
+                               placeholder="Поиск ошибки" autocomplete="off">
+                        <button class="btn btn-sm btn-outline-dark" type="submit">Найти</button>
+                        <button class="btn btn-sm btn-outline-secondary analytics-universal-search-reset d-none" type="button"
+                                data-universal-error-sort-reset title="Сбросить локальный выбор и сортировку"
+                                aria-label="Сбросить локальный выбор и сортировку">
+                            <i class="bi bi-arrow-counterclockwise"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+            <div class="analytics-universal-severity-stats mb-2" id="universal-errors-severity"></div>
+            <div class="analytics-universal-analysis-grid analytics-universal-error-analysis" id="universal-error-analysis">
+                <div class="analytics-universal-analysis-main analytics-universal-error-main">
+                    <div class="analytics-universal-top-table-wrap">
+                        <table class="table table-sm align-middle analytics-table analytics-universal-top-table analytics-universal-data-table analytics-universal-error-table">
+                            <thead>
+                            <tr>
+                                <th><button class="analytics-table-sort-btn" type="button" data-universal-error-sort="error">Ошибка <span data-sort-icon></span></button></th>
+                                <th class="text-end"><button class="analytics-table-sort-btn justify-content-end" type="button" data-universal-error-sort="count">Количество <span data-sort-icon></span></button></th>
+                                <th class="text-end">Покрытие %</th>
+                                <th class="text-end"><button class="analytics-table-sort-btn justify-content-end" type="button" data-universal-error-sort="share">Доля % <span data-sort-icon></span></button></th>
+                                <th class="text-end"><button class="analytics-table-sort-btn justify-content-end" type="button" data-universal-error-sort="eventCount">Событий <span data-sort-icon></span></button></th>
+                                <th class="text-end"><button class="analytics-table-sort-btn justify-content-end" type="button" data-universal-error-sort="avg">AVG <span data-sort-icon></span></button></th>
+                                <th class="text-end"><button class="analytics-table-sort-btn justify-content-end" type="button" data-universal-error-sort="p95">P95 <span data-sort-icon></span></button></th>
+                                <th class="text-end"><button class="analytics-table-sort-btn justify-content-end" type="button" data-universal-error-sort="lastSeen">Последняя фиксация <span data-sort-icon></span></button></th>
+                                <th class="text-end">Журнал</th>
+                            </tr>
+                            </thead>
+                            <tbody id="universal-errors-body">
+                            <tr>
+                                <td colspan="9" class="text-muted text-center py-3">Нет ошибок для выбранного фильтра</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="analytics-universal-top-actions">
+                        <button class="btn btn-sm btn-outline-dark d-none" type="button" id="universal-errors-more">Показать ещё</button>
+                        <button class="btn btn-sm btn-outline-secondary d-none" type="button" id="universal-errors-collapse">Свернуть</button>
+                        <span class="small text-muted" id="universal-errors-count"></span>
+                    </div>
+                </div>
+                <aside class="analytics-universal-root-cause analytics-universal-error-root-cause" id="universal-error-root-cause-panel">
+                    <div class="analytics-universal-root-cause-head">
+                        <div>
+                            <div class="analytics-universal-root-cause-title" id="universal-error-root-cause-title">Ошибки</div>
+                        </div>
+                    </div>
+                    <div class="analytics-universal-root-cause-body" id="universal-error-root-cause-body"></div>
+                </aside>
+            </div>
+        </section>
+
+        <section class="glass-card analytics-panel analytics-universal-data-card analytics-universal-modules-card p-3 p-lg-4" id="analytics-universal-modules-card">
+            <div class="analytics-panel-head mb-3">
+                <div>
+                    <div class="analytics-panel-title">Анализ модулей</div>
+                    <div class="analytics-panel-sub">Вклад модулей и этапов в задержки и ошибки</div>
+                </div>
+                <div class="analytics-universal-block-actions">
+                    <form class="analytics-universal-block-search" id="universal-module-search-form">
+                        <input class="form-control form-control-sm" id="universal-module-search-input" type="search"
+                               placeholder="Поиск модуля" autocomplete="off">
+                        <button class="btn btn-sm btn-outline-dark" type="submit">Найти</button>
+                        <button class="btn btn-sm btn-outline-secondary analytics-universal-search-reset d-none" type="button"
+                                data-universal-module-sort-reset title="Сбросить локальный выбор и сортировку"
+                                aria-label="Сбросить локальный выбор и сортировку">
+                            <i class="bi bi-arrow-counterclockwise"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+            <div class="analytics-universal-severity-stats mb-2" id="universal-modules-severity"></div>
+            <div class="analytics-universal-analysis-grid analytics-universal-module-analysis">
+                <div class="analytics-universal-analysis-main analytics-universal-module-main">
+                    <div class="analytics-universal-top-table-wrap">
+                        <table class="table table-sm align-middle analytics-table analytics-universal-top-table analytics-universal-data-table analytics-universal-module-table">
+                            <thead>
+                            <tr>
+                                <th><button class="analytics-table-sort-btn" type="button" data-universal-module-sort="module">Модуль / слой <span data-sort-icon></span></button></th>
+                                <th class="text-end"><button class="analytics-table-sort-btn justify-content-end" type="button" data-universal-module-sort="count">Количество <span data-sort-icon></span></button></th>
+                                <th class="text-end">Покрытие %</th>
+                                <th class="text-end"><button class="analytics-table-sort-btn justify-content-end" type="button" data-universal-module-sort="share">Доля % <span data-sort-icon></span></button></th>
+                                <th class="text-end"><button class="analytics-table-sort-btn justify-content-end" type="button" data-universal-module-sort="errorCount">Ошибок <span data-sort-icon></span></button></th>
+                                <th class="text-end"><button class="analytics-table-sort-btn justify-content-end" type="button" data-universal-module-sort="errorRate">Доля ошибок <span data-sort-icon></span></button></th>
+                                <th class="text-end"><button class="analytics-table-sort-btn justify-content-end" type="button" data-universal-module-sort="avg">AVG <span data-sort-icon></span></button></th>
+                                <th class="text-end"><button class="analytics-table-sort-btn justify-content-end" type="button" data-universal-module-sort="p95">P95 <span data-sort-icon></span></button></th>
+                                <th class="text-end"><button class="analytics-table-sort-btn justify-content-end" type="button" data-universal-module-sort="eventCount">Событий <span data-sort-icon></span></button></th>
+                                <th class="text-end">Журнал</th>
+                            </tr>
+                            </thead>
+                            <tbody id="universal-modules-body">
+                            <tr>
+                                <td colspan="10" class="text-muted text-center py-3">Нет данных для выбранного фильтра</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="analytics-universal-top-actions">
+                        <button class="btn btn-sm btn-outline-dark d-none" type="button" id="universal-modules-more">Показать ещё</button>
+                        <button class="btn btn-sm btn-outline-secondary d-none" type="button" id="universal-modules-collapse">Свернуть</button>
+                        <span class="small text-muted" id="universal-modules-count"></span>
+                    </div>
+                </div>
+                <aside class="analytics-universal-root-cause analytics-universal-module-root-cause" id="universal-module-root-cause-panel">
+                    <div class="analytics-universal-root-cause-head">
+                        <div class="analytics-universal-root-cause-title" id="universal-module-root-cause-title">Модули</div>
+                    </div>
+                    <div class="analytics-universal-root-cause-body" id="universal-module-root-cause-body"></div>
+                </aside>
+            </div>
+        </section>
     </section>
 
     <section class="analytics-kpi-grid mb-4" data-analytics-view="overview">
@@ -331,7 +579,7 @@
             <div class="analytics-kpi-value" id="kpi-p95-ms">0</div>
         </article>
         <article class="glass-card analytics-kpi-card p-3">
-            <div class="analytics-kpi-label">Error rate</div>
+            <div class="analytics-kpi-label">Доля ошибок</div>
             <div class="analytics-kpi-value" id="kpi-error-rate">0%</div>
         </article>
         <article class="glass-card analytics-kpi-card p-3">
@@ -356,7 +604,7 @@
         </article>
         <article class="glass-card analytics-panel p-3 p-lg-4">
             <div class="analytics-panel-head">
-                <div class="analytics-panel-title">Latency trend</div>
+                <div class="analytics-panel-title">Динамика производительности</div>
                 <div class="analytics-panel-sub">AVG / P95 / P99</div>
             </div>
             <div class="analytics-chart-wrap">
@@ -365,7 +613,7 @@
         </article>
         <article class="glass-card analytics-panel p-3 p-lg-4">
             <div class="analytics-panel-head">
-                <div class="analytics-panel-title">Error rate trend</div>
+                <div class="analytics-panel-title">Динамика ошибок</div>
                 <div class="analytics-panel-sub">Доля ошибок по времени</div>
             </div>
             <div class="analytics-chart-wrap">
@@ -374,8 +622,8 @@
         </article>
         <article class="glass-card analytics-panel p-3 p-lg-4">
             <div class="analytics-panel-head">
-                <div class="analytics-panel-title">KPI по типам событий</div>
-                <div class="analytics-panel-sub">Count / P95 / Error rate</div>
+                <div class="analytics-panel-title">События</div>
+                <div class="analytics-panel-sub">Количество / P95 / Доля ошибок</div>
             </div>
             <div class="analytics-chart-wrap">
                 <canvas id="chart-event-kpi" height="130"></canvas>
@@ -386,7 +634,6 @@
     <section class="glass-card analytics-panel p-3 p-lg-4 mb-4" data-analytics-view="overview">
         <div class="analytics-panel-head mb-3">
             <div class="analytics-panel-title">Этапы выполнения</div>
-            <div class="analytics-panel-sub">Drill-down по CONTROLLER/SERVICE/DATABASE/FRONTEND</div>
         </div>
         <div class="analytics-grid analytics-grid-2">
             <div>
@@ -400,19 +647,16 @@
                 </div>
             </div>
         </div>
-        <div class="small text-muted mt-3 mb-1">
-            Сводка ниже всегда показывает общую статистику по верхним фильтрам (период, модуль, path, тип события), без учёта выбора событий в графиках этого блока.
-        </div>
         <div class="table-responsive">
             <table class="table table-sm align-middle analytics-table" id="analytics-stage-table">
                 <thead>
                 <tr>
                     <th>Этап</th>
-                    <th class="text-end">Count</th>
+                    <th class="text-end">Количество</th>
                     <th class="text-end">AVG</th>
                     <th class="text-end">P95</th>
                     <th class="text-end">P99</th>
-                    <th class="text-end">Error rate</th>
+                    <th class="text-end">Доля ошибок</th>
                 </tr>
                 </thead>
                 <tbody></tbody>
@@ -557,12 +801,140 @@
         </div>
     </section>
 
-    <section class="glass-card analytics-panel p-3 p-lg-4 mb-4" data-analytics-view="raw">
+    <section class="glass-card analytics-panel analytics-system-chart-panel p-3 p-lg-4 mb-4" data-analytics-view="system" hidden>
         <div class="analytics-panel-head mb-3">
-            <div class="analytics-panel-title" id="analytics-events-panel-title">Raw события</div>
-            <div class="analytics-panel-sub" id="analytics-events-panel-sub">Фильтрация проблемных кейсов и переход к деталям</div>
+            <div>
+                <div class="analytics-panel-title analytics-panel-title-big">Служебные события</div>
+                <div class="analytics-panel-sub">График и таблица системных HTTP/asset/technical событий</div>
+            </div>
+            <div class="analytics-system-chart-head-actions">
+                <button class="btn btn-sm btn-outline-secondary analytics-chart-icon-btn" type="button"
+                        id="system-chart-interval-toggle" title="Выделить интервал" aria-label="Выделить интервал">
+                    <i class="bi bi-aspect-ratio"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-secondary analytics-system-interval-undo d-none" type="button"
+                        id="system-chart-interval-undo" title="Отменить интервал">
+                    Отменить
+                </button>
+                <button class="btn btn-sm btn-outline-secondary analytics-chart-icon-btn" type="button"
+                        id="system-chart-help" title="Справка" aria-label="Справка">
+                    <i class="bi bi-info-circle"></i>
+                </button>
+            </div>
         </div>
-        <form class="mb-3 analytics-events-form" id="analytics-events-form">
+        <form class="analytics-system-chart-form mb-3" id="analytics-system-chart-form">
+            <div class="analytics-system-chart-toolbar">
+                <div class="analytics-system-chart-field analytics-system-chart-events">
+                    <label class="form-label mb-1" for="system-chart-events-toggle">Событие</label>
+                    <div class="analytics-system-events-inline">
+                        <button class="btn btn-outline-secondary" type="button" id="system-chart-events-toggle"
+                                aria-expanded="false">
+                            Все служебные
+                        </button>
+                        <div class="analytics-system-events-popup d-none" id="system-chart-events-popup">
+                            <label class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="system-chart-events-all" checked>
+                                <span class="form-check-label">Все служебные события</span>
+                            </label>
+                            <select class="form-select" id="system-chart-events-list" multiple size="10"></select>
+                        </div>
+                    </div>
+                </div>
+                <div class="analytics-system-chart-field analytics-system-chart-field-date">
+                    <label class="form-label mb-1" for="system-chart-from">Период с</label>
+                    <input class="form-control" type="datetime-local" id="system-chart-from">
+                </div>
+                <div class="analytics-system-chart-field analytics-system-chart-field-date">
+                    <label class="form-label mb-1" for="system-chart-to">Период по</label>
+                    <input class="form-control" type="datetime-local" id="system-chart-to">
+                </div>
+                <div class="analytics-system-chart-field">
+                    <label class="form-label mb-1" for="system-chart-preset">Пресет</label>
+                    <select class="form-select" id="system-chart-preset">
+                        <option value="">—</option>
+                        <option value="15m">15 минут</option>
+                        <option value="30m">30 минут</option>
+                        <option value="1h">1 час</option>
+                        <option value="3h">3 часа</option>
+                        <option value="6h">6 часов</option>
+                        <option value="12h">12 часов</option>
+                        <option value="24h">24 часа</option>
+                        <option value="1w">1 неделя</option>
+                        <option value="1mo">1 месяц</option>
+                        <option value="3mo">3 месяца</option>
+                        <option value="6mo">6 месяцев</option>
+                        <option value="1y">1 год</option>
+                        <option value="all">Все время</option>
+                    </select>
+                </div>
+                <div class="analytics-system-chart-field">
+                    <label class="form-label mb-1" for="system-chart-bucket">Интервал</label>
+                    <select class="form-select" id="system-chart-bucket">
+                        <option value="">Авто</option>
+                        <option value="1">1 мин</option>
+                        <option value="2">2 мин</option>
+                        <option value="5">5 мин</option>
+                        <option value="15">15 мин</option>
+                        <option value="30">30 мин</option>
+                        <option value="60">1 час</option>
+                        <option value="180">3 часа</option>
+                        <option value="360">6 часов</option>
+                        <option value="1440">1 день</option>
+                    </select>
+                </div>
+                <div class="analytics-system-chart-field">
+                    <label class="form-label mb-1" for="system-chart-compare">Сравнение</label>
+                    <select class="form-select" id="system-chart-compare">
+                        <option value="off">Выключено</option>
+                        <option value="overlay">Наложение</option>
+                        <option value="split">Раздельно</option>
+                    </select>
+                </div>
+                <div class="analytics-system-chart-field analytics-system-chart-metrics">
+                    <label class="form-label mb-1" for="system-chart-metric-toggle">Метрика</label>
+                    <div class="analytics-system-metrics-inline">
+                        <button class="btn btn-outline-secondary" type="button" id="system-chart-metric-toggle"
+                                aria-expanded="false">
+                            Метрики
+                        </button>
+                        <div class="analytics-system-events-popup analytics-system-metrics-popup d-none"
+                             id="system-chart-metric-popup">
+                            <div class="analytics-universal-option-list" id="system-chart-metric-options"></div>
+                        </div>
+                    </div>
+                    <select class="d-none" id="system-chart-metric" multiple aria-hidden="true" tabindex="-1">
+                        <option value="count" selected>Количество</option>
+                        <option value="avg">AVG</option>
+                        <option value="p95">P95</option>
+                        <option value="p99">P99</option>
+                        <option value="error">Доля ошибок</option>
+                    </select>
+                </div>
+                <div class="analytics-system-chart-actions">
+                    <button class="btn btn-outline-secondary analytics-system-reset-main d-none" type="button"
+                            id="system-chart-reset-main" title="Сбросить локальный фильтр"
+                            aria-label="Сбросить локальный фильтр">
+                        <i class="bi bi-arrow-counterclockwise"></i>
+                    </button>
+                </div>
+            </div>
+        </form>
+        <div class="small text-muted mb-2" id="system-chart-status"></div>
+        <div class="analytics-system-chart-pair">
+            <div class="analytics-system-chart-wrap glass-card">
+                <canvas id="chart-system-events" height="180"></canvas>
+            </div>
+            <div class="analytics-system-chart-wrap glass-card d-none" id="system-chart-compare-wrap">
+                <canvas id="chart-system-events-compare" height="180"></canvas>
+            </div>
+        </div>
+    </section>
+
+    <section class="glass-card analytics-panel analytics-panel-wrap p-3 p-lg-4 mb-4" data-analytics-view="raw">
+        <div class="analytics-panel-head mb-3">
+            <div class="analytics-panel-title analytics-panel-title-big" id="analytics-events-panel-title">Журнал событий</div>
+        </div>
+        <form class="mb-3 analytics-events-form glass-card" id="analytics-events-form">
             <section class="analytics-filter-group mb-2">
                 <div class="analytics-filter-group-title">Базовые фильтры</div>
                 <div class="analytics-events-base-row">
@@ -616,20 +988,20 @@
                             <option value="">Все события</option>
                         </select>
                     </div>
-                    <div class="analytics-events-field analytics-events-field-sort">
+                    <div class="analytics-events-field analytics-events-field-sort d-none">
                         <label class="form-label mb-1">Сортировка</label>
                         <select class="form-select" id="events-sort-by">
                             <option value="startedAt">Время</option>
                             <option value="durationMs">Длительность</option>
                             <option value="statusCode">HTTP</option>
                             <option value="eventTypeCode">Событие</option>
-                            <option value="traceId">Trace</option>
-                            <option value="requestPath">Path</option>
+                            <option value="traceId">Трассировка</option>
+                            <option value="requestPath">Внутренний маршрут</option>
                             <option value="isError">Статус</option>
                             <option value="metricValue">Значение метрики</option>
                         </select>
                     </div>
-                    <div class="analytics-events-field analytics-events-field-sm analytics-events-field-order">
+                    <div class="analytics-events-field analytics-events-field-sm analytics-events-field-order d-none">
                         <label class="form-label mb-1">Порядок</label>
                         <select class="form-select" id="events-sort-dir">
                             <option value="desc">↓</option>
@@ -647,10 +1019,10 @@
 
             <div class="analytics-events-advanced d-none" id="events-advanced-wrap">
                 <section class="analytics-filter-group">
-                    <div class="analytics-filter-group-title">Метрики</div>
+                    <div class="analytics-filter-group-title analytics-panel-title-big">Метрики</div>
                     <div class="analytics-events-inline-row analytics-events-inline-row-metrics">
                         <div class="analytics-events-field analytics-events-field-metric-type">
-                            <label class="form-label mb-1">Метрика этапа</label>
+                            <label class="form-label mb-1">Метрика</label>
                             <select class="form-select" id="events-metric-type">
                                 <option value="">Любая метрика</option>
                             </select>
@@ -687,7 +1059,7 @@
                 </section>
             </div>
         </form>
-        <div class="table-responsive">
+        <div class="table-responsive glass-card">
             <table class="table table-sm align-middle analytics-table analytics-events-table" id="analytics-events-table">
                 <thead>
                 <tr>
@@ -695,8 +1067,8 @@
                     <th>Событие</th>
                     <th class="text-end">ms</th>
                     <th class="text-end">HTTP</th>
-                    <th>Path</th>
-                    <th>Trace</th>
+                    <th>Внутренний маршрут</th>
+                    <th>Трассировка</th>
                     <th>Статус</th>
                     <th class="text-end"></th>
                 </tr>
@@ -713,8 +1085,8 @@
         <div class="analytics-panel-head mb-3">
             <div class="analytics-panel-title">Сравнение до/после</div>
         </div>
-        <form class="row g-2 mb-3" id="analytics-compare-form">
-            <div class="col-12 col-lg-2">
+        <form class="analytics-compare-form" id="analytics-compare-form">
+            <div class="analytics-compare-field analytics-compare-field-preset">
                 <label class="form-label mb-1">Быстрый период</label>
                 <select class="form-select" id="compare-quick-range">
                     <option value="15m">15 минут</option>
@@ -732,30 +1104,55 @@
                     <option value="all">Все время</option>
                 </select>
             </div>
-            <div class="col-6 col-lg-3">
-                <label class="form-label mb-1">База: с</label>
+            <div class="analytics-compare-field">
+                <label class="form-label mb-1">До: с</label>
                 <input class="form-control" type="datetime-local" id="compare-baseline-from">
             </div>
-            <div class="col-6 col-lg-3">
-                <label class="form-label mb-1">База: по</label>
+            <div class="analytics-compare-field">
+                <label class="form-label mb-1">До: по</label>
                 <input class="form-control" type="datetime-local" id="compare-baseline-to">
             </div>
-            <div class="col-6 col-lg-3">
-                <label class="form-label mb-1">Текущий: с</label>
+            <div class="analytics-compare-field">
+                <label class="form-label mb-1">После: с</label>
                 <input class="form-control" type="datetime-local" id="compare-target-from">
             </div>
-            <div class="col-6 col-lg-2">
-                <label class="form-label mb-1">Текущий: по</label>
+            <div class="analytics-compare-field">
+                <label class="form-label mb-1">После: по</label>
                 <input class="form-control" type="datetime-local" id="compare-target-to">
             </div>
-            <div class="col-12 col-lg-1 d-grid">
-                <label class="form-label mb-1 d-none d-lg-block">&nbsp;</label>
-                <button class="btn btn-dark" type="submit">OK</button>
+            <div class="analytics-compare-action">
+                <button class="btn btn-outline-secondary analytics-compare-reset d-none" type="button"
+                        id="compare-reset" title="&#1057;&#1073;&#1088;&#1086;&#1089;&#1080;&#1090;&#1100; &#1082; &#1075;&#1083;&#1072;&#1074;&#1085;&#1086;&#1084;&#1091; &#1087;&#1077;&#1088;&#1080;&#1086;&#1076;&#1091;"
+                        aria-label="&#1057;&#1073;&#1088;&#1086;&#1089;&#1080;&#1090;&#1100; &#1082; &#1075;&#1083;&#1072;&#1074;&#1085;&#1086;&#1084;&#1091; &#1087;&#1077;&#1088;&#1080;&#1086;&#1076;&#1091;">
+                    <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>
+                </button>
             </div>
         </form>
         <div class="analytics-grid analytics-grid-3 mb-3" id="compare-kpi-cards"></div>
-        <div class="analytics-chart-wrap analytics-chart-wrap-sm">
-            <canvas id="chart-compare-delta" height="100"></canvas>
+        <section class="analytics-compare-summary-card mb-3" id="compare-summary-card"></section>
+        <div class="analytics-compare-insight-grid mb-3">
+            <section class="analytics-compare-table-card">
+                <div class="analytics-compare-section-title">&#1063;&#1090;&#1086; &#1091;&#1093;&#1091;&#1076;&#1096;&#1080;&#1083;&#1086;&#1089;&#1100;</div>
+                <div class="analytics-compare-section-subtitle">&#1058;&#1086;&#1087; &#1076;&#1077;&#1075;&#1088;&#1072;&#1076;&#1080;&#1088;&#1086;&#1074;&#1072;&#1074;&#1096;&#1080;&#1093;&#1089;&#1103; &#1089;&#1086;&#1073;&#1099;&#1090;&#1080;&#1081;</div>
+                <div id="compare-degraded-table"></div>
+            </section>
+            <section class="analytics-compare-table-card">
+                <div class="analytics-compare-section-title">&#1063;&#1090;&#1086; &#1091;&#1083;&#1091;&#1095;&#1096;&#1080;&#1083;&#1086;&#1089;&#1100;</div>
+                <div class="analytics-compare-section-subtitle">&#1058;&#1086;&#1087; &#1091;&#1083;&#1091;&#1095;&#1096;&#1080;&#1074;&#1096;&#1080;&#1093;&#1089;&#1103; &#1089;&#1086;&#1073;&#1099;&#1090;&#1080;&#1081;</div>
+                <div id="compare-improved-table"></div>
+            </section>
+        </div>
+        <div class="analytics-compare-insight-grid">
+            <section class="analytics-compare-table-card">
+                <div class="analytics-compare-section-title">&#1048;&#1079;&#1084;&#1077;&#1085;&#1077;&#1085;&#1080;&#1077; &#1085;&#1072;&#1075;&#1088;&#1091;&#1079;&#1082;&#1080;</div>
+                <div class="analytics-compare-section-subtitle">&#1043;&#1076;&#1077; &#1080;&#1079;&#1084;&#1077;&#1085;&#1080;&#1083;&#1086;&#1089;&#1100; &#1082;&#1086;&#1083;&#1080;&#1095;&#1077;&#1089;&#1090;&#1074;&#1086;</div>
+                <div id="compare-load-table"></div>
+            </section>
+            <section class="analytics-compare-table-card">
+                <div class="analytics-compare-section-title">&#1048;&#1079;&#1084;&#1077;&#1085;&#1077;&#1085;&#1080;&#1077; &#1086;&#1096;&#1080;&#1073;&#1086;&#1082;</div>
+                <div class="analytics-compare-section-subtitle">&#1043;&#1076;&#1077; &#1074;&#1099;&#1088;&#1086;&#1089;&#1083;&#1072; &#1076;&#1086;&#1083;&#1103; &#1086;&#1096;&#1080;&#1073;&#1086;&#1082;</div>
+                <div id="compare-errors-table"></div>
+            </section>
         </div>
     </section>
 </main>
@@ -846,7 +1243,7 @@
 <script th:inline="javascript">
     window.analyticsApiBase = [[${analyticsApiBase}]];
 </script>
-<script th:src="@{/analytics/js/analytics-dashboard.js(v='20260604-10')}"></script>
+<script th:src="@{/analytics/js/analytics-dashboard.js(v='20260606-06')}"></script>
 <script th:src="@{/analytics/js/analytics-settings.js(v='20260604-07')}"></script>
 </body>
 </html>

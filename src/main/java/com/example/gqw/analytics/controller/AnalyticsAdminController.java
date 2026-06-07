@@ -604,6 +604,32 @@ public class AnalyticsAdminController {
         return "redirect:/analytics-admin/dictionaries";
     }
 
+    @GetMapping("/analytics-admin/dictionaries/stages/delete/precheck")
+    @ResponseBody
+    public Map<String, Object> precheckDeleteStageType(
+        @RequestParam(required = false) String originalCode,
+        @RequestParam(required = false) String code
+    ) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        try {
+            String resolvedCode = resolveDictionaryCode(originalCode, code);
+            AnalyticsDictionaryAdminService.StageDeletePrecheck precheck = dictionaryAdminService.precheckDeleteStageType(resolvedCode);
+            payload.put("ok", true);
+            payload.put("code", precheck.code());
+            payload.put("deletable", precheck.deletable());
+            payload.put("reason", precheck.reason());
+            payload.put("stageUsageCount", precheck.stageUsageCount());
+            payload.put("aggregateUsageCount", precheck.aggregateUsageCount());
+        } catch (RuntimeException ex) {
+            payload.put("ok", false);
+            payload.put("deletable", false);
+            payload.put("reason", ex.getMessage());
+            payload.put("stageUsageCount", 0);
+            payload.put("aggregateUsageCount", 0);
+        }
+        return payload;
+    }
+
     @PostMapping("/analytics-admin/dictionaries/metrics/save-all")
     public String saveAllStageMetricTypes(
         @RequestParam(name = "originalCode[]", required = false) List<String> originalCodes,
@@ -672,7 +698,34 @@ public class AnalyticsAdminController {
         return "redirect:/analytics-admin/dictionaries";
     }
 
-    @PostMapping("/analytics-admin/dictionaries/aliases/save")
+    @GetMapping("/analytics-admin/dictionaries/metrics/delete/precheck")
+    @ResponseBody
+    public Map<String, Object> precheckDeleteStageMetricType(
+        @RequestParam(required = false) String originalCode,
+        @RequestParam(required = false) String code
+    ) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        try {
+            String resolvedCode = resolveDictionaryCode(originalCode, code);
+            AnalyticsDictionaryAdminService.MetricDeletePrecheck precheck = dictionaryAdminService.precheckDeleteStageMetricType(resolvedCode);
+            payload.put("ok", true);
+            payload.put("code", precheck.code());
+            payload.put("deletable", precheck.deletable());
+            payload.put("reason", precheck.reason());
+            payload.put("usages", precheck.usages());
+            payload.put("metricValueCount", precheck.metricValueCount());
+            payload.put("rollupCount", precheck.rollupCount());
+        } catch (RuntimeException ex) {
+            payload.put("ok", false);
+            payload.put("deletable", false);
+            payload.put("reason", ex.getMessage());
+            payload.put("usages", List.of());
+            payload.put("metricValueCount", 0);
+            payload.put("rollupCount", 0);
+        }
+        return payload;
+    }
+
     public String saveAlias(
         @RequestParam String aliasType,
         @RequestParam String sourceCode,
@@ -689,7 +742,6 @@ public class AnalyticsAdminController {
         return "redirect:/analytics-admin/dictionaries";
     }
 
-    @PostMapping("/analytics-admin/dictionaries/aliases/disable")
     public String disableAlias(@RequestParam Long aliasId, RedirectAttributes redirectAttributes) {
         try {
             boolean active = dictionaryAdminService.toggleAlias(aliasId);
@@ -700,7 +752,6 @@ public class AnalyticsAdminController {
         return "redirect:/analytics-admin/dictionaries";
     }
 
-    @PostMapping("/analytics-admin/dictionaries/aliases/delete")
     public String deleteAlias(@RequestParam Long aliasId, RedirectAttributes redirectAttributes) {
         try {
             dictionaryAdminService.deleteAlias(aliasId);
@@ -720,13 +771,12 @@ public class AnalyticsAdminController {
         model.addAttribute("attributeTypes", attributeTypes);
         model.addAttribute("attributeTypeValueCounts", dictionaryAdminService.eventAttributeValueCounts(attributeTypes));
         model.addAttribute("stageTypes", dictionaryAdminService.allStageTypes());
-        model.addAttribute("metricTypes", dictionaryAdminService.allStageMetricTypes());
+        var metricTypes = dictionaryAdminService.allStageMetricTypes();
+        model.addAttribute("metricTypes", metricTypes);
+        model.addAttribute("stageMetricValueCounts", dictionaryAdminService.stageMetricValueCounts(metricTypes));
         model.addAttribute("builtInEventAttributeCodes", dictionaryAdminService.builtInEventAttributeCodes());
         model.addAttribute("builtInStageCodes", dictionaryAdminService.builtInStageCodes());
         model.addAttribute("builtInStageMetricCodes", dictionaryAdminService.builtInStageMetricCodes());
-        model.addAttribute("eventAliases", dictionaryAdminService.allAliases(AnalyticsCodeAliasType.EVENT));
-        model.addAttribute("attributeAliases", dictionaryAdminService.allAliases(AnalyticsCodeAliasType.ATTRIBUTE));
-        model.addAttribute("metricAliases", dictionaryAdminService.allAliases(AnalyticsCodeAliasType.METRIC));
         model.addAttribute("valueKinds", MetricValueKind.values());
         model.addAttribute("selectedEventModuleCode", eventModuleCode == null ? "" : eventModuleCode);
         model.addAttribute(

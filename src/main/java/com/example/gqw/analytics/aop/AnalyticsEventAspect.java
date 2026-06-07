@@ -4,6 +4,9 @@ import com.example.gqw.analytics.service.AnalyticsTrackingApi;
 import com.example.gqw.analytics.service.AnalyticsHttpErrorTrackingService;
 import com.example.gqw.analytics.service.ErrorClassClassifier;
 import com.example.gqw.analytics.entity.EventType;
+import com.example.gqw.analytics.entity.MetricValueKind;
+import com.example.gqw.analytics.entity.StageMetricType;
+import com.example.gqw.analytics.repository.StageMetricTypeRepository;
 import com.example.gqw.config.TraceIdFilter;
 import com.example.gqw.shop.entity.ShopUser;
 import com.example.gqw.shop.service.CurrentUserService;
@@ -17,6 +20,8 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -42,6 +47,8 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)
 public class AnalyticsEventAspect {
 
+    private static final Logger log = LoggerFactory.getLogger(AnalyticsEventAspect.class);
+
     public static final String ANALYTICS_EVENT_UID_MDC_KEY = "analyticsEventUid";
     public static final String ANALYTICS_EVENT_UID_REQUEST_ATTRIBUTE = "analyticsEventUid";
     public static final String ANALYTICS_EVENT_UID_RESPONSE_HEADER = "X-Analytics-Event-Uid";
@@ -50,15 +57,18 @@ public class AnalyticsEventAspect {
 
     private final AnalyticsTrackingApi analyticsTrackingApi;
     private final CurrentUserService currentUserService;
+    private final StageMetricTypeRepository stageMetricTypeRepository;
     private final ExpressionParser expressionParser = new SpelExpressionParser();
     private final ParameterNameDiscoverer parameterNameDiscoverer = new DefaultParameterNameDiscoverer();
 
     public AnalyticsEventAspect(
         AnalyticsTrackingApi analyticsTrackingApi,
-        CurrentUserService currentUserService
+        CurrentUserService currentUserService,
+        StageMetricTypeRepository stageMetricTypeRepository
     ) {
         this.analyticsTrackingApi = analyticsTrackingApi;
         this.currentUserService = currentUserService;
+        this.stageMetricTypeRepository = stageMetricTypeRepository;
     }
 
     @Around("@annotation(TrackAnalyticsEvent)")
@@ -108,7 +118,14 @@ public class AnalyticsEventAspect {
             MDC.put(APP_MODULE_MDC_KEY, eventModuleCode);
             controllerStageId = analyticsTrackingApi.startStage(eventUid, "CONTROLLER", context.nextStageOrder());
             context.pushStageId(controllerStageId);
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException exception) {
+            log.warn(
+                "Analytics event tracking skipped for code={} path={} reason={}",
+                eventCode,
+                request.getRequestURI(),
+                exception.getMessage(),
+                exception
+            );
             AnalyticsEventContextHolder.clear();
             MDC.remove(ANALYTICS_EVENT_UID_MDC_KEY);
             restoreMdc(APP_MODULE_MDC_KEY, previousAppModule);
@@ -130,6 +147,7 @@ public class AnalyticsEventAspect {
             Object result = joinPoint.proceed();
 
             recordAttributes(trackAnalyticsEvent, method, joinPoint.getArgs(), request, result, null, resolvedAttributes);
+            recordMetrics(trackAnalyticsEvent, method, joinPoint.getArgs(), request, result, null, controllerStageId);
             BigDecimal responseItems = AnalyticsValueEstimator.estimateItemCount(result);
             if (responseItems.signum() > 0) {
                 safeRecordMetricNum(controllerStageId, "ITEM_COUNT", responseItems, "count");
@@ -168,6 +186,7 @@ public class AnalyticsEventAspect {
             }
             recordSystemAttributesOnFinish(eventCode, request, errorStatus, errorMessage, errorClass, resolvedAttributes);
             recordAttributes(trackAnalyticsEvent, method, joinPoint.getArgs(), request, null, throwable, resolvedAttributes);
+            recordMetrics(trackAnalyticsEvent, method, joinPoint.getArgs(), request, null, throwable, controllerStageId);
             safeRecordMetricText(
                 controllerStageId,
                 "ERROR_CODE",
@@ -189,6 +208,94 @@ public class AnalyticsEventAspect {
             MDC.remove(ANALYTICS_EVENT_UID_MDC_KEY);
             restoreMdc(APP_MODULE_MDC_KEY, previousAppModule);
             restoreMdc(ANALYTICS_MODULE_MDC_KEY, previousAnalyticsModule);
+        }
+    }
+
+    private void recordMetrics(
+        TrackAnalyticsEvent trackAnalyticsEvent,
+        Method method,
+        Object[] args,
+        HttpServletRequest request,
+        Object result,
+        Throwable throwable,
+        Long stageId
+    ) {
+        if (trackAnalyticsEvent.metrics().length == 0) {
+            return;
+        }
+        if (stageId == null) {
+            for (TrackAnalyticsMetric metric : trackAnalyticsEvent.metrics()) {
+                logMetricWarning(metric, method, request, null, "No active analytics stage is available", null);
+            }
+            return;
+        }
+        for (TrackAnalyticsMetric metric : trackAnalyticsEvent.metrics()) {
+            recordMetric(metric, method, args, request, result, throwable, stageId);
+        }
+    }
+
+    private void recordMetric(
+        TrackAnalyticsMetric metric,
+        Method method,
+        Object[] args,
+        HttpServletRequest request,
+        Object result,
+        Throwable throwable,
+        Long stageId
+    ) {
+        String code = normalizeMetricCode(metric.code());
+        if (code == null) {
+            logMetricWarning(metric, method, request, stageId, "Metric code is blank", null);
+            return;
+        }
+        StageMetricType type = stageMetricTypeRepository.findById(code).orElse(null);
+        if (type == null) {
+            logMetricWarning(metric, method, request, stageId, "Unknown metric type: " + code, null);
+            return;
+        }
+        if (!Boolean.TRUE.equals(type.getIsActive())) {
+            logMetricWarning(metric, method, request, stageId, "Inactive metric type: " + code, null);
+            return;
+        }
+
+        MetricExpressionResult expressionResult = evaluateMetricExpression(method, args, request, result, throwable, metric.value());
+        if (expressionResult.error() != null) {
+            logMetricWarning(
+                metric,
+                method,
+                request,
+                stageId,
+                "Metric expression failed: " + metric.value(),
+                expressionResult.error()
+            );
+            return;
+        }
+        Object value = expressionResult.value();
+        if (value == null || (value instanceof CharSequence text && text.toString().isBlank())) {
+            logMetricWarning(metric, method, request, stageId, "Metric expression returned null/blank value", null);
+            return;
+        }
+
+        try {
+            if (type.getValueKind() == MetricValueKind.NUMERIC) {
+                BigDecimal number = toBigDecimal(value);
+                if (number == null) {
+                    logMetricWarning(
+                        metric,
+                        method,
+                        request,
+                        stageId,
+                        "Metric type is NUMERIC but expression returned non-numeric value: " + value,
+                        null
+                    );
+                    return;
+                }
+                analyticsTrackingApi.recordMetricNum(stageId, code, number, normalizeMetricUnit(metric.unit()));
+                return;
+            }
+            analyticsTrackingApi.recordMetricText(stageId, code, String.valueOf(value), normalizeMetricUnit(metric.unit()));
+        } catch (RuntimeException exception) {
+            logMetricWarning(metric, method, request, stageId, exception.getMessage(), exception);
         }
     }
 
@@ -219,8 +326,14 @@ public class AnalyticsEventAspect {
             try {
                 analyticsTrackingApi.addAttribute(AnalyticsEventContextHolder.get().eventUid(), attribute.code(), value);
                 resolvedAttributes.add(attribute.code());
-            } catch (RuntimeException ignored) {
-                // Analytics must never break business flow.
+            } catch (RuntimeException exception) {
+                log.warn(
+                    "Analytics attribute tracking skipped for code={} eventUid={} reason={}",
+                    attribute.code(),
+                    AnalyticsEventContextHolder.get().eventUid(),
+                    exception.getMessage(),
+                    exception
+                );
             }
         }
     }
@@ -285,8 +398,14 @@ public class AnalyticsEventAspect {
         try {
             analyticsTrackingApi.addAttribute(AnalyticsEventContextHolder.get().eventUid(), code, value);
             resolvedAttributes.add(code);
-        } catch (RuntimeException ignored) {
-            // Analytics must never break business flow.
+        } catch (RuntimeException exception) {
+            log.warn(
+                "Analytics attribute tracking skipped for code={} eventUid={} reason={}",
+                code,
+                AnalyticsEventContextHolder.get().eventUid(),
+                exception.getMessage(),
+                exception
+            );
         }
     }
 
@@ -330,16 +449,28 @@ public class AnalyticsEventAspect {
     private void safeRecordMetricNum(Long stageId, String metricTypeCode, BigDecimal value, String unit) {
         try {
             analyticsTrackingApi.recordMetricNum(stageId, metricTypeCode, value, unit);
-        } catch (RuntimeException ignored) {
-            // Analytics must never break business flow.
+        } catch (RuntimeException exception) {
+            log.warn(
+                "Analytics numeric metric tracking skipped for code={} stageId={} reason={}",
+                metricTypeCode,
+                stageId,
+                exception.getMessage(),
+                exception
+            );
         }
     }
 
     private void safeRecordMetricText(Long stageId, String metricTypeCode, String value, String unit) {
         try {
             analyticsTrackingApi.recordMetricText(stageId, metricTypeCode, value, unit);
-        } catch (RuntimeException ignored) {
-            // Analytics must never break business flow.
+        } catch (RuntimeException exception) {
+            log.warn(
+                "Analytics text metric tracking skipped for code={} stageId={} reason={}",
+                metricTypeCode,
+                stageId,
+                exception.getMessage(),
+                exception
+            );
         }
     }
 
@@ -375,6 +506,25 @@ public class AnalyticsEventAspect {
         }
     }
 
+    private MetricExpressionResult evaluateMetricExpression(
+        Method method,
+        Object[] args,
+        HttpServletRequest request,
+        Object result,
+        Throwable throwable,
+        String expression
+    ) {
+        if (expression == null || expression.isBlank()) {
+            return new MetricExpressionResult(null, null);
+        }
+        try {
+            StandardEvaluationContext context = buildEvaluationContext(method, args, request, result, throwable);
+            return new MetricExpressionResult(expressionParser.parseExpression(expression).getValue(context), null);
+        } catch (RuntimeException exception) {
+            return new MetricExpressionResult(null, exception);
+        }
+    }
+
     private String evaluateAttribute(
         Method method,
         Object[] args,
@@ -387,25 +537,7 @@ public class AnalyticsEventAspect {
             return null;
         }
         try {
-            StandardEvaluationContext context = new StandardEvaluationContext();
-            context.setVariable("request", request);
-            context.setVariable("result", result);
-            context.setVariable("exception", throwable);
-            context.setVariable("args", args);
-
-            for (int i = 0; i < args.length; i++) {
-                context.setVariable("p" + i, args[i]);
-                context.setVariable("a" + i, args[i]);
-                context.setVariable("arg" + i, args[i]);
-            }
-            String[] parameterNames = parameterNameDiscoverer.getParameterNames(method);
-            if (parameterNames != null) {
-                for (int i = 0; i < parameterNames.length && i < args.length; i++) {
-                    if (parameterNames[i] != null && !parameterNames[i].isBlank()) {
-                        context.setVariable(parameterNames[i], args[i]);
-                    }
-                }
-            }
+            StandardEvaluationContext context = buildEvaluationContext(method, args, request, result, throwable);
             Object value = expressionParser.parseExpression(expression).getValue(context);
             if (value == null) {
                 return null;
@@ -414,6 +546,110 @@ public class AnalyticsEventAspect {
         } catch (RuntimeException ignored) {
             return null;
         }
+    }
+
+    private StandardEvaluationContext buildEvaluationContext(
+        Method method,
+        Object[] args,
+        HttpServletRequest request,
+        Object result,
+        Throwable throwable
+    ) {
+        StandardEvaluationContext context = new StandardEvaluationContext();
+        context.setVariable("request", request);
+        context.setVariable("result", result);
+        context.setVariable("exception", throwable);
+        context.setVariable("args", args);
+
+        for (int i = 0; i < args.length; i++) {
+            context.setVariable("p" + i, args[i]);
+            context.setVariable("a" + i, args[i]);
+            context.setVariable("arg" + i, args[i]);
+        }
+        String[] parameterNames = parameterNameDiscoverer.getParameterNames(method);
+        if (parameterNames != null) {
+            for (int i = 0; i < parameterNames.length && i < args.length; i++) {
+                if (parameterNames[i] != null && !parameterNames[i].isBlank()) {
+                    context.setVariable(parameterNames[i], args[i]);
+                }
+            }
+        }
+        return context;
+    }
+
+    private BigDecimal toBigDecimal(Object value) {
+        if (value instanceof BigDecimal decimal) {
+            return decimal;
+        }
+        if (value instanceof Number number) {
+            return BigDecimal.valueOf(number.doubleValue());
+        }
+        if (value instanceof CharSequence text) {
+            try {
+                return new BigDecimal(text.toString().trim());
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private void logMetricWarning(
+        TrackAnalyticsMetric metric,
+        Method method,
+        HttpServletRequest request,
+        Long stageId,
+        String reason,
+        RuntimeException exception
+    ) {
+        String traceId = request == null ? "" : resolveTraceId(request);
+        String path = request == null ? "" : request.getRequestURI();
+        AnalyticsEventContext context = AnalyticsEventContextHolder.get();
+        String eventUid = context == null ? "" : String.valueOf(context.eventUid());
+        if (exception == null) {
+            log.warn(
+                "Analytics metric tracking skipped: code={}, expression={}, class={}, method={}, path={}, traceId={}, eventUid={}, stageId={}, required={}, reason={}",
+                metric.code(),
+                metric.value(),
+                method.getDeclaringClass().getSimpleName(),
+                method.getName(),
+                path,
+                traceId,
+                eventUid,
+                stageId,
+                metric.required(),
+                reason
+            );
+            return;
+        }
+        log.warn(
+            "Analytics metric tracking skipped: code={}, expression={}, class={}, method={}, path={}, traceId={}, eventUid={}, stageId={}, required={}, reason={}",
+            metric.code(),
+            metric.value(),
+            method.getDeclaringClass().getSimpleName(),
+            method.getName(),
+            path,
+            traceId,
+            eventUid,
+            stageId,
+            metric.required(),
+            reason,
+            exception
+        );
+    }
+
+    private String normalizeMetricCode(String code) {
+        if (code == null || code.isBlank()) {
+            return null;
+        }
+        return code.trim().toUpperCase();
+    }
+
+    private String normalizeMetricUnit(String unit) {
+        if (unit == null || unit.isBlank()) {
+            return null;
+        }
+        return unit.trim();
     }
 
     private HttpServletRequest resolveRequest(Object[] args) {
@@ -523,6 +759,9 @@ public class AnalyticsEventAspect {
             return;
         }
         MDC.put(key, value);
+    }
+
+    private record MetricExpressionResult(Object value, RuntimeException error) {
     }
 
 }

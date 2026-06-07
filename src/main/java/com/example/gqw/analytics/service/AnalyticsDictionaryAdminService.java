@@ -119,6 +119,21 @@ public class AnalyticsDictionaryAdminService {
         return counts;
     }
 
+    @Transactional(readOnly = true)
+    public Map<String, Long> stageMetricValueCounts(List<StageMetricType> metricTypes) {
+        Map<String, Long> counts = new LinkedHashMap<>();
+        if (metricTypes == null) {
+            return counts;
+        }
+        for (StageMetricType type : metricTypes) {
+            if (type == null || type.getCode() == null || type.getCode().isBlank()) {
+                continue;
+            }
+            counts.put(type.getCode(), analyticsStageMetricRepository.countByMetricTypeCode(type.getCode()));
+        }
+        return counts;
+    }
+
     @Transactional
     public void createOrUpdateModuleType(
         String originalCodeRaw,
@@ -208,7 +223,6 @@ public class AnalyticsDictionaryAdminService {
             }
             old.setIsActive(false);
             eventTypeRepository.save(old);
-            upsertAlias(AnalyticsCodeAliasType.EVENT, originalCode, code);
         }
 
         EventType entity = existing != null ? existing : new EventType();
@@ -258,7 +272,6 @@ public class AnalyticsDictionaryAdminService {
             }
             old.setIsActive(false);
             attributeTypeRepository.save(old);
-            upsertAlias(AnalyticsCodeAliasType.ATTRIBUTE, originalCode, code);
         }
 
         EventAttributeType entity = existing != null ? existing : new EventAttributeType();
@@ -307,7 +320,6 @@ public class AnalyticsDictionaryAdminService {
             }
             old.setIsActive(false);
             metricTypeRepository.save(old);
-            upsertAlias(AnalyticsCodeAliasType.METRIC, originalCode, code);
         }
 
         StageMetricType entity = existing != null ? existing : new StageMetricType();
@@ -457,7 +469,7 @@ public class AnalyticsDictionaryAdminService {
             throw new IllegalArgumentException(precheck.reason());
         }
 
-        List<EventType> moduleEventTypes = eventTypeRepository.findByModuleCodeOrderByCodeAsc(precheck.code());
+        List<EventType> moduleEventTypes = findEventTypesByModuleCode(precheck.code());
         for (EventType eventType : moduleEventTypes) {
             if (eventType == null || eventType.getCode() == null || eventType.getCode().isBlank()) {
                 continue;
@@ -514,12 +526,12 @@ public class AnalyticsDictionaryAdminService {
         ModuleType moduleType = moduleTypeRepository.findById(code)
             .orElseThrow(() -> new IllegalArgumentException("Модуль не найден: " + code));
 
-        long eventTypeCount = eventTypeRepository.countByModuleCode(code);
-        long eventCount = analyticsEventRepository.countByModuleCode(code);
+        long eventTypeCount = countEventTypesByModuleCode(code);
+        long eventCount = countEventsByModuleCode(code);
 
         List<String> usages = new java.util.ArrayList<>();
         if (eventTypeCount > 0) {
-            List<EventType> moduleEventTypes = eventTypeRepository.findByModuleCodeOrderByCodeAsc(code);
+            List<EventType> moduleEventTypes = findEventTypesByModuleCode(code);
             for (EventType eventType : moduleEventTypes) {
                 if (eventType == null || eventType.getCode() == null || eventType.getCode().isBlank()) {
                     continue;
@@ -643,42 +655,98 @@ public class AnalyticsDictionaryAdminService {
 
     @Transactional
     public void deleteStageMetricType(String codeRaw) {
-        String code = normalizeCode(codeRaw, true);
-        if (isSystemStageMetricCode(code)) {
-            throw new IllegalArgumentException("Нельзя удалить системную метрику из коробки: " + code);
+        MetricDeletePrecheck precheck = precheckDeleteStageMetricType(codeRaw);
+        if (!precheck.deletable()) {
+            throw new IllegalArgumentException(precheck.reason());
         }
+        deleteMetricRollups(precheck.code());
+        jdbcTemplate.update("delete from analytics.stage_metric where metric_type_code = ?", precheck.code());
+        jdbcTemplate.update(
+            """
+                delete from analytics.code_alias
+                where alias_type = 'METRIC'
+                  and (source_code = ? or target_code = ?)
+                """,
+            precheck.code(),
+            precheck.code()
+        );
+        metricTypeRepository.delete(precheck.metricType());
+    }
+
+    @Transactional(readOnly = true)
+    public MetricDeletePrecheck precheckDeleteStageMetricType(String codeRaw) {
+        String code = normalizeCode(codeRaw, true);
         StageMetricType metricType = metricTypeRepository.findById(code)
             .orElseThrow(() -> new IllegalArgumentException("Метрика не найдена: " + code));
-        long usageCount = analyticsStageMetricRepository.countByMetricTypeCode(code);
-        if (usageCount > 0) {
-            throw new IllegalArgumentException("Нельзя удалить метрику: есть связанные значения (" + usageCount + ")");
+        if (Boolean.TRUE.equals(metricType.getIsSystem())) {
+            return new MetricDeletePrecheck(
+                null,
+                code,
+                false,
+                "Нельзя удалить системную метрику из коробки: " + code,
+                List.of(),
+                0L,
+                0L
+            );
         }
-        metricTypeRepository.delete(metricType);
+        List<String> usages = analyticsEventTypeMaintenanceService.findTrackedMetricUsages(code);
+        long metricValueCount = analyticsStageMetricRepository.countByMetricTypeCode(code);
+        long rollupCount = countMetricRollups(code);
+
+        boolean deletable = usages.isEmpty();
+        String reason = "";
+        if (!usages.isEmpty()) {
+            int limit = Math.min(usages.size(), 8);
+            String joined = String.join("; ", usages.subList(0, limit));
+            String suffix = usages.size() > limit
+                ? "; ... и ещё " + (usages.size() - limit)
+                : "";
+            reason = "Нельзя удалить метрику: она используется в коде (" + usages.size() + "): " + joined + suffix;
+        }
+
+        return new MetricDeletePrecheck(metricType, code, deletable, reason, usages, metricValueCount, rollupCount);
     }
 
     @Transactional
     public void deleteStageType(String codeRaw) {
+        StageDeletePrecheck precheck = precheckDeleteStageType(codeRaw);
+        if (!precheck.deletable()) {
+            throw new IllegalArgumentException(precheck.reason());
+        }
+        stageTypeRepository.delete(precheck.stageType());
+    }
+
+    @Transactional(readOnly = true)
+    public StageDeletePrecheck precheckDeleteStageType(String codeRaw) {
         String code = normalizeCode(codeRaw, true);
         if (isSystemStageCode(code)) {
-            throw new IllegalArgumentException("Нельзя удалить системный этап из коробки: " + code);
+            return new StageDeletePrecheck(
+                null,
+                code,
+                false,
+                "Нельзя удалить системный этап из коробки: " + code,
+                0L,
+                0L
+            );
         }
         StageType stageType = stageTypeRepository.findById(code)
             .orElseThrow(() -> new IllegalArgumentException("Этап не найден: " + code));
         long stageUsageCount = analyticsStageRepository.countByStageTypeCode(code);
+        long aggregateUsageCount = countStageAggregates(code);
+        String reason = "";
         if (stageUsageCount > 0) {
-            throw new IllegalArgumentException("Нельзя удалить этап: есть связанные вызовы (" + stageUsageCount + ")");
+            reason = "Нельзя удалить этап: есть связанные вызовы (" + stageUsageCount + ")";
+        } else if (aggregateUsageCount > 0) {
+            reason = "Нельзя удалить этап: есть связанные агрегированные метрики (" + aggregateUsageCount + ")";
         }
-        Integer aggregateUsageCount = jdbcTemplate.queryForObject(
-            "select count(*) from analytics.aggregated_metric where stage_type_code = ?",
-            Integer.class,
-            code
+        return new StageDeletePrecheck(
+            stageType,
+            code,
+            reason.isBlank(),
+            reason,
+            stageUsageCount,
+            aggregateUsageCount
         );
-        if (aggregateUsageCount != null && aggregateUsageCount > 0) {
-            throw new IllegalArgumentException(
-                "Нельзя удалить этап: есть связанные агрегированные метрики (" + aggregateUsageCount + ")"
-            );
-        }
-        stageTypeRepository.delete(stageType);
     }
 
     @Transactional
@@ -736,6 +804,69 @@ public class AnalyticsDictionaryAdminService {
             .orElse(false);
     }
 
+    private long countMetricRollups(String code) {
+        try {
+            Long count = jdbcTemplate.queryForObject(
+                "select count(*) from analytics.stage_metric_rollup_bucket where metric_type_code = ?",
+                Long.class,
+                code
+            );
+            return count == null ? 0L : count;
+        } catch (RuntimeException ignored) {
+            return 0L;
+        }
+    }
+
+    private void deleteMetricRollups(String code) {
+        try {
+            jdbcTemplate.update("delete from analytics.stage_metric_rollup_bucket where metric_type_code = ?", code);
+        } catch (RuntimeException ignored) {
+            // The rollup table is optional in lightweight test/runtime profiles.
+        }
+    }
+
+    private List<EventType> findEventTypesByModuleCode(String code) {
+        String normalizedCode = normalizeCode(code, true);
+        return eventTypeRepository.findAll().stream()
+            .filter(eventType -> normalizedCode.equals(normalizeCode(eventType.getModuleCode(), false)))
+            .sorted(java.util.Comparator.comparing(EventType::getCode))
+            .toList();
+    }
+
+    private long countEventTypesByModuleCode(String code) {
+        return findEventTypesByModuleCode(code).size();
+    }
+
+    private long countEventsByModuleCode(String code) {
+        String normalizedCode = normalizeCode(code, true);
+        Long count = jdbcTemplate.queryForObject(
+            """
+                select count(*)
+                  from analytics.event e
+                  left join analytics.event_type et on et.code = e.event_type_code
+                 where upper(coalesce(nullif(e.module_code, ''), '')) = ?
+                    or upper(coalesce(nullif(et.module_code, ''), '')) = ?
+                """,
+            Long.class,
+            normalizedCode,
+            normalizedCode
+        );
+        return count == null ? 0L : count;
+    }
+
+    private long countStageAggregates(String code) {
+        try {
+            Long count = jdbcTemplate.queryForObject(
+                "select count(*) from analytics.aggregated_metric where stage_type_code = ?",
+                Long.class,
+                code
+            );
+            return count == null ? 0L : count;
+        } catch (RuntimeException ignored) {
+            return 0L;
+        }
+    }
+
     public record ModuleDeletePrecheck(
         ModuleType moduleType,
         String code,
@@ -744,6 +875,27 @@ public class AnalyticsDictionaryAdminService {
         List<String> usages,
         long eventTypeCount,
         long eventCount
+    ) {
+    }
+
+    public record StageDeletePrecheck(
+        StageType stageType,
+        String code,
+        boolean deletable,
+        String reason,
+        long stageUsageCount,
+        long aggregateUsageCount
+    ) {
+    }
+
+    public record MetricDeletePrecheck(
+        StageMetricType metricType,
+        String code,
+        boolean deletable,
+        String reason,
+        List<String> usages,
+        long metricValueCount,
+        long rollupCount
     ) {
     }
 

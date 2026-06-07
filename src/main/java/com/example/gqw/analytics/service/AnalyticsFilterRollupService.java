@@ -6,6 +6,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
@@ -167,6 +168,31 @@ public class AnalyticsFilterRollupService {
     }
 
     @Transactional(readOnly = true)
+    public List<String> findModuleCodes(
+        Instant from,
+        Instant to,
+        Collection<String> eventTypeCodes
+    ) {
+        if (eventTypeCodes == null || eventTypeCodes.isEmpty()) {
+            return List.of();
+        }
+        MapSqlParameterSource params = baseRangeParams(from, to)
+            .addValue("eventTypeCodes", eventTypeCodes);
+        return jdbcTemplate.queryForList(
+            """
+                select distinct module_code
+                from analytics.filter_event_type_day
+                where day_start between :fromDate and :toDate
+                  and event_type_code in (:eventTypeCodes)
+                  and module_code is not null
+                order by module_code asc
+            """,
+            params,
+            String.class
+        );
+    }
+
+    @Transactional(readOnly = true)
     public List<String> findAttributeTypeCodes(
         Instant from,
         Instant to,
@@ -249,6 +275,8 @@ public class AnalyticsFilterRollupService {
                   and e.module_code is not null
                   and e.event_type_code is not null
                 group by 1, 2, 3
+                on conflict (day_start, module_code, event_type_code)
+                do update set sample_count = excluded.sample_count
             """,
             params
         );
@@ -278,6 +306,8 @@ public class AnalyticsFilterRollupService {
                   and a.attribute_type_code is not null
                   and trim(coalesce(nullif(a.attr_value, ''), nullif(a.attr_value_json, ''))) <> ''
                 group by 1, 2, 3, 4, 5
+                on conflict (day_start, module_code, event_type_code, attribute_type_code, attribute_value)
+                do update set sample_count = excluded.sample_count
             """,
             params
         );
@@ -304,6 +334,8 @@ public class AnalyticsFilterRollupService {
                 where e.module_code is not null
                   and e.event_type_code is not null
                 group by 1, 2, 3
+                on conflict (day_start, module_code, event_type_code)
+                do update set sample_count = excluded.sample_count
             """,
             Map.of()
         );
@@ -332,6 +364,8 @@ public class AnalyticsFilterRollupService {
                   and a.attribute_type_code is not null
                   and trim(coalesce(nullif(a.attr_value, ''), nullif(a.attr_value_json, ''))) <> ''
                 group by 1, 2, 3, 4, 5
+                on conflict (day_start, module_code, event_type_code, attribute_type_code, attribute_value)
+                do update set sample_count = excluded.sample_count
             """,
             Map.of()
         );

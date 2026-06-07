@@ -1,5 +1,7 @@
 package com.example.gqw.shop.repository;
 
+import com.example.gqw.analytics.aop.TrackAnalyticsMetric;
+import com.example.gqw.analytics.aop.TrackAnalyticsStageMetric;
 import com.example.gqw.shop.entity.Category;
 import com.example.gqw.shop.entity.Product;
 import java.util.List;

@@ -20,6 +20,8 @@ public @interface TrackAnalyticsEvent {
 
     TrackAnalyticsAttribute[] attributes() default {};
 
+    TrackAnalyticsMetric[] metrics() default {};
+
     boolean trackPayloadSize() default true;
 
     String operationDescription() default "";
