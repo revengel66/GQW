@@ -10,9 +10,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class AnalyticsMetricAnnotationTestController {
 
     private final AnalyticsStageMetricTestService stageMetricTestService;
+    private final AnalyticsLayerTestFacade layerTestFacade;
 
-    AnalyticsMetricAnnotationTestController(AnalyticsStageMetricTestService stageMetricTestService) {
+    AnalyticsMetricAnnotationTestController(
+        AnalyticsStageMetricTestService stageMetricTestService,
+        AnalyticsLayerTestFacade layerTestFacade
+    ) {
         this.stageMetricTestService = stageMetricTestService;
+        this.layerTestFacade = layerTestFacade;
     }
 
     @GetMapping("/test/analytics/metrics/success")
@@ -80,5 +85,35 @@ public class AnalyticsMetricAnnotationTestController {
     @TrackAnalyticsEvent(code = "ANNOTATION_METRIC_EVENT", trackPayloadSize = false)
     public Map<String, Object> stageMetricSpelError() {
         return Map.of("value", stageMetricTestService.spelErrorMetric());
+    }
+
+    @GetMapping("/test/analytics/layers/facade")
+    @TrackAnalyticsEvent(code = "ANNOTATION_METRIC_EVENT", trackPayloadSize = false)
+    public Map<String, Object> customLayerFacade() {
+        return Map.of("size", layerTestFacade.facadeWithDatabase().size());
+    }
+
+    @GetMapping("/test/analytics/layers/no-facade")
+    @TrackAnalyticsEvent(code = "ANNOTATION_METRIC_EVENT", trackPayloadSize = false)
+    public Map<String, Object> withoutCustomLayerFacade() {
+        return Map.of("size", stageMetricTestService.databaseMetric().size());
+    }
+
+    @GetMapping("/test/analytics/layers/facade-metric")
+    @TrackAnalyticsEvent(code = "ANNOTATION_METRIC_EVENT", trackPayloadSize = false)
+    public Map<String, Object> customLayerStageMetric() {
+        return Map.of("size", layerTestFacade.facadeMetric().size());
+    }
+
+    @GetMapping("/test/analytics/layers/unknown")
+    @TrackAnalyticsEvent(code = "ANNOTATION_METRIC_EVENT", trackPayloadSize = false)
+    public Map<String, Object> unknownLayer() {
+        return Map.of("value", layerTestFacade.unknownLayer());
+    }
+
+    @GetMapping("/test/analytics/layers/inactive")
+    @TrackAnalyticsEvent(code = "ANNOTATION_METRIC_EVENT", trackPayloadSize = false)
+    public Map<String, Object> inactiveLayer() {
+        return Map.of("value", layerTestFacade.inactiveLayer());
     }
 }

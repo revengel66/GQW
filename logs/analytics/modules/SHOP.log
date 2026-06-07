@@ -51145,3 +51145,940 @@ java.lang.IllegalArgumentException: Unknown event type: LOGIN
 2026-06-07 16:35:49.336  INFO [trace:c6c71c968f174b7894b40c8e98090838] [event:d0070854-f6b4-4423-906e-48bd5be017be] [module:SHOP] --- [nio-8080-exec-2] analytics.db.stage                       : DB_STAGE_END stageId=9674567 method=ProductCharacteristicRepository.findForProductsOrdered durationMs=19 traceId='c6c71c968f174b7894b40c8e98090838' eventUid='d0070854-f6b4-4423-906e-48bd5be017be'
 2026-06-07 16:35:49.339  INFO [trace:c6c71c968f174b7894b40c8e98090838] [event:d0070854-f6b4-4423-906e-48bd5be017be] [module:SHOP] --- [nio-8080-exec-2] c.e.gqw.shop.service.CatalogService      : Method finished successfully CatalogService.cardCharacteristics: operation='execute business operation', layer=SERVICE, durationMs=30, traceId='c6c71c968f174b7894b40c8e98090838', eventUid='d0070854-f6b4-4423-906e-48bd5be017be'.
 2026-06-07 16:35:49.352  INFO [trace:c6c71c968f174b7894b40c8e98090838] [event:d0070854-f6b4-4423-906e-48bd5be017be] [module:SHOP] --- [nio-8080-exec-2] c.e.g.shop.controller.CatalogController  : Method finished successfully CatalogController.home: operation='handle incoming request', layer=CONTROLLER, durationMs=148, traceId='c6c71c968f174b7894b40c8e98090838', eventUid='d0070854-f6b4-4423-906e-48bd5be017be'.
+2026-06-07 17:16:33.918 DEBUG [trace:61ce994211ce405e806d864c918f31fd] [event:] [module:SHOP] --- [    Test worker] org.hibernate.SQL                        : select su1_0.id,su1_0.address,su1_0.address_apartment,su1_0.address_entrance,su1_0.address_floor,su1_0.address_house,su1_0.address_intercom,su1_0.address_street,su1_0.created_at,su1_0.email,su1_0.full_name,su1_0.is_admin,su1_0.is_enabled,su1_0.password_hash,su1_0.phone,su1_0.review_replies_seen_at,su1_0.updated_at,su1_0.username from shop.shop_user su1_0 where su1_0.username=?
+2026-06-07 17:16:33.988  INFO [trace:61ce994211ce405e806d864c918f31fd] [event:] [module:SHOP] --- [    Test worker] c.e.gqw.shop.service.CurrentUserService  : Method started CurrentUserService.findCurrentUser (operation='read data', layer=SERVICE, traceId='61ce994211ce405e806d864c918f31fd', eventUid='').
+2026-06-07 17:16:33.988 DEBUG [trace:61ce994211ce405e806d864c918f31fd] [event:] [module:SHOP] --- [    Test worker] org.hibernate.SQL                        : select su1_0.id,su1_0.address,su1_0.address_apartment,su1_0.address_entrance,su1_0.address_floor,su1_0.address_house,su1_0.address_intercom,su1_0.address_street,su1_0.created_at,su1_0.email,su1_0.full_name,su1_0.is_admin,su1_0.is_enabled,su1_0.password_hash,su1_0.phone,su1_0.review_replies_seen_at,su1_0.updated_at,su1_0.username from shop.shop_user su1_0 where su1_0.username=?
+2026-06-07 17:16:33.989  INFO [trace:61ce994211ce405e806d864c918f31fd] [event:] [module:SHOP] --- [    Test worker] c.e.gqw.shop.service.CurrentUserService  : Method finished successfully CurrentUserService.findCurrentUser: operation='read data', layer=SERVICE, durationMs=0, traceId='61ce994211ce405e806d864c918f31fd', eventUid=''.
+2026-06-07 17:16:33.989 DEBUG [trace:61ce994211ce405e806d864c918f31fd] [event:] [module:SHOP] --- [    Test worker] org.hibernate.SQL                        : select et1_0.code,et1_0.description,et1_0.is_active,et1_0.is_system,et1_0.module_code,et1_0.name from analytics.event_type et1_0 where et1_0.code=?
+2026-06-07 17:16:33.990  WARN [trace:61ce994211ce405e806d864c918f31fd] [event:] [module:SHOP] --- [    Test worker] c.e.g.a.aop.AnalyticsEventAspect         : Analytics event tracking skipped for code=LOGIN path=/login reason=Unknown event type: LOGIN
+
+java.lang.IllegalArgumentException: Unknown event type: LOGIN
+	at com.example.gqw.analytics.service.AnalyticsEventService.lambda$createEvent$0(AnalyticsEventService.java:55)
+	at java.base/java.util.Optional.orElseThrow(Optional.java:403)
+	at com.example.gqw.analytics.service.AnalyticsEventService.createEvent(AnalyticsEventService.java:55)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.springframework.aop.support.AopUtils.invokeJoinpointUsingReflection(AopUtils.java:359)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.invokeJoinpoint(ReflectiveMethodInvocation.java:190)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:158)
+	at org.springframework.transaction.interceptor.TransactionInterceptor$1.proceedWithInvocation(TransactionInterceptor.java:133)
+	at org.springframework.transaction.interceptor.TransactionAspectSupport.invokeWithinTransaction(TransactionAspectSupport.java:371)
+	at org.springframework.transaction.interceptor.TransactionInterceptor.invoke(TransactionInterceptor.java:130)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.aspectj.MethodInvocationProceedingJoinPoint.proceed(MethodInvocationProceedingJoinPoint.java:82)
+	at com.example.gqw.analytics.logging.AnalyticsMethodLoggingAspect.logMethodExecution(AnalyticsMethodLoggingAspect.java:80)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.springframework.aop.aspectj.AbstractAspectJAdvice.invokeAdviceMethodWithGivenArgs(AbstractAspectJAdvice.java:648)
+	at org.springframework.aop.aspectj.AbstractAspectJAdvice.invokeAdviceMethod(AbstractAspectJAdvice.java:630)
+	at org.springframework.aop.aspectj.AspectJAroundAdvice.invoke(AspectJAroundAdvice.java:70)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.aspectj.MethodInvocationProceedingJoinPoint.proceed(MethodInvocationProceedingJoinPoint.java:82)
+	at com.example.gqw.analytics.aop.AnalyticsServiceStageAspect.aroundServiceStage(AnalyticsServiceStageAspect.java:38)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.springframework.aop.aspectj.AbstractAspectJAdvice.invokeAdviceMethodWithGivenArgs(AbstractAspectJAdvice.java:648)
+	at org.springframework.aop.aspectj.AbstractAspectJAdvice.invokeAdviceMethod(AbstractAspectJAdvice.java:630)
+	at org.springframework.aop.aspectj.AspectJAroundAdvice.invoke(AspectJAroundAdvice.java:70)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.interceptor.ExposeInvocationInterceptor.invoke(ExposeInvocationInterceptor.java:96)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.framework.CglibAopProxy$DynamicAdvisedInterceptor.intercept(CglibAopProxy.java:719)
+	at com.example.gqw.analytics.service.AnalyticsEventService$$SpringCGLIB$$0.createEvent(<generated>)
+	at com.example.gqw.analytics.service.AnalyticsTrackerFacade.startEvent(AnalyticsTrackerFacade.java:35)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.springframework.aop.support.AopUtils.invokeJoinpointUsingReflection(AopUtils.java:359)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.invokeJoinpoint(ReflectiveMethodInvocation.java:190)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:158)
+	at org.springframework.transaction.interceptor.TransactionInterceptor$1.proceedWithInvocation(TransactionInterceptor.java:133)
+	at org.springframework.transaction.interceptor.TransactionAspectSupport.invokeWithinTransaction(TransactionAspectSupport.java:371)
+	at org.springframework.transaction.interceptor.TransactionInterceptor.invoke(TransactionInterceptor.java:130)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.aspectj.MethodInvocationProceedingJoinPoint.proceed(MethodInvocationProceedingJoinPoint.java:82)
+	at com.example.gqw.analytics.logging.AnalyticsMethodLoggingAspect.logMethodExecution(AnalyticsMethodLoggingAspect.java:80)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.springframework.aop.aspectj.AbstractAspectJAdvice.invokeAdviceMethodWithGivenArgs(AbstractAspectJAdvice.java:648)
+	at org.springframework.aop.aspectj.AbstractAspectJAdvice.invokeAdviceMethod(AbstractAspectJAdvice.java:630)
+	at org.springframework.aop.aspectj.AspectJAroundAdvice.invoke(AspectJAroundAdvice.java:70)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.aspectj.MethodInvocationProceedingJoinPoint.proceed(MethodInvocationProceedingJoinPoint.java:82)
+	at com.example.gqw.analytics.aop.AnalyticsServiceStageAspect.aroundServiceStage(AnalyticsServiceStageAspect.java:38)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.springframework.aop.aspectj.AbstractAspectJAdvice.invokeAdviceMethodWithGivenArgs(AbstractAspectJAdvice.java:648)
+	at org.springframework.aop.aspectj.AbstractAspectJAdvice.invokeAdviceMethod(AbstractAspectJAdvice.java:630)
+	at org.springframework.aop.aspectj.AspectJAroundAdvice.invoke(AspectJAroundAdvice.java:70)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.interceptor.ExposeInvocationInterceptor.invoke(ExposeInvocationInterceptor.java:96)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.framework.CglibAopProxy$DynamicAdvisedInterceptor.intercept(CglibAopProxy.java:719)
+	at com.example.gqw.analytics.service.AnalyticsTrackerFacade$$SpringCGLIB$$0.startEvent(<generated>)
+	at com.example.gqw.analytics.aop.AnalyticsEventAspect.aroundTrackedMethod(AnalyticsEventAspect.java:101)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.springframework.aop.aspectj.AbstractAspectJAdvice.invokeAdviceMethodWithGivenArgs(AbstractAspectJAdvice.java:648)
+	at org.springframework.aop.aspectj.AbstractAspectJAdvice.invokeAdviceMethod(AbstractAspectJAdvice.java:630)
+	at org.springframework.aop.aspectj.AspectJAroundAdvice.invoke(AspectJAroundAdvice.java:70)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:168)
+	at org.springframework.aop.interceptor.ExposeInvocationInterceptor.invoke(ExposeInvocationInterceptor.java:96)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.framework.CglibAopProxy$DynamicAdvisedInterceptor.intercept(CglibAopProxy.java:719)
+	at com.example.gqw.analytics.service.LoginAnalyticsService$$SpringCGLIB$$0.trackSuccess(<generated>)
+	at com.example.gqw.config.SecurityConfig.safeTrackLoginSuccess(SecurityConfig.java:86)
+	at com.example.gqw.config.SecurityConfig.lambda$securityFilterChain$2(SecurityConfig.java:58)
+	at org.springframework.security.web.authentication.AbstractAuthenticationProcessingFilter.successfulAuthentication(AbstractAuthenticationProcessingFilter.java:405)
+	at org.springframework.security.web.authentication.AbstractAuthenticationProcessingFilter.doFilter(AbstractAuthenticationProcessingFilter.java:280)
+	at org.springframework.security.web.authentication.AbstractAuthenticationProcessingFilter.doFilter(AbstractAuthenticationProcessingFilter.java:239)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:380)
+	at org.springframework.security.web.authentication.logout.LogoutFilter.doFilter(LogoutFilter.java:110)
+	at org.springframework.security.web.authentication.logout.LogoutFilter.doFilter(LogoutFilter.java:96)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:380)
+	at org.springframework.security.web.csrf.CsrfFilter.doFilterInternal(CsrfFilter.java:135)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:380)
+	at org.springframework.security.web.header.HeaderWriterFilter.doHeadersAfter(HeaderWriterFilter.java:90)
+	at org.springframework.security.web.header.HeaderWriterFilter.doFilterInternal(HeaderWriterFilter.java:75)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:380)
+	at org.springframework.security.web.context.SecurityContextHolderFilter.doFilter(SecurityContextHolderFilter.java:82)
+	at org.springframework.security.web.context.SecurityContextHolderFilter.doFilter(SecurityContextHolderFilter.java:69)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:380)
+	at org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter.doFilterInternal(WebAsyncManagerIntegrationFilter.java:62)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:380)
+	at org.springframework.security.web.session.DisableEncodeUrlFilter.doFilterInternal(DisableEncodeUrlFilter.java:42)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:380)
+	at org.springframework.security.web.FilterChainProxy.doFilterInternal(FilterChainProxy.java:237)
+	at org.springframework.security.web.FilterChainProxy.doFilter(FilterChainProxy.java:195)
+	at org.springframework.web.filter.CompositeFilter$VirtualFilterChain.doFilter(CompositeFilter.java:113)
+	at org.springframework.web.filter.ServletRequestPathFilter.doFilter(ServletRequestPathFilter.java:52)
+	at org.springframework.web.filter.CompositeFilter$VirtualFilterChain.doFilter(CompositeFilter.java:113)
+	at org.springframework.web.filter.CompositeFilter.doFilter(CompositeFilter.java:74)
+	at org.springframework.security.config.annotation.web.configuration.WebSecurityConfiguration$CompositeFilterChainProxy.doFilter(WebSecurityConfiguration.java:317)
+	at org.springframework.web.filter.DelegatingFilterProxy.invokeDelegate(DelegatingFilterProxy.java:355)
+	at org.springframework.web.filter.DelegatingFilterProxy.doFilter(DelegatingFilterProxy.java:272)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.RequestContextFilter.doFilterInternal(RequestContextFilter.java:100)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.FormContentFilter.doFilterInternal(FormContentFilter.java:93)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at com.example.gqw.config.TraceIdFilter.doFilterInternal(TraceIdFilter.java:58)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at com.example.gqw.analytics.logging.AppModuleMdcFilter.doFilterInternal(AppModuleMdcFilter.java:34)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.CharacterEncodingFilter.doFilterInternal(CharacterEncodingFilter.java:199)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.test.web.servlet.MockMvc.perform(MockMvc.java:199)
+	at com.example.gqw.AnalyticsIntegrationTest.loginAs(AnalyticsIntegrationTest.java:622)
+	at com.example.gqw.AnalyticsIntegrationTest.analyticsEventsEndpointScopesSystemEventsAndDetailsRemainAddressable(AnalyticsIntegrationTest.java:530)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.junit.platform.commons.util.ReflectionUtils.invokeMethod(ReflectionUtils.java:701)
+	at org.junit.platform.commons.support.ReflectionSupport.invokeMethod(ReflectionSupport.java:502)
+	at org.junit.jupiter.engine.support.MethodReflectionUtils.invoke(MethodReflectionUtils.java:45)
+	at org.junit.jupiter.engine.execution.MethodInvocation.proceed(MethodInvocation.java:61)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$ValidatingInvocation.proceed(InvocationInterceptorChain.java:124)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.intercept(TimeoutExtension.java:163)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestableMethod(TimeoutExtension.java:148)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestMethod(TimeoutExtension.java:86)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker$ReflectiveInterceptorCall.lambda$ofVoidMethod$0(InterceptingExecutableInvoker.java:123)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.lambda$invoke$0(InterceptingExecutableInvoker.java:105)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$InterceptedInvocation.proceed(InvocationInterceptorChain.java:99)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.proceed(InvocationInterceptorChain.java:66)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.chainAndInvoke(InvocationInterceptorChain.java:47)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.invoke(InvocationInterceptorChain.java:39)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:104)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:98)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invokeVoid(InterceptingExecutableInvoker.java:71)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.lambda$invokeTestMethod$0(TestMethodTestDescriptor.java:219)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:74)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.invokeTestMethod(TestMethodTestDescriptor.java:215)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:157)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:70)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$2(NodeTestTask.java:176)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:74)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$1(NodeTestTask.java:166)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:138)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$0(NodeTestTask.java:164)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:74)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:163)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:116)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:42)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$2(NodeTestTask.java:180)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:74)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$1(NodeTestTask.java:166)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:138)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$0(NodeTestTask.java:164)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:74)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:163)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:116)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:42)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$2(NodeTestTask.java:180)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:74)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$1(NodeTestTask.java:166)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:138)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$0(NodeTestTask.java:164)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:74)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:163)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:116)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.submit(SameThreadHierarchicalTestExecutorService.java:36)
+	at org.junit.platform.engine.support.hierarchical.HierarchicalTestExecutor.execute(HierarchicalTestExecutor.java:52)
+	at org.junit.platform.engine.support.hierarchical.HierarchicalTestEngine.execute(HierarchicalTestEngine.java:58)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.executeEngine(EngineExecutionOrchestrator.java:246)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.failOrExecuteEngine(EngineExecutionOrchestrator.java:218)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:179)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:108)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.lambda$execute$0(EngineExecutionOrchestrator.java:66)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.withInterceptedStreams(EngineExecutionOrchestrator.java:157)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:65)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:125)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:114)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:93)
+	at org.junit.platform.launcher.core.DelegatingLauncher.execute(DelegatingLauncher.java:48)
+	at org.junit.platform.launcher.core.InterceptingLauncher.lambda$execute$0(InterceptingLauncher.java:41)
+	at org.junit.platform.launcher.core.ClasspathAlignmentCheckingLauncherInterceptor.intercept(ClasspathAlignmentCheckingLauncherInterceptor.java:25)
+	at org.junit.platform.launcher.core.InterceptingLauncher.execute(InterceptingLauncher.java:40)
+	at org.junit.platform.launcher.core.DelegatingLauncher.execute(DelegatingLauncher.java:48)
+	at org.gradle.api.internal.tasks.testing.junitplatform.JUnitPlatformTestDefinitionProcessor$CollectThenExecuteTestDefinitionConsumer.processAllTestDefinitions(JUnitPlatformTestDefinitionProcessor.java:179)
+	at org.gradle.api.internal.tasks.testing.junitplatform.JUnitPlatformTestDefinitionProcessor$CollectThenExecuteTestDefinitionConsumer.access$000(JUnitPlatformTestDefinitionProcessor.java:122)
+	at org.gradle.api.internal.tasks.testing.junitplatform.JUnitPlatformTestDefinitionProcessor.stop(JUnitPlatformTestDefinitionProcessor.java:116)
+	at org.gradle.api.internal.tasks.testing.SuiteTestDefinitionProcessor.stop(SuiteTestDefinitionProcessor.java:63)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.gradle.internal.dispatch.MethodInvocation.invokeOn(MethodInvocation.java:77)
+	at org.gradle.internal.dispatch.ReflectionDispatch.dispatch(ReflectionDispatch.java:28)
+	at org.gradle.internal.dispatch.ReflectionDispatch.dispatch(ReflectionDispatch.java:19)
+	at org.gradle.internal.dispatch.ContextClassLoaderDispatch.dispatch(ContextClassLoaderDispatch.java:33)
+	at org.gradle.internal.dispatch.ProxyDispatchAdapter$DispatchingInvocationHandler.invoke(ProxyDispatchAdapter.java:88)
+	at jdk.proxy1/jdk.proxy1.$Proxy4.stop(Unknown Source)
+	at org.gradle.api.internal.tasks.testing.worker.TestWorker$3.run(TestWorker.java:195)
+	at org.gradle.api.internal.tasks.testing.worker.TestWorker.executeAndMaintainThreadName(TestWorker.java:126)
+	at org.gradle.api.internal.tasks.testing.worker.TestWorker.execute(TestWorker.java:103)
+	at org.gradle.api.internal.tasks.testing.worker.TestWorker.execute(TestWorker.java:63)
+	at org.gradle.process.internal.worker.child.ActionExecutionWorker.execute(ActionExecutionWorker.java:56)
+	at org.gradle.process.internal.worker.child.SystemApplicationClassLoaderWorker.call(SystemApplicationClassLoaderWorker.java:122)
+	at org.gradle.process.internal.worker.child.SystemApplicationClassLoaderWorker.call(SystemApplicationClassLoaderWorker.java:72)
+	at worker.org.gradle.process.internal.worker.GradleWorkerMain.run(GradleWorkerMain.java:69)
+	at worker.org.gradle.process.internal.worker.GradleWorkerMain.main(GradleWorkerMain.java:74)
+
+2026-06-07 17:16:35.504 DEBUG [trace:8246676021e147ff8cf9c0ebabf353a1] [event:] [module:SHOP] --- [    Test worker] org.hibernate.SQL                        : select su1_0.id,su1_0.address,su1_0.address_apartment,su1_0.address_entrance,su1_0.address_floor,su1_0.address_house,su1_0.address_intercom,su1_0.address_street,su1_0.created_at,su1_0.email,su1_0.full_name,su1_0.is_admin,su1_0.is_enabled,su1_0.password_hash,su1_0.phone,su1_0.review_replies_seen_at,su1_0.updated_at,su1_0.username from shop.shop_user su1_0 where su1_0.username=?
+2026-06-07 17:16:35.564  INFO [trace:8246676021e147ff8cf9c0ebabf353a1] [event:] [module:SHOP] --- [    Test worker] c.e.gqw.shop.service.CurrentUserService  : Method started CurrentUserService.findCurrentUser (operation='read data', layer=SERVICE, traceId='8246676021e147ff8cf9c0ebabf353a1', eventUid='').
+2026-06-07 17:16:35.565 DEBUG [trace:8246676021e147ff8cf9c0ebabf353a1] [event:] [module:SHOP] --- [    Test worker] org.hibernate.SQL                        : select su1_0.id,su1_0.address,su1_0.address_apartment,su1_0.address_entrance,su1_0.address_floor,su1_0.address_house,su1_0.address_intercom,su1_0.address_street,su1_0.created_at,su1_0.email,su1_0.full_name,su1_0.is_admin,su1_0.is_enabled,su1_0.password_hash,su1_0.phone,su1_0.review_replies_seen_at,su1_0.updated_at,su1_0.username from shop.shop_user su1_0 where su1_0.username=?
+2026-06-07 17:16:35.565  INFO [trace:8246676021e147ff8cf9c0ebabf353a1] [event:] [module:SHOP] --- [    Test worker] c.e.gqw.shop.service.CurrentUserService  : Method finished successfully CurrentUserService.findCurrentUser: operation='read data', layer=SERVICE, durationMs=1, traceId='8246676021e147ff8cf9c0ebabf353a1', eventUid=''.
+2026-06-07 17:16:35.566 DEBUG [trace:8246676021e147ff8cf9c0ebabf353a1] [event:] [module:SHOP] --- [    Test worker] org.hibernate.SQL                        : select et1_0.code,et1_0.description,et1_0.is_active,et1_0.is_system,et1_0.module_code,et1_0.name from analytics.event_type et1_0 where et1_0.code=?
+2026-06-07 17:16:35.566  WARN [trace:8246676021e147ff8cf9c0ebabf353a1] [event:] [module:SHOP] --- [    Test worker] c.e.g.a.aop.AnalyticsEventAspect         : Analytics event tracking skipped for code=LOGIN path=/login reason=Unknown event type: LOGIN
+
+java.lang.IllegalArgumentException: Unknown event type: LOGIN
+	at com.example.gqw.analytics.service.AnalyticsEventService.lambda$createEvent$0(AnalyticsEventService.java:55)
+	at java.base/java.util.Optional.orElseThrow(Optional.java:403)
+	at com.example.gqw.analytics.service.AnalyticsEventService.createEvent(AnalyticsEventService.java:55)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.springframework.aop.support.AopUtils.invokeJoinpointUsingReflection(AopUtils.java:359)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.invokeJoinpoint(ReflectiveMethodInvocation.java:190)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:158)
+	at org.springframework.transaction.interceptor.TransactionInterceptor$1.proceedWithInvocation(TransactionInterceptor.java:133)
+	at org.springframework.transaction.interceptor.TransactionAspectSupport.invokeWithinTransaction(TransactionAspectSupport.java:371)
+	at org.springframework.transaction.interceptor.TransactionInterceptor.invoke(TransactionInterceptor.java:130)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.aspectj.MethodInvocationProceedingJoinPoint.proceed(MethodInvocationProceedingJoinPoint.java:82)
+	at com.example.gqw.analytics.logging.AnalyticsMethodLoggingAspect.logMethodExecution(AnalyticsMethodLoggingAspect.java:80)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.springframework.aop.aspectj.AbstractAspectJAdvice.invokeAdviceMethodWithGivenArgs(AbstractAspectJAdvice.java:648)
+	at org.springframework.aop.aspectj.AbstractAspectJAdvice.invokeAdviceMethod(AbstractAspectJAdvice.java:630)
+	at org.springframework.aop.aspectj.AspectJAroundAdvice.invoke(AspectJAroundAdvice.java:70)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.aspectj.MethodInvocationProceedingJoinPoint.proceed(MethodInvocationProceedingJoinPoint.java:82)
+	at com.example.gqw.analytics.aop.AnalyticsServiceStageAspect.aroundServiceStage(AnalyticsServiceStageAspect.java:38)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.springframework.aop.aspectj.AbstractAspectJAdvice.invokeAdviceMethodWithGivenArgs(AbstractAspectJAdvice.java:648)
+	at org.springframework.aop.aspectj.AbstractAspectJAdvice.invokeAdviceMethod(AbstractAspectJAdvice.java:630)
+	at org.springframework.aop.aspectj.AspectJAroundAdvice.invoke(AspectJAroundAdvice.java:70)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.interceptor.ExposeInvocationInterceptor.invoke(ExposeInvocationInterceptor.java:96)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.framework.CglibAopProxy$DynamicAdvisedInterceptor.intercept(CglibAopProxy.java:719)
+	at com.example.gqw.analytics.service.AnalyticsEventService$$SpringCGLIB$$0.createEvent(<generated>)
+	at com.example.gqw.analytics.service.AnalyticsTrackerFacade.startEvent(AnalyticsTrackerFacade.java:35)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.springframework.aop.support.AopUtils.invokeJoinpointUsingReflection(AopUtils.java:359)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.invokeJoinpoint(ReflectiveMethodInvocation.java:190)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:158)
+	at org.springframework.transaction.interceptor.TransactionInterceptor$1.proceedWithInvocation(TransactionInterceptor.java:133)
+	at org.springframework.transaction.interceptor.TransactionAspectSupport.invokeWithinTransaction(TransactionAspectSupport.java:371)
+	at org.springframework.transaction.interceptor.TransactionInterceptor.invoke(TransactionInterceptor.java:130)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.aspectj.MethodInvocationProceedingJoinPoint.proceed(MethodInvocationProceedingJoinPoint.java:82)
+	at com.example.gqw.analytics.logging.AnalyticsMethodLoggingAspect.logMethodExecution(AnalyticsMethodLoggingAspect.java:80)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.springframework.aop.aspectj.AbstractAspectJAdvice.invokeAdviceMethodWithGivenArgs(AbstractAspectJAdvice.java:648)
+	at org.springframework.aop.aspectj.AbstractAspectJAdvice.invokeAdviceMethod(AbstractAspectJAdvice.java:630)
+	at org.springframework.aop.aspectj.AspectJAroundAdvice.invoke(AspectJAroundAdvice.java:70)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.aspectj.MethodInvocationProceedingJoinPoint.proceed(MethodInvocationProceedingJoinPoint.java:82)
+	at com.example.gqw.analytics.aop.AnalyticsServiceStageAspect.aroundServiceStage(AnalyticsServiceStageAspect.java:38)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.springframework.aop.aspectj.AbstractAspectJAdvice.invokeAdviceMethodWithGivenArgs(AbstractAspectJAdvice.java:648)
+	at org.springframework.aop.aspectj.AbstractAspectJAdvice.invokeAdviceMethod(AbstractAspectJAdvice.java:630)
+	at org.springframework.aop.aspectj.AspectJAroundAdvice.invoke(AspectJAroundAdvice.java:70)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.interceptor.ExposeInvocationInterceptor.invoke(ExposeInvocationInterceptor.java:96)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.framework.CglibAopProxy$DynamicAdvisedInterceptor.intercept(CglibAopProxy.java:719)
+	at com.example.gqw.analytics.service.AnalyticsTrackerFacade$$SpringCGLIB$$0.startEvent(<generated>)
+	at com.example.gqw.analytics.aop.AnalyticsEventAspect.aroundTrackedMethod(AnalyticsEventAspect.java:101)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.springframework.aop.aspectj.AbstractAspectJAdvice.invokeAdviceMethodWithGivenArgs(AbstractAspectJAdvice.java:648)
+	at org.springframework.aop.aspectj.AbstractAspectJAdvice.invokeAdviceMethod(AbstractAspectJAdvice.java:630)
+	at org.springframework.aop.aspectj.AspectJAroundAdvice.invoke(AspectJAroundAdvice.java:70)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:168)
+	at org.springframework.aop.interceptor.ExposeInvocationInterceptor.invoke(ExposeInvocationInterceptor.java:96)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.framework.CglibAopProxy$DynamicAdvisedInterceptor.intercept(CglibAopProxy.java:719)
+	at com.example.gqw.analytics.service.LoginAnalyticsService$$SpringCGLIB$$0.trackSuccess(<generated>)
+	at com.example.gqw.config.SecurityConfig.safeTrackLoginSuccess(SecurityConfig.java:86)
+	at com.example.gqw.config.SecurityConfig.lambda$securityFilterChain$2(SecurityConfig.java:58)
+	at org.springframework.security.web.authentication.AbstractAuthenticationProcessingFilter.successfulAuthentication(AbstractAuthenticationProcessingFilter.java:405)
+	at org.springframework.security.web.authentication.AbstractAuthenticationProcessingFilter.doFilter(AbstractAuthenticationProcessingFilter.java:280)
+	at org.springframework.security.web.authentication.AbstractAuthenticationProcessingFilter.doFilter(AbstractAuthenticationProcessingFilter.java:239)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:380)
+	at org.springframework.security.web.authentication.logout.LogoutFilter.doFilter(LogoutFilter.java:110)
+	at org.springframework.security.web.authentication.logout.LogoutFilter.doFilter(LogoutFilter.java:96)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:380)
+	at org.springframework.security.web.csrf.CsrfFilter.doFilterInternal(CsrfFilter.java:135)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:380)
+	at org.springframework.security.web.header.HeaderWriterFilter.doHeadersAfter(HeaderWriterFilter.java:90)
+	at org.springframework.security.web.header.HeaderWriterFilter.doFilterInternal(HeaderWriterFilter.java:75)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:380)
+	at org.springframework.security.web.context.SecurityContextHolderFilter.doFilter(SecurityContextHolderFilter.java:82)
+	at org.springframework.security.web.context.SecurityContextHolderFilter.doFilter(SecurityContextHolderFilter.java:69)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:380)
+	at org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter.doFilterInternal(WebAsyncManagerIntegrationFilter.java:62)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:380)
+	at org.springframework.security.web.session.DisableEncodeUrlFilter.doFilterInternal(DisableEncodeUrlFilter.java:42)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:380)
+	at org.springframework.security.web.FilterChainProxy.doFilterInternal(FilterChainProxy.java:237)
+	at org.springframework.security.web.FilterChainProxy.doFilter(FilterChainProxy.java:195)
+	at org.springframework.web.filter.CompositeFilter$VirtualFilterChain.doFilter(CompositeFilter.java:113)
+	at org.springframework.web.filter.ServletRequestPathFilter.doFilter(ServletRequestPathFilter.java:52)
+	at org.springframework.web.filter.CompositeFilter$VirtualFilterChain.doFilter(CompositeFilter.java:113)
+	at org.springframework.web.filter.CompositeFilter.doFilter(CompositeFilter.java:74)
+	at org.springframework.security.config.annotation.web.configuration.WebSecurityConfiguration$CompositeFilterChainProxy.doFilter(WebSecurityConfiguration.java:317)
+	at org.springframework.web.filter.DelegatingFilterProxy.invokeDelegate(DelegatingFilterProxy.java:355)
+	at org.springframework.web.filter.DelegatingFilterProxy.doFilter(DelegatingFilterProxy.java:272)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.RequestContextFilter.doFilterInternal(RequestContextFilter.java:100)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.FormContentFilter.doFilterInternal(FormContentFilter.java:93)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at com.example.gqw.config.TraceIdFilter.doFilterInternal(TraceIdFilter.java:58)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at com.example.gqw.analytics.logging.AppModuleMdcFilter.doFilterInternal(AppModuleMdcFilter.java:34)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.CharacterEncodingFilter.doFilterInternal(CharacterEncodingFilter.java:199)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.test.web.servlet.MockMvc.perform(MockMvc.java:199)
+	at com.example.gqw.AnalyticsIntegrationTest.loginAs(AnalyticsIntegrationTest.java:622)
+	at com.example.gqw.AnalyticsIntegrationTest.analyticsDictionariesReturnsJsonForAdmin(AnalyticsIntegrationTest.java:192)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.junit.platform.commons.util.ReflectionUtils.invokeMethod(ReflectionUtils.java:701)
+	at org.junit.platform.commons.support.ReflectionSupport.invokeMethod(ReflectionSupport.java:502)
+	at org.junit.jupiter.engine.support.MethodReflectionUtils.invoke(MethodReflectionUtils.java:45)
+	at org.junit.jupiter.engine.execution.MethodInvocation.proceed(MethodInvocation.java:61)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$ValidatingInvocation.proceed(InvocationInterceptorChain.java:124)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.intercept(TimeoutExtension.java:163)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestableMethod(TimeoutExtension.java:148)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestMethod(TimeoutExtension.java:86)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker$ReflectiveInterceptorCall.lambda$ofVoidMethod$0(InterceptingExecutableInvoker.java:123)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.lambda$invoke$0(InterceptingExecutableInvoker.java:105)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$InterceptedInvocation.proceed(InvocationInterceptorChain.java:99)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.proceed(InvocationInterceptorChain.java:66)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.chainAndInvoke(InvocationInterceptorChain.java:47)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.invoke(InvocationInterceptorChain.java:39)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:104)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:98)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invokeVoid(InterceptingExecutableInvoker.java:71)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.lambda$invokeTestMethod$0(TestMethodTestDescriptor.java:219)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:74)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.invokeTestMethod(TestMethodTestDescriptor.java:215)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:157)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:70)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$2(NodeTestTask.java:176)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:74)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$1(NodeTestTask.java:166)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:138)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$0(NodeTestTask.java:164)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:74)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:163)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:116)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:42)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$2(NodeTestTask.java:180)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:74)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$1(NodeTestTask.java:166)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:138)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$0(NodeTestTask.java:164)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:74)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:163)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:116)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:42)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$2(NodeTestTask.java:180)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:74)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$1(NodeTestTask.java:166)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:138)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$0(NodeTestTask.java:164)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:74)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:163)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:116)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.submit(SameThreadHierarchicalTestExecutorService.java:36)
+	at org.junit.platform.engine.support.hierarchical.HierarchicalTestExecutor.execute(HierarchicalTestExecutor.java:52)
+	at org.junit.platform.engine.support.hierarchical.HierarchicalTestEngine.execute(HierarchicalTestEngine.java:58)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.executeEngine(EngineExecutionOrchestrator.java:246)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.failOrExecuteEngine(EngineExecutionOrchestrator.java:218)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:179)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:108)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.lambda$execute$0(EngineExecutionOrchestrator.java:66)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.withInterceptedStreams(EngineExecutionOrchestrator.java:157)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:65)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:125)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:114)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:93)
+	at org.junit.platform.launcher.core.DelegatingLauncher.execute(DelegatingLauncher.java:48)
+	at org.junit.platform.launcher.core.InterceptingLauncher.lambda$execute$0(InterceptingLauncher.java:41)
+	at org.junit.platform.launcher.core.ClasspathAlignmentCheckingLauncherInterceptor.intercept(ClasspathAlignmentCheckingLauncherInterceptor.java:25)
+	at org.junit.platform.launcher.core.InterceptingLauncher.execute(InterceptingLauncher.java:40)
+	at org.junit.platform.launcher.core.DelegatingLauncher.execute(DelegatingLauncher.java:48)
+	at org.gradle.api.internal.tasks.testing.junitplatform.JUnitPlatformTestDefinitionProcessor$CollectThenExecuteTestDefinitionConsumer.processAllTestDefinitions(JUnitPlatformTestDefinitionProcessor.java:179)
+	at org.gradle.api.internal.tasks.testing.junitplatform.JUnitPlatformTestDefinitionProcessor$CollectThenExecuteTestDefinitionConsumer.access$000(JUnitPlatformTestDefinitionProcessor.java:122)
+	at org.gradle.api.internal.tasks.testing.junitplatform.JUnitPlatformTestDefinitionProcessor.stop(JUnitPlatformTestDefinitionProcessor.java:116)
+	at org.gradle.api.internal.tasks.testing.SuiteTestDefinitionProcessor.stop(SuiteTestDefinitionProcessor.java:63)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.gradle.internal.dispatch.MethodInvocation.invokeOn(MethodInvocation.java:77)
+	at org.gradle.internal.dispatch.ReflectionDispatch.dispatch(ReflectionDispatch.java:28)
+	at org.gradle.internal.dispatch.ReflectionDispatch.dispatch(ReflectionDispatch.java:19)
+	at org.gradle.internal.dispatch.ContextClassLoaderDispatch.dispatch(ContextClassLoaderDispatch.java:33)
+	at org.gradle.internal.dispatch.ProxyDispatchAdapter$DispatchingInvocationHandler.invoke(ProxyDispatchAdapter.java:88)
+	at jdk.proxy1/jdk.proxy1.$Proxy4.stop(Unknown Source)
+	at org.gradle.api.internal.tasks.testing.worker.TestWorker$3.run(TestWorker.java:195)
+	at org.gradle.api.internal.tasks.testing.worker.TestWorker.executeAndMaintainThreadName(TestWorker.java:126)
+	at org.gradle.api.internal.tasks.testing.worker.TestWorker.execute(TestWorker.java:103)
+	at org.gradle.api.internal.tasks.testing.worker.TestWorker.execute(TestWorker.java:63)
+	at org.gradle.process.internal.worker.child.ActionExecutionWorker.execute(ActionExecutionWorker.java:56)
+	at org.gradle.process.internal.worker.child.SystemApplicationClassLoaderWorker.call(SystemApplicationClassLoaderWorker.java:122)
+	at org.gradle.process.internal.worker.child.SystemApplicationClassLoaderWorker.call(SystemApplicationClassLoaderWorker.java:72)
+	at worker.org.gradle.process.internal.worker.GradleWorkerMain.run(GradleWorkerMain.java:69)
+	at worker.org.gradle.process.internal.worker.GradleWorkerMain.main(GradleWorkerMain.java:74)
+
+2026-06-07 17:16:36.383 DEBUG [trace:794d496fc71c44baa8a92e7c4711da5d] [event:] [module:SHOP] --- [    Test worker] org.hibernate.SQL                        : select su1_0.id,su1_0.address,su1_0.address_apartment,su1_0.address_entrance,su1_0.address_floor,su1_0.address_house,su1_0.address_intercom,su1_0.address_street,su1_0.created_at,su1_0.email,su1_0.full_name,su1_0.is_admin,su1_0.is_enabled,su1_0.password_hash,su1_0.phone,su1_0.review_replies_seen_at,su1_0.updated_at,su1_0.username from shop.shop_user su1_0 where su1_0.username=?
+2026-06-07 17:16:36.449  INFO [trace:794d496fc71c44baa8a92e7c4711da5d] [event:] [module:SHOP] --- [    Test worker] c.e.gqw.shop.service.CurrentUserService  : Method started CurrentUserService.findCurrentUser (operation='read data', layer=SERVICE, traceId='794d496fc71c44baa8a92e7c4711da5d', eventUid='').
+2026-06-07 17:16:36.450 DEBUG [trace:794d496fc71c44baa8a92e7c4711da5d] [event:] [module:SHOP] --- [    Test worker] org.hibernate.SQL                        : select su1_0.id,su1_0.address,su1_0.address_apartment,su1_0.address_entrance,su1_0.address_floor,su1_0.address_house,su1_0.address_intercom,su1_0.address_street,su1_0.created_at,su1_0.email,su1_0.full_name,su1_0.is_admin,su1_0.is_enabled,su1_0.password_hash,su1_0.phone,su1_0.review_replies_seen_at,su1_0.updated_at,su1_0.username from shop.shop_user su1_0 where su1_0.username=?
+2026-06-07 17:16:36.450  INFO [trace:794d496fc71c44baa8a92e7c4711da5d] [event:] [module:SHOP] --- [    Test worker] c.e.gqw.shop.service.CurrentUserService  : Method finished successfully CurrentUserService.findCurrentUser: operation='read data', layer=SERVICE, durationMs=1, traceId='794d496fc71c44baa8a92e7c4711da5d', eventUid=''.
+2026-06-07 17:16:36.450 DEBUG [trace:794d496fc71c44baa8a92e7c4711da5d] [event:] [module:SHOP] --- [    Test worker] org.hibernate.SQL                        : select et1_0.code,et1_0.description,et1_0.is_active,et1_0.is_system,et1_0.module_code,et1_0.name from analytics.event_type et1_0 where et1_0.code=?
+2026-06-07 17:16:36.450  WARN [trace:794d496fc71c44baa8a92e7c4711da5d] [event:] [module:SHOP] --- [    Test worker] c.e.g.a.aop.AnalyticsEventAspect         : Analytics event tracking skipped for code=LOGIN path=/login reason=Unknown event type: LOGIN
+
+java.lang.IllegalArgumentException: Unknown event type: LOGIN
+	at com.example.gqw.analytics.service.AnalyticsEventService.lambda$createEvent$0(AnalyticsEventService.java:55)
+	at java.base/java.util.Optional.orElseThrow(Optional.java:403)
+	at com.example.gqw.analytics.service.AnalyticsEventService.createEvent(AnalyticsEventService.java:55)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.springframework.aop.support.AopUtils.invokeJoinpointUsingReflection(AopUtils.java:359)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.invokeJoinpoint(ReflectiveMethodInvocation.java:190)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:158)
+	at org.springframework.transaction.interceptor.TransactionInterceptor$1.proceedWithInvocation(TransactionInterceptor.java:133)
+	at org.springframework.transaction.interceptor.TransactionAspectSupport.invokeWithinTransaction(TransactionAspectSupport.java:371)
+	at org.springframework.transaction.interceptor.TransactionInterceptor.invoke(TransactionInterceptor.java:130)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.aspectj.MethodInvocationProceedingJoinPoint.proceed(MethodInvocationProceedingJoinPoint.java:82)
+	at com.example.gqw.analytics.logging.AnalyticsMethodLoggingAspect.logMethodExecution(AnalyticsMethodLoggingAspect.java:80)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.springframework.aop.aspectj.AbstractAspectJAdvice.invokeAdviceMethodWithGivenArgs(AbstractAspectJAdvice.java:648)
+	at org.springframework.aop.aspectj.AbstractAspectJAdvice.invokeAdviceMethod(AbstractAspectJAdvice.java:630)
+	at org.springframework.aop.aspectj.AspectJAroundAdvice.invoke(AspectJAroundAdvice.java:70)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.aspectj.MethodInvocationProceedingJoinPoint.proceed(MethodInvocationProceedingJoinPoint.java:82)
+	at com.example.gqw.analytics.aop.AnalyticsServiceStageAspect.aroundServiceStage(AnalyticsServiceStageAspect.java:38)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.springframework.aop.aspectj.AbstractAspectJAdvice.invokeAdviceMethodWithGivenArgs(AbstractAspectJAdvice.java:648)
+	at org.springframework.aop.aspectj.AbstractAspectJAdvice.invokeAdviceMethod(AbstractAspectJAdvice.java:630)
+	at org.springframework.aop.aspectj.AspectJAroundAdvice.invoke(AspectJAroundAdvice.java:70)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.interceptor.ExposeInvocationInterceptor.invoke(ExposeInvocationInterceptor.java:96)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.framework.CglibAopProxy$DynamicAdvisedInterceptor.intercept(CglibAopProxy.java:719)
+	at com.example.gqw.analytics.service.AnalyticsEventService$$SpringCGLIB$$0.createEvent(<generated>)
+	at com.example.gqw.analytics.service.AnalyticsTrackerFacade.startEvent(AnalyticsTrackerFacade.java:35)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.springframework.aop.support.AopUtils.invokeJoinpointUsingReflection(AopUtils.java:359)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.invokeJoinpoint(ReflectiveMethodInvocation.java:190)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:158)
+	at org.springframework.transaction.interceptor.TransactionInterceptor$1.proceedWithInvocation(TransactionInterceptor.java:133)
+	at org.springframework.transaction.interceptor.TransactionAspectSupport.invokeWithinTransaction(TransactionAspectSupport.java:371)
+	at org.springframework.transaction.interceptor.TransactionInterceptor.invoke(TransactionInterceptor.java:130)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.aspectj.MethodInvocationProceedingJoinPoint.proceed(MethodInvocationProceedingJoinPoint.java:82)
+	at com.example.gqw.analytics.logging.AnalyticsMethodLoggingAspect.logMethodExecution(AnalyticsMethodLoggingAspect.java:80)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.springframework.aop.aspectj.AbstractAspectJAdvice.invokeAdviceMethodWithGivenArgs(AbstractAspectJAdvice.java:648)
+	at org.springframework.aop.aspectj.AbstractAspectJAdvice.invokeAdviceMethod(AbstractAspectJAdvice.java:630)
+	at org.springframework.aop.aspectj.AspectJAroundAdvice.invoke(AspectJAroundAdvice.java:70)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.aspectj.MethodInvocationProceedingJoinPoint.proceed(MethodInvocationProceedingJoinPoint.java:82)
+	at com.example.gqw.analytics.aop.AnalyticsServiceStageAspect.aroundServiceStage(AnalyticsServiceStageAspect.java:38)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.springframework.aop.aspectj.AbstractAspectJAdvice.invokeAdviceMethodWithGivenArgs(AbstractAspectJAdvice.java:648)
+	at org.springframework.aop.aspectj.AbstractAspectJAdvice.invokeAdviceMethod(AbstractAspectJAdvice.java:630)
+	at org.springframework.aop.aspectj.AspectJAroundAdvice.invoke(AspectJAroundAdvice.java:70)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.interceptor.ExposeInvocationInterceptor.invoke(ExposeInvocationInterceptor.java:96)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.framework.CglibAopProxy$DynamicAdvisedInterceptor.intercept(CglibAopProxy.java:719)
+	at com.example.gqw.analytics.service.AnalyticsTrackerFacade$$SpringCGLIB$$0.startEvent(<generated>)
+	at com.example.gqw.analytics.aop.AnalyticsEventAspect.aroundTrackedMethod(AnalyticsEventAspect.java:101)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.springframework.aop.aspectj.AbstractAspectJAdvice.invokeAdviceMethodWithGivenArgs(AbstractAspectJAdvice.java:648)
+	at org.springframework.aop.aspectj.AbstractAspectJAdvice.invokeAdviceMethod(AbstractAspectJAdvice.java:630)
+	at org.springframework.aop.aspectj.AspectJAroundAdvice.invoke(AspectJAroundAdvice.java:70)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:168)
+	at org.springframework.aop.interceptor.ExposeInvocationInterceptor.invoke(ExposeInvocationInterceptor.java:96)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.framework.CglibAopProxy$DynamicAdvisedInterceptor.intercept(CglibAopProxy.java:719)
+	at com.example.gqw.analytics.service.LoginAnalyticsService$$SpringCGLIB$$0.trackSuccess(<generated>)
+	at com.example.gqw.config.SecurityConfig.safeTrackLoginSuccess(SecurityConfig.java:86)
+	at com.example.gqw.config.SecurityConfig.lambda$securityFilterChain$2(SecurityConfig.java:58)
+	at org.springframework.security.web.authentication.AbstractAuthenticationProcessingFilter.successfulAuthentication(AbstractAuthenticationProcessingFilter.java:405)
+	at org.springframework.security.web.authentication.AbstractAuthenticationProcessingFilter.doFilter(AbstractAuthenticationProcessingFilter.java:280)
+	at org.springframework.security.web.authentication.AbstractAuthenticationProcessingFilter.doFilter(AbstractAuthenticationProcessingFilter.java:239)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:380)
+	at org.springframework.security.web.authentication.logout.LogoutFilter.doFilter(LogoutFilter.java:110)
+	at org.springframework.security.web.authentication.logout.LogoutFilter.doFilter(LogoutFilter.java:96)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:380)
+	at org.springframework.security.web.csrf.CsrfFilter.doFilterInternal(CsrfFilter.java:135)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:380)
+	at org.springframework.security.web.header.HeaderWriterFilter.doHeadersAfter(HeaderWriterFilter.java:90)
+	at org.springframework.security.web.header.HeaderWriterFilter.doFilterInternal(HeaderWriterFilter.java:75)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:380)
+	at org.springframework.security.web.context.SecurityContextHolderFilter.doFilter(SecurityContextHolderFilter.java:82)
+	at org.springframework.security.web.context.SecurityContextHolderFilter.doFilter(SecurityContextHolderFilter.java:69)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:380)
+	at org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter.doFilterInternal(WebAsyncManagerIntegrationFilter.java:62)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:380)
+	at org.springframework.security.web.session.DisableEncodeUrlFilter.doFilterInternal(DisableEncodeUrlFilter.java:42)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:380)
+	at org.springframework.security.web.FilterChainProxy.doFilterInternal(FilterChainProxy.java:237)
+	at org.springframework.security.web.FilterChainProxy.doFilter(FilterChainProxy.java:195)
+	at org.springframework.web.filter.CompositeFilter$VirtualFilterChain.doFilter(CompositeFilter.java:113)
+	at org.springframework.web.filter.ServletRequestPathFilter.doFilter(ServletRequestPathFilter.java:52)
+	at org.springframework.web.filter.CompositeFilter$VirtualFilterChain.doFilter(CompositeFilter.java:113)
+	at org.springframework.web.filter.CompositeFilter.doFilter(CompositeFilter.java:74)
+	at org.springframework.security.config.annotation.web.configuration.WebSecurityConfiguration$CompositeFilterChainProxy.doFilter(WebSecurityConfiguration.java:317)
+	at org.springframework.web.filter.DelegatingFilterProxy.invokeDelegate(DelegatingFilterProxy.java:355)
+	at org.springframework.web.filter.DelegatingFilterProxy.doFilter(DelegatingFilterProxy.java:272)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.RequestContextFilter.doFilterInternal(RequestContextFilter.java:100)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.FormContentFilter.doFilterInternal(FormContentFilter.java:93)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at com.example.gqw.config.TraceIdFilter.doFilterInternal(TraceIdFilter.java:58)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at com.example.gqw.analytics.logging.AppModuleMdcFilter.doFilterInternal(AppModuleMdcFilter.java:34)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.CharacterEncodingFilter.doFilterInternal(CharacterEncodingFilter.java:199)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.test.web.servlet.MockMvc.perform(MockMvc.java:199)
+	at com.example.gqw.AnalyticsIntegrationTest.loginAs(AnalyticsIntegrationTest.java:622)
+	at com.example.gqw.AnalyticsIntegrationTest.analyticsApiForbidsNonAdminUser(AnalyticsIntegrationTest.java:185)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.junit.platform.commons.util.ReflectionUtils.invokeMethod(ReflectionUtils.java:701)
+	at org.junit.platform.commons.support.ReflectionSupport.invokeMethod(ReflectionSupport.java:502)
+	at org.junit.jupiter.engine.support.MethodReflectionUtils.invoke(MethodReflectionUtils.java:45)
+	at org.junit.jupiter.engine.execution.MethodInvocation.proceed(MethodInvocation.java:61)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$ValidatingInvocation.proceed(InvocationInterceptorChain.java:124)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.intercept(TimeoutExtension.java:163)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestableMethod(TimeoutExtension.java:148)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestMethod(TimeoutExtension.java:86)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker$ReflectiveInterceptorCall.lambda$ofVoidMethod$0(InterceptingExecutableInvoker.java:123)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.lambda$invoke$0(InterceptingExecutableInvoker.java:105)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$InterceptedInvocation.proceed(InvocationInterceptorChain.java:99)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.proceed(InvocationInterceptorChain.java:66)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.chainAndInvoke(InvocationInterceptorChain.java:47)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.invoke(InvocationInterceptorChain.java:39)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:104)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:98)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invokeVoid(InterceptingExecutableInvoker.java:71)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.lambda$invokeTestMethod$0(TestMethodTestDescriptor.java:219)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:74)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.invokeTestMethod(TestMethodTestDescriptor.java:215)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:157)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:70)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$2(NodeTestTask.java:176)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:74)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$1(NodeTestTask.java:166)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:138)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$0(NodeTestTask.java:164)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:74)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:163)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:116)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:42)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$2(NodeTestTask.java:180)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:74)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$1(NodeTestTask.java:166)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:138)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$0(NodeTestTask.java:164)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:74)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:163)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:116)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:42)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$2(NodeTestTask.java:180)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:74)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$1(NodeTestTask.java:166)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:138)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$0(NodeTestTask.java:164)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:74)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:163)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:116)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.submit(SameThreadHierarchicalTestExecutorService.java:36)
+	at org.junit.platform.engine.support.hierarchical.HierarchicalTestExecutor.execute(HierarchicalTestExecutor.java:52)
+	at org.junit.platform.engine.support.hierarchical.HierarchicalTestEngine.execute(HierarchicalTestEngine.java:58)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.executeEngine(EngineExecutionOrchestrator.java:246)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.failOrExecuteEngine(EngineExecutionOrchestrator.java:218)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:179)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:108)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.lambda$execute$0(EngineExecutionOrchestrator.java:66)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.withInterceptedStreams(EngineExecutionOrchestrator.java:157)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:65)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:125)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:114)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:93)
+	at org.junit.platform.launcher.core.DelegatingLauncher.execute(DelegatingLauncher.java:48)
+	at org.junit.platform.launcher.core.InterceptingLauncher.lambda$execute$0(InterceptingLauncher.java:41)
+	at org.junit.platform.launcher.core.ClasspathAlignmentCheckingLauncherInterceptor.intercept(ClasspathAlignmentCheckingLauncherInterceptor.java:25)
+	at org.junit.platform.launcher.core.InterceptingLauncher.execute(InterceptingLauncher.java:40)
+	at org.junit.platform.launcher.core.DelegatingLauncher.execute(DelegatingLauncher.java:48)
+	at org.gradle.api.internal.tasks.testing.junitplatform.JUnitPlatformTestDefinitionProcessor$CollectThenExecuteTestDefinitionConsumer.processAllTestDefinitions(JUnitPlatformTestDefinitionProcessor.java:179)
+	at org.gradle.api.internal.tasks.testing.junitplatform.JUnitPlatformTestDefinitionProcessor$CollectThenExecuteTestDefinitionConsumer.access$000(JUnitPlatformTestDefinitionProcessor.java:122)
+	at org.gradle.api.internal.tasks.testing.junitplatform.JUnitPlatformTestDefinitionProcessor.stop(JUnitPlatformTestDefinitionProcessor.java:116)
+	at org.gradle.api.internal.tasks.testing.SuiteTestDefinitionProcessor.stop(SuiteTestDefinitionProcessor.java:63)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.gradle.internal.dispatch.MethodInvocation.invokeOn(MethodInvocation.java:77)
+	at org.gradle.internal.dispatch.ReflectionDispatch.dispatch(ReflectionDispatch.java:28)
+	at org.gradle.internal.dispatch.ReflectionDispatch.dispatch(ReflectionDispatch.java:19)
+	at org.gradle.internal.dispatch.ContextClassLoaderDispatch.dispatch(ContextClassLoaderDispatch.java:33)
+	at org.gradle.internal.dispatch.ProxyDispatchAdapter$DispatchingInvocationHandler.invoke(ProxyDispatchAdapter.java:88)
+	at jdk.proxy1/jdk.proxy1.$Proxy4.stop(Unknown Source)
+	at org.gradle.api.internal.tasks.testing.worker.TestWorker$3.run(TestWorker.java:195)
+	at org.gradle.api.internal.tasks.testing.worker.TestWorker.executeAndMaintainThreadName(TestWorker.java:126)
+	at org.gradle.api.internal.tasks.testing.worker.TestWorker.execute(TestWorker.java:103)
+	at org.gradle.api.internal.tasks.testing.worker.TestWorker.execute(TestWorker.java:63)
+	at org.gradle.process.internal.worker.child.ActionExecutionWorker.execute(ActionExecutionWorker.java:56)
+	at org.gradle.process.internal.worker.child.SystemApplicationClassLoaderWorker.call(SystemApplicationClassLoaderWorker.java:122)
+	at org.gradle.process.internal.worker.child.SystemApplicationClassLoaderWorker.call(SystemApplicationClassLoaderWorker.java:72)
+	at worker.org.gradle.process.internal.worker.GradleWorkerMain.run(GradleWorkerMain.java:69)
+	at worker.org.gradle.process.internal.worker.GradleWorkerMain.main(GradleWorkerMain.java:74)
+
+2026-06-07 17:16:38.572  INFO [trace:acea8d8b60f0442ca775b51c3e997beb] [event:538a02ae-1f00-4a43-a227-15055824ee2d] [module:SHOP] --- [nio-8080-exec-8] c.e.g.shop.controller.CatalogController  : Method started CatalogController.delivery (operation='handle incoming request', layer=CONTROLLER, traceId='acea8d8b60f0442ca775b51c3e997beb', eventUid='538a02ae-1f00-4a43-a227-15055824ee2d').
+2026-06-07 17:16:38.576  INFO [trace:acea8d8b60f0442ca775b51c3e997beb] [event:538a02ae-1f00-4a43-a227-15055824ee2d] [module:SHOP] --- [nio-8080-exec-8] c.e.g.shop.controller.CatalogController  : Method finished successfully CatalogController.delivery: operation='handle incoming request', layer=CONTROLLER, durationMs=4, traceId='acea8d8b60f0442ca775b51c3e997beb', eventUid='538a02ae-1f00-4a43-a227-15055824ee2d'.
+2026-06-07 17:16:39.541  INFO [trace:3ccc43eacc334caba0aa172d07ebeeb9] [event:] [module:SHOP] --- [nio-8080-exec-1] c.e.gqw.shop.service.CatalogService      : Method started CatalogService.topCategories (operation='execute business operation', layer=SERVICE, traceId='3ccc43eacc334caba0aa172d07ebeeb9', eventUid='').
+2026-06-07 17:16:39.543  INFO [trace:3ccc43eacc334caba0aa172d07ebeeb9] [event:] [module:SHOP] --- [nio-8080-exec-1] c.e.gqw.shop.service.CatalogService      : Method finished successfully CatalogService.topCategories: operation='execute business operation', layer=SERVICE, durationMs=2, traceId='3ccc43eacc334caba0aa172d07ebeeb9', eventUid=''.
+2026-06-07 17:16:39.543  INFO [trace:3ccc43eacc334caba0aa172d07ebeeb9] [event:] [module:SHOP] --- [nio-8080-exec-1] c.e.gqw.shop.service.CurrentUserService  : Method started CurrentUserService.findCurrentUser (operation='read data', layer=SERVICE, traceId='3ccc43eacc334caba0aa172d07ebeeb9', eventUid='').
+2026-06-07 17:16:39.543  INFO [trace:3ccc43eacc334caba0aa172d07ebeeb9] [event:] [module:SHOP] --- [nio-8080-exec-1] c.e.gqw.shop.service.CurrentUserService  : Method finished successfully CurrentUserService.findCurrentUser: operation='read data', layer=SERVICE, durationMs=0, traceId='3ccc43eacc334caba0aa172d07ebeeb9', eventUid=''.
+2026-06-07 17:16:39.543  INFO [trace:3ccc43eacc334caba0aa172d07ebeeb9] [event:] [module:SHOP] --- [nio-8080-exec-1] c.e.gqw.shop.service.CurrentUserService  : Method started CurrentUserService.findCurrentUser (operation='read data', layer=SERVICE, traceId='3ccc43eacc334caba0aa172d07ebeeb9', eventUid='').
+2026-06-07 17:16:39.543  INFO [trace:3ccc43eacc334caba0aa172d07ebeeb9] [event:] [module:SHOP] --- [nio-8080-exec-1] c.e.gqw.shop.service.CurrentUserService  : Method finished successfully CurrentUserService.findCurrentUser: operation='read data', layer=SERVICE, durationMs=0, traceId='3ccc43eacc334caba0aa172d07ebeeb9', eventUid=''.
+2026-06-07 17:16:39.544  INFO [trace:3ccc43eacc334caba0aa172d07ebeeb9] [event:] [module:SHOP] --- [nio-8080-exec-1] c.example.gqw.shop.service.CartService   : Method started CartService.items (operation='read data', layer=SERVICE, traceId='3ccc43eacc334caba0aa172d07ebeeb9', eventUid='').
+2026-06-07 17:16:39.544  INFO [trace:3ccc43eacc334caba0aa172d07ebeeb9] [event:] [module:SHOP] --- [nio-8080-exec-1] c.e.gqw.shop.service.CurrentUserService  : Method started CurrentUserService.findCurrentUser (operation='read data', layer=SERVICE, traceId='3ccc43eacc334caba0aa172d07ebeeb9', eventUid='').
+2026-06-07 17:16:39.544  INFO [trace:3ccc43eacc334caba0aa172d07ebeeb9] [event:] [module:SHOP] --- [nio-8080-exec-1] c.e.gqw.shop.service.CurrentUserService  : Method finished successfully CurrentUserService.findCurrentUser: operation='read data', layer=SERVICE, durationMs=0, traceId='3ccc43eacc334caba0aa172d07ebeeb9', eventUid=''.
+2026-06-07 17:16:39.545  INFO [trace:3ccc43eacc334caba0aa172d07ebeeb9] [event:] [module:SHOP] --- [nio-8080-exec-1] c.example.gqw.shop.service.CartService   : Method finished successfully CartService.items: operation='read data', layer=SERVICE, durationMs=0, traceId='3ccc43eacc334caba0aa172d07ebeeb9', eventUid=''.
+2026-06-07 17:16:39.545  INFO [trace:3ccc43eacc334caba0aa172d07ebeeb9] [event:] [module:SHOP] --- [nio-8080-exec-1] c.e.gqw.shop.service.WishlistService     : Method started WishlistService.items (operation='read data', layer=SERVICE, traceId='3ccc43eacc334caba0aa172d07ebeeb9', eventUid='').
+2026-06-07 17:16:39.545  INFO [trace:3ccc43eacc334caba0aa172d07ebeeb9] [event:] [module:SHOP] --- [nio-8080-exec-1] c.e.gqw.shop.service.CurrentUserService  : Method started CurrentUserService.findCurrentUser (operation='read data', layer=SERVICE, traceId='3ccc43eacc334caba0aa172d07ebeeb9', eventUid='').
+2026-06-07 17:16:39.545  INFO [trace:3ccc43eacc334caba0aa172d07ebeeb9] [event:] [module:SHOP] --- [nio-8080-exec-1] c.e.gqw.shop.service.CurrentUserService  : Method finished successfully CurrentUserService.findCurrentUser: operation='read data', layer=SERVICE, durationMs=0, traceId='3ccc43eacc334caba0aa172d07ebeeb9', eventUid=''.
+2026-06-07 17:16:39.546  INFO [trace:3ccc43eacc334caba0aa172d07ebeeb9] [event:] [module:SHOP] --- [nio-8080-exec-1] c.e.gqw.shop.service.WishlistService     : Method finished successfully WishlistService.items: operation='read data', layer=SERVICE, durationMs=0, traceId='3ccc43eacc334caba0aa172d07ebeeb9', eventUid=''.
+2026-06-07 17:16:39.546  INFO [trace:3ccc43eacc334caba0aa172d07ebeeb9] [event:] [module:SHOP] --- [nio-8080-exec-1] c.e.gqw.shop.service.WishlistService     : Method started WishlistService.count (operation='count data', layer=SERVICE, traceId='3ccc43eacc334caba0aa172d07ebeeb9', eventUid='').
+2026-06-07 17:16:39.546  INFO [trace:3ccc43eacc334caba0aa172d07ebeeb9] [event:] [module:SHOP] --- [nio-8080-exec-1] c.e.gqw.shop.service.CurrentUserService  : Method started CurrentUserService.findCurrentUser (operation='read data', layer=SERVICE, traceId='3ccc43eacc334caba0aa172d07ebeeb9', eventUid='').
+2026-06-07 17:16:39.546  INFO [trace:3ccc43eacc334caba0aa172d07ebeeb9] [event:] [module:SHOP] --- [nio-8080-exec-1] c.e.gqw.shop.service.CurrentUserService  : Method finished successfully CurrentUserService.findCurrentUser: operation='read data', layer=SERVICE, durationMs=0, traceId='3ccc43eacc334caba0aa172d07ebeeb9', eventUid=''.
+2026-06-07 17:16:39.547  INFO [trace:3ccc43eacc334caba0aa172d07ebeeb9] [event:] [module:SHOP] --- [nio-8080-exec-1] c.e.gqw.shop.service.WishlistService     : Method finished successfully WishlistService.count: operation='count data', layer=SERVICE, durationMs=1, traceId='3ccc43eacc334caba0aa172d07ebeeb9', eventUid=''.
+2026-06-07 17:16:39.547  INFO [trace:3ccc43eacc334caba0aa172d07ebeeb9] [event:] [module:SHOP] --- [nio-8080-exec-1] c.e.gqw.shop.service.CatalogService      : Method started CatalogService.topCategories (operation='execute business operation', layer=SERVICE, traceId='3ccc43eacc334caba0aa172d07ebeeb9', eventUid='').
+2026-06-07 17:16:39.548  INFO [trace:3ccc43eacc334caba0aa172d07ebeeb9] [event:] [module:SHOP] --- [nio-8080-exec-1] c.e.gqw.shop.service.CatalogService      : Method finished successfully CatalogService.topCategories: operation='execute business operation', layer=SERVICE, durationMs=0, traceId='3ccc43eacc334caba0aa172d07ebeeb9', eventUid=''.
+2026-06-07 17:16:39.548  INFO [trace:3ccc43eacc334caba0aa172d07ebeeb9] [event:] [module:SHOP] --- [nio-8080-exec-1] c.e.gqw.shop.service.CatalogService      : Method started CatalogService.subcategoriesByParentId (operation='execute business operation', layer=SERVICE, traceId='3ccc43eacc334caba0aa172d07ebeeb9', eventUid='').
+2026-06-07 17:16:39.552  INFO [trace:3ccc43eacc334caba0aa172d07ebeeb9] [event:] [module:SHOP] --- [nio-8080-exec-1] c.e.gqw.shop.service.CatalogService      : Method finished successfully CatalogService.subcategoriesByParentId: operation='execute business operation', layer=SERVICE, durationMs=3, traceId='3ccc43eacc334caba0aa172d07ebeeb9', eventUid=''.
+2026-06-07 17:16:39.552  INFO [trace:3ccc43eacc334caba0aa172d07ebeeb9] [event:] [module:SHOP] --- [nio-8080-exec-1] c.example.gqw.shop.service.CartService   : Method started CartService.items (operation='read data', layer=SERVICE, traceId='3ccc43eacc334caba0aa172d07ebeeb9', eventUid='').
+2026-06-07 17:16:39.552  INFO [trace:3ccc43eacc334caba0aa172d07ebeeb9] [event:] [module:SHOP] --- [nio-8080-exec-1] c.e.gqw.shop.service.CurrentUserService  : Method started CurrentUserService.findCurrentUser (operation='read data', layer=SERVICE, traceId='3ccc43eacc334caba0aa172d07ebeeb9', eventUid='').
+2026-06-07 17:16:39.552  INFO [trace:3ccc43eacc334caba0aa172d07ebeeb9] [event:] [module:SHOP] --- [nio-8080-exec-1] c.e.gqw.shop.service.CurrentUserService  : Method finished successfully CurrentUserService.findCurrentUser: operation='read data', layer=SERVICE, durationMs=0, traceId='3ccc43eacc334caba0aa172d07ebeeb9', eventUid=''.
+2026-06-07 17:16:39.553  INFO [trace:3ccc43eacc334caba0aa172d07ebeeb9] [event:] [module:SHOP] --- [nio-8080-exec-1] c.example.gqw.shop.service.CartService   : Method finished successfully CartService.items: operation='read data', layer=SERVICE, durationMs=1, traceId='3ccc43eacc334caba0aa172d07ebeeb9', eventUid=''.
+2026-06-07 17:16:39.553  INFO [trace:3ccc43eacc334caba0aa172d07ebeeb9] [event:] [module:SHOP] --- [nio-8080-exec-1] c.e.gqw.shop.service.CurrentUserService  : Method started CurrentUserService.findCurrentUser (operation='read data', layer=SERVICE, traceId='3ccc43eacc334caba0aa172d07ebeeb9', eventUid='').
+2026-06-07 17:16:39.553  INFO [trace:3ccc43eacc334caba0aa172d07ebeeb9] [event:] [module:SHOP] --- [nio-8080-exec-1] c.e.gqw.shop.service.CurrentUserService  : Method finished successfully CurrentUserService.findCurrentUser: operation='read data', layer=SERVICE, durationMs=0, traceId='3ccc43eacc334caba0aa172d07ebeeb9', eventUid=''.
+2026-06-07 17:16:39.572  INFO [trace:3ccc43eacc334caba0aa172d07ebeeb9] [event:464f6771-5992-48bf-a89e-9ed680f19fbb] [module:SHOP] --- [nio-8080-exec-1] c.e.g.shop.controller.SupportController  : Method started SupportController.supportPage (operation='handle incoming request', layer=CONTROLLER, traceId='3ccc43eacc334caba0aa172d07ebeeb9', eventUid='464f6771-5992-48bf-a89e-9ed680f19fbb').
+2026-06-07 17:16:39.572  INFO [trace:3ccc43eacc334caba0aa172d07ebeeb9] [event:464f6771-5992-48bf-a89e-9ed680f19fbb] [module:SHOP] --- [nio-8080-exec-1] c.e.g.shop.controller.SupportController  : Method finished successfully SupportController.supportPage: operation='handle incoming request', layer=CONTROLLER, durationMs=0, traceId='3ccc43eacc334caba0aa172d07ebeeb9', eventUid='464f6771-5992-48bf-a89e-9ed680f19fbb'.
+2026-06-07 17:16:40.254  INFO [trace:7cbaae21bb674d68bf010df6b7d832f4] [event:74b42b03-1297-4ffa-b0df-5e335d6f5ca0] [module:SHOP] --- [nio-8080-exec-7] c.e.g.shop.controller.CatalogController  : Method started CatalogController.catalog (operation='handle incoming request', layer=CONTROLLER, traceId='7cbaae21bb674d68bf010df6b7d832f4', eventUid='74b42b03-1297-4ffa-b0df-5e335d6f5ca0').
+2026-06-07 17:16:40.256  INFO [trace:7cbaae21bb674d68bf010df6b7d832f4] [event:74b42b03-1297-4ffa-b0df-5e335d6f5ca0] [module:SHOP] --- [nio-8080-exec-7] c.e.gqw.shop.service.CatalogService      : Method started CatalogService.topCategories (operation='execute business operation', layer=SERVICE, traceId='7cbaae21bb674d68bf010df6b7d832f4', eventUid='74b42b03-1297-4ffa-b0df-5e335d6f5ca0').
+2026-06-07 17:16:40.282  INFO [trace:7cbaae21bb674d68bf010df6b7d832f4] [event:74b42b03-1297-4ffa-b0df-5e335d6f5ca0] [module:SHOP] --- [nio-8080-exec-7] analytics.db.stage                       : DB_STAGE_START stageId=9674576 method=CategoryRepository.findByParentIsNullAndIsPublishedTrueOrderByIdAsc traceId='7cbaae21bb674d68bf010df6b7d832f4' eventUid='74b42b03-1297-4ffa-b0df-5e335d6f5ca0'
+2026-06-07 17:16:40.297  INFO [trace:7cbaae21bb674d68bf010df6b7d832f4] [event:74b42b03-1297-4ffa-b0df-5e335d6f5ca0] [module:SHOP] --- [nio-8080-exec-7] jdk.proxy6.$Proxy251                     : Database call completed successfully CategoryRepository.findByParentIsNullAndIsPublishedTrueOrderByIdAsc: layer=DATABASE, stageId=9674576, durationMs=15, traceId='7cbaae21bb674d68bf010df6b7d832f4', eventUid='74b42b03-1297-4ffa-b0df-5e335d6f5ca0'.
+2026-06-07 17:16:40.298  INFO [trace:7cbaae21bb674d68bf010df6b7d832f4] [event:74b42b03-1297-4ffa-b0df-5e335d6f5ca0] [module:SHOP] --- [nio-8080-exec-7] analytics.db.stage                       : DB_STAGE_END stageId=9674576 method=CategoryRepository.findByParentIsNullAndIsPublishedTrueOrderByIdAsc durationMs=15 traceId='7cbaae21bb674d68bf010df6b7d832f4' eventUid='74b42b03-1297-4ffa-b0df-5e335d6f5ca0'
+2026-06-07 17:16:40.299  INFO [trace:7cbaae21bb674d68bf010df6b7d832f4] [event:74b42b03-1297-4ffa-b0df-5e335d6f5ca0] [module:SHOP] --- [nio-8080-exec-7] c.e.gqw.shop.service.CatalogService      : Method finished successfully CatalogService.topCategories: operation='execute business operation', layer=SERVICE, durationMs=42, traceId='7cbaae21bb674d68bf010df6b7d832f4', eventUid='74b42b03-1297-4ffa-b0df-5e335d6f5ca0'.
+2026-06-07 17:16:40.307  INFO [trace:7cbaae21bb674d68bf010df6b7d832f4] [event:74b42b03-1297-4ffa-b0df-5e335d6f5ca0] [module:SHOP] --- [nio-8080-exec-7] c.e.g.shop.controller.CatalogController  : Method finished successfully CatalogController.catalog: operation='handle incoming request', layer=CONTROLLER, durationMs=52, traceId='7cbaae21bb674d68bf010df6b7d832f4', eventUid='74b42b03-1297-4ffa-b0df-5e335d6f5ca0'.
+2026-06-07 17:16:42.509  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:] [module:SHOP] --- [nio-8080-exec-8] c.e.gqw.shop.service.CatalogService      : Method started CatalogService.topCategories (operation='execute business operation', layer=SERVICE, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='').
+2026-06-07 17:16:42.510  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:] [module:SHOP] --- [nio-8080-exec-8] c.e.gqw.shop.service.CatalogService      : Method finished successfully CatalogService.topCategories: operation='execute business operation', layer=SERVICE, durationMs=1, traceId='9cc601abc1994554b7b604f993a02eed', eventUid=''.
+2026-06-07 17:16:42.511  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:] [module:SHOP] --- [nio-8080-exec-8] c.e.gqw.shop.service.CurrentUserService  : Method started CurrentUserService.findCurrentUser (operation='read data', layer=SERVICE, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='').
+2026-06-07 17:16:42.511  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:] [module:SHOP] --- [nio-8080-exec-8] c.e.gqw.shop.service.CurrentUserService  : Method finished successfully CurrentUserService.findCurrentUser: operation='read data', layer=SERVICE, durationMs=0, traceId='9cc601abc1994554b7b604f993a02eed', eventUid=''.
+2026-06-07 17:16:42.511  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:] [module:SHOP] --- [nio-8080-exec-8] c.e.gqw.shop.service.CurrentUserService  : Method started CurrentUserService.findCurrentUser (operation='read data', layer=SERVICE, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='').
+2026-06-07 17:16:42.511  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:] [module:SHOP] --- [nio-8080-exec-8] c.e.gqw.shop.service.CurrentUserService  : Method finished successfully CurrentUserService.findCurrentUser: operation='read data', layer=SERVICE, durationMs=0, traceId='9cc601abc1994554b7b604f993a02eed', eventUid=''.
+2026-06-07 17:16:42.511  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:] [module:SHOP] --- [nio-8080-exec-8] c.example.gqw.shop.service.CartService   : Method started CartService.items (operation='read data', layer=SERVICE, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='').
+2026-06-07 17:16:42.511  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:] [module:SHOP] --- [nio-8080-exec-8] c.e.gqw.shop.service.CurrentUserService  : Method started CurrentUserService.findCurrentUser (operation='read data', layer=SERVICE, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='').
+2026-06-07 17:16:42.511  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:] [module:SHOP] --- [nio-8080-exec-8] c.e.gqw.shop.service.CurrentUserService  : Method finished successfully CurrentUserService.findCurrentUser: operation='read data', layer=SERVICE, durationMs=0, traceId='9cc601abc1994554b7b604f993a02eed', eventUid=''.
+2026-06-07 17:16:42.512  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:] [module:SHOP] --- [nio-8080-exec-8] c.example.gqw.shop.service.CartService   : Method finished successfully CartService.items: operation='read data', layer=SERVICE, durationMs=0, traceId='9cc601abc1994554b7b604f993a02eed', eventUid=''.
+2026-06-07 17:16:42.512  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:] [module:SHOP] --- [nio-8080-exec-8] c.e.gqw.shop.service.WishlistService     : Method started WishlistService.items (operation='read data', layer=SERVICE, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='').
+2026-06-07 17:16:42.512  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:] [module:SHOP] --- [nio-8080-exec-8] c.e.gqw.shop.service.CurrentUserService  : Method started CurrentUserService.findCurrentUser (operation='read data', layer=SERVICE, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='').
+2026-06-07 17:16:42.512  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:] [module:SHOP] --- [nio-8080-exec-8] c.e.gqw.shop.service.CurrentUserService  : Method finished successfully CurrentUserService.findCurrentUser: operation='read data', layer=SERVICE, durationMs=0, traceId='9cc601abc1994554b7b604f993a02eed', eventUid=''.
+2026-06-07 17:16:42.513  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:] [module:SHOP] --- [nio-8080-exec-8] c.e.gqw.shop.service.WishlistService     : Method finished successfully WishlistService.items: operation='read data', layer=SERVICE, durationMs=0, traceId='9cc601abc1994554b7b604f993a02eed', eventUid=''.
+2026-06-07 17:16:42.513  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:] [module:SHOP] --- [nio-8080-exec-8] c.e.gqw.shop.service.WishlistService     : Method started WishlistService.count (operation='count data', layer=SERVICE, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='').
+2026-06-07 17:16:42.513  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:] [module:SHOP] --- [nio-8080-exec-8] c.e.gqw.shop.service.CurrentUserService  : Method started CurrentUserService.findCurrentUser (operation='read data', layer=SERVICE, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='').
+2026-06-07 17:16:42.513  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:] [module:SHOP] --- [nio-8080-exec-8] c.e.gqw.shop.service.CurrentUserService  : Method finished successfully CurrentUserService.findCurrentUser: operation='read data', layer=SERVICE, durationMs=0, traceId='9cc601abc1994554b7b604f993a02eed', eventUid=''.
+2026-06-07 17:16:42.514  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:] [module:SHOP] --- [nio-8080-exec-8] c.e.gqw.shop.service.WishlistService     : Method finished successfully WishlistService.count: operation='count data', layer=SERVICE, durationMs=1, traceId='9cc601abc1994554b7b604f993a02eed', eventUid=''.
+2026-06-07 17:16:42.514  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:] [module:SHOP] --- [nio-8080-exec-8] c.e.gqw.shop.service.CatalogService      : Method started CatalogService.topCategories (operation='execute business operation', layer=SERVICE, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='').
+2026-06-07 17:16:42.515  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:] [module:SHOP] --- [nio-8080-exec-8] c.e.gqw.shop.service.CatalogService      : Method finished successfully CatalogService.topCategories: operation='execute business operation', layer=SERVICE, durationMs=0, traceId='9cc601abc1994554b7b604f993a02eed', eventUid=''.
+2026-06-07 17:16:42.515  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:] [module:SHOP] --- [nio-8080-exec-8] c.e.gqw.shop.service.CatalogService      : Method started CatalogService.subcategoriesByParentId (operation='execute business operation', layer=SERVICE, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='').
+2026-06-07 17:16:42.518  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:] [module:SHOP] --- [nio-8080-exec-8] c.e.gqw.shop.service.CatalogService      : Method finished successfully CatalogService.subcategoriesByParentId: operation='execute business operation', layer=SERVICE, durationMs=3, traceId='9cc601abc1994554b7b604f993a02eed', eventUid=''.
+2026-06-07 17:16:42.518  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:] [module:SHOP] --- [nio-8080-exec-8] c.example.gqw.shop.service.CartService   : Method started CartService.items (operation='read data', layer=SERVICE, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='').
+2026-06-07 17:16:42.518  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:] [module:SHOP] --- [nio-8080-exec-8] c.e.gqw.shop.service.CurrentUserService  : Method started CurrentUserService.findCurrentUser (operation='read data', layer=SERVICE, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='').
+2026-06-07 17:16:42.518  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:] [module:SHOP] --- [nio-8080-exec-8] c.e.gqw.shop.service.CurrentUserService  : Method finished successfully CurrentUserService.findCurrentUser: operation='read data', layer=SERVICE, durationMs=0, traceId='9cc601abc1994554b7b604f993a02eed', eventUid=''.
+2026-06-07 17:16:42.519  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:] [module:SHOP] --- [nio-8080-exec-8] c.example.gqw.shop.service.CartService   : Method finished successfully CartService.items: operation='read data', layer=SERVICE, durationMs=1, traceId='9cc601abc1994554b7b604f993a02eed', eventUid=''.
+2026-06-07 17:16:42.521  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:] [module:SHOP] --- [nio-8080-exec-8] c.e.gqw.shop.service.CurrentUserService  : Method started CurrentUserService.findCurrentUser (operation='read data', layer=SERVICE, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='').
+2026-06-07 17:16:42.521  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:] [module:SHOP] --- [nio-8080-exec-8] c.e.gqw.shop.service.CurrentUserService  : Method finished successfully CurrentUserService.findCurrentUser: operation='read data', layer=SERVICE, durationMs=0, traceId='9cc601abc1994554b7b604f993a02eed', eventUid=''.
+2026-06-07 17:16:42.558  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] c.e.g.shop.controller.CatalogController  : Method started CatalogController.category (operation='handle incoming request', layer=CONTROLLER, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e').
+2026-06-07 17:16:42.560  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] c.e.gqw.shop.service.CatalogService      : Method started CatalogService.categoryBySlug (operation='получение категории по slug', layer=SERVICE, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e').
+2026-06-07 17:16:42.563  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_START stageId=9674581 method=CategoryRepository.findBySlugAndIsPublishedTrue traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.568  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] jdk.proxy6.$Proxy251                     : Database call completed successfully CategoryRepository.findBySlugAndIsPublishedTrue: layer=DATABASE, stageId=9674581, durationMs=5, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'.
+2026-06-07 17:16:42.569  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_END stageId=9674581 method=CategoryRepository.findBySlugAndIsPublishedTrue durationMs=5 traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.570  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] c.e.gqw.shop.service.CatalogService      : Method finished successfully CatalogService.categoryBySlug: operation='получение категории по slug', layer=SERVICE, durationMs=9, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'.
+2026-06-07 17:16:42.575  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] c.e.gqw.shop.service.CatalogService      : Method started CatalogService.categoryCatalogData (operation='execute business operation', layer=SERVICE, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e').
+2026-06-07 17:16:42.579  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_START stageId=9674583 method=CategoryRepository.findBySlugAndIsPublishedTrue traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.581  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] jdk.proxy6.$Proxy251                     : Database call completed successfully CategoryRepository.findBySlugAndIsPublishedTrue: layer=DATABASE, stageId=9674583, durationMs=2, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'.
+2026-06-07 17:16:42.581  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_END stageId=9674583 method=CategoryRepository.findBySlugAndIsPublishedTrue durationMs=2 traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.588  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_START stageId=9674584 method=JpaSpecificationExecutor.findAll traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.623  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] jdk.proxy6.$Proxy250                     : Database call completed successfully JpaSpecificationExecutor.findAll: layer=DATABASE, stageId=9674584, durationMs=34, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'.
+2026-06-07 17:16:42.623  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_END stageId=9674584 method=JpaSpecificationExecutor.findAll durationMs=34 traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.626  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_START stageId=9674585 method=CategoryFilterRepository.findByCategory traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.634  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] jdk.proxy6.$Proxy252                     : Database call completed successfully CategoryFilterRepository.findByCategory: layer=DATABASE, stageId=9674585, durationMs=8, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'.
+2026-06-07 17:16:42.634  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_END stageId=9674585 method=CategoryFilterRepository.findByCategory durationMs=8 traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.634  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_START stageId=9674586 method=ProductFilterOptionRepository.findByProductIn traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.646  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] jdk.proxy6.$Proxy256                     : Database call completed successfully ProductFilterOptionRepository.findByProductIn: layer=DATABASE, stageId=9674586, durationMs=11, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'.
+2026-06-07 17:16:42.646  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_END stageId=9674586 method=ProductFilterOptionRepository.findByProductIn durationMs=11 traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.663  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] c.e.gqw.shop.service.CatalogService      : Method finished successfully CatalogService.categoryCatalogData: operation='execute business operation', layer=SERVICE, durationMs=83, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'.
+2026-06-07 17:16:42.671  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] c.e.gqw.shop.service.CatalogService      : Method started CatalogService.categoryPriceBounds (operation='execute business operation', layer=SERVICE, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e').
+2026-06-07 17:16:42.675  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_START stageId=9674588 method=CategoryRepository.findBySlugAndIsPublishedTrue traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.677  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] jdk.proxy6.$Proxy251                     : Database call completed successfully CategoryRepository.findBySlugAndIsPublishedTrue: layer=DATABASE, stageId=9674588, durationMs=2, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'.
+2026-06-07 17:16:42.677  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_END stageId=9674588 method=CategoryRepository.findBySlugAndIsPublishedTrue durationMs=2 traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.679  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_START stageId=9674589 method=JpaSpecificationExecutor.findAll traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.684  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] jdk.proxy6.$Proxy250                     : Database call completed successfully JpaSpecificationExecutor.findAll: layer=DATABASE, stageId=9674589, durationMs=4, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'.
+2026-06-07 17:16:42.684  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_END stageId=9674589 method=JpaSpecificationExecutor.findAll durationMs=4 traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.684  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] c.e.gqw.shop.service.CatalogService      : Method finished successfully CatalogService.categoryPriceBounds: operation='execute business operation', layer=SERVICE, durationMs=12, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'.
+2026-06-07 17:16:42.692  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] c.e.gqw.shop.service.CatalogService      : Method started CatalogService.cardCharacteristics (operation='execute business operation', layer=SERVICE, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e').
+2026-06-07 17:16:42.692  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_START stageId=9674591 method=ProductCharacteristicRepository.findForProductsOrdered traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.702  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] jdk.proxy6.$Proxy253                     : Database call completed successfully ProductCharacteristicRepository.findForProductsOrdered: layer=DATABASE, stageId=9674591, durationMs=10, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'.
+2026-06-07 17:16:42.702  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_END stageId=9674591 method=ProductCharacteristicRepository.findForProductsOrdered durationMs=10 traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.703  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] c.e.gqw.shop.service.CatalogService      : Method finished successfully CatalogService.cardCharacteristics: operation='execute business operation', layer=SERVICE, durationMs=11, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'.
+2026-06-07 17:16:42.709  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] c.e.gqw.shop.service.CatalogService      : Method started CatalogService.categoryTree (operation='execute business operation', layer=SERVICE, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e').
+2026-06-07 17:16:42.712  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_START stageId=9674593 method=CategoryRepository.findByParentIsNullAndIsPublishedTrueOrderByIdAsc traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.714  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] jdk.proxy6.$Proxy251                     : Database call completed successfully CategoryRepository.findByParentIsNullAndIsPublishedTrueOrderByIdAsc: layer=DATABASE, stageId=9674593, durationMs=2, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'.
+2026-06-07 17:16:42.714  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_END stageId=9674593 method=CategoryRepository.findByParentIsNullAndIsPublishedTrueOrderByIdAsc durationMs=2 traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.718  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_START stageId=9674594 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.722  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] jdk.proxy6.$Proxy251                     : Database call completed successfully CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc: layer=DATABASE, stageId=9674594, durationMs=4, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'.
+2026-06-07 17:16:42.723  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_END stageId=9674594 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc durationMs=4 traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.725  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_START stageId=9674595 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.727  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] jdk.proxy6.$Proxy251                     : Database call completed successfully CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc: layer=DATABASE, stageId=9674595, durationMs=1, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'.
+2026-06-07 17:16:42.728  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_END stageId=9674595 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc durationMs=1 traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.731  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_START stageId=9674596 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.733  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] jdk.proxy6.$Proxy251                     : Database call completed successfully CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc: layer=DATABASE, stageId=9674596, durationMs=2, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'.
+2026-06-07 17:16:42.733  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_END stageId=9674596 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc durationMs=2 traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.734  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_START stageId=9674597 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.734  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] jdk.proxy6.$Proxy251                     : Database call completed successfully CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc: layer=DATABASE, stageId=9674597, durationMs=0, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'.
+2026-06-07 17:16:42.734  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_END stageId=9674597 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc durationMs=0 traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.741  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_START stageId=9674598 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.741  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] jdk.proxy6.$Proxy251                     : Database call completed successfully CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc: layer=DATABASE, stageId=9674598, durationMs=0, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'.
+2026-06-07 17:16:42.741  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_END stageId=9674598 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc durationMs=0 traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.746  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_START stageId=9674599 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.750  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] jdk.proxy6.$Proxy251                     : Database call completed successfully CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc: layer=DATABASE, stageId=9674599, durationMs=4, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'.
+2026-06-07 17:16:42.750  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_END stageId=9674599 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc durationMs=4 traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.751  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_START stageId=9674600 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.751  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] jdk.proxy6.$Proxy251                     : Database call completed successfully CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc: layer=DATABASE, stageId=9674600, durationMs=0, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'.
+2026-06-07 17:16:42.751  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_END stageId=9674600 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc durationMs=0 traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.760  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_START stageId=9674601 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.762  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] jdk.proxy6.$Proxy251                     : Database call completed successfully CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc: layer=DATABASE, stageId=9674601, durationMs=1, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'.
+2026-06-07 17:16:42.762  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_END stageId=9674601 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc durationMs=1 traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.765  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_START stageId=9674602 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.767  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] jdk.proxy6.$Proxy251                     : Database call completed successfully CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc: layer=DATABASE, stageId=9674602, durationMs=2, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'.
+2026-06-07 17:16:42.767  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_END stageId=9674602 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc durationMs=2 traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.771  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_START stageId=9674603 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.775  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] jdk.proxy6.$Proxy251                     : Database call completed successfully CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc: layer=DATABASE, stageId=9674603, durationMs=3, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'.
+2026-06-07 17:16:42.775  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_END stageId=9674603 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc durationMs=3 traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.778  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_START stageId=9674604 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.780  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] jdk.proxy6.$Proxy251                     : Database call completed successfully CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc: layer=DATABASE, stageId=9674604, durationMs=1, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'.
+2026-06-07 17:16:42.780  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_END stageId=9674604 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc durationMs=1 traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.783  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_START stageId=9674605 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.785  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] jdk.proxy6.$Proxy251                     : Database call completed successfully CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc: layer=DATABASE, stageId=9674605, durationMs=2, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'.
+2026-06-07 17:16:42.785  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_END stageId=9674605 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc durationMs=2 traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.788  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_START stageId=9674606 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.788  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] jdk.proxy6.$Proxy251                     : Database call completed successfully CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc: layer=DATABASE, stageId=9674606, durationMs=0, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'.
+2026-06-07 17:16:42.788  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_END stageId=9674606 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc durationMs=0 traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.788  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_START stageId=9674607 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.796  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] jdk.proxy6.$Proxy251                     : Database call completed successfully CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc: layer=DATABASE, stageId=9674607, durationMs=8, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'.
+2026-06-07 17:16:42.796  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_END stageId=9674607 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc durationMs=8 traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.800  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_START stageId=9674608 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.803  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] jdk.proxy6.$Proxy251                     : Database call completed successfully CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc: layer=DATABASE, stageId=9674608, durationMs=2, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'.
+2026-06-07 17:16:42.803  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_END stageId=9674608 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc durationMs=2 traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.806  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_START stageId=9674609 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.809  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] jdk.proxy6.$Proxy251                     : Database call completed successfully CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc: layer=DATABASE, stageId=9674609, durationMs=2, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'.
+2026-06-07 17:16:42.809  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_END stageId=9674609 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc durationMs=2 traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.812  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_START stageId=9674610 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.815  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] jdk.proxy6.$Proxy251                     : Database call completed successfully CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc: layer=DATABASE, stageId=9674610, durationMs=3, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'.
+2026-06-07 17:16:42.815  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_END stageId=9674610 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc durationMs=3 traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.819  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_START stageId=9674611 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.821  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] jdk.proxy6.$Proxy251                     : Database call completed successfully CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc: layer=DATABASE, stageId=9674611, durationMs=2, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'.
+2026-06-07 17:16:42.821  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_END stageId=9674611 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc durationMs=2 traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.825  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_START stageId=9674612 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.828  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] jdk.proxy6.$Proxy251                     : Database call completed successfully CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc: layer=DATABASE, stageId=9674612, durationMs=3, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'.
+2026-06-07 17:16:42.828  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_END stageId=9674612 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc durationMs=3 traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.831  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_START stageId=9674613 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.832  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] jdk.proxy6.$Proxy251                     : Database call completed successfully CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc: layer=DATABASE, stageId=9674613, durationMs=0, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'.
+2026-06-07 17:16:42.832  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_END stageId=9674613 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc durationMs=0 traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.836  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_START stageId=9674614 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.838  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] jdk.proxy6.$Proxy251                     : Database call completed successfully CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc: layer=DATABASE, stageId=9674614, durationMs=1, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'.
+2026-06-07 17:16:42.838  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_END stageId=9674614 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc durationMs=1 traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.842  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_START stageId=9674615 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.847  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] jdk.proxy6.$Proxy251                     : Database call completed successfully CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc: layer=DATABASE, stageId=9674615, durationMs=4, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'.
+2026-06-07 17:16:42.847  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_END stageId=9674615 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc durationMs=4 traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.851  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_START stageId=9674616 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.853  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] jdk.proxy6.$Proxy251                     : Database call completed successfully CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc: layer=DATABASE, stageId=9674616, durationMs=1, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'.
+2026-06-07 17:16:42.853  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_END stageId=9674616 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc durationMs=1 traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.857  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_START stageId=9674617 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.859  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] jdk.proxy6.$Proxy251                     : Database call completed successfully CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc: layer=DATABASE, stageId=9674617, durationMs=2, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'.
+2026-06-07 17:16:42.859  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_END stageId=9674617 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc durationMs=2 traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.861  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_START stageId=9674618 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.863  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] jdk.proxy6.$Proxy251                     : Database call completed successfully CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc: layer=DATABASE, stageId=9674618, durationMs=2, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'.
+2026-06-07 17:16:42.863  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_END stageId=9674618 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc durationMs=2 traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.866  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_START stageId=9674619 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.870  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] jdk.proxy6.$Proxy251                     : Database call completed successfully CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc: layer=DATABASE, stageId=9674619, durationMs=3, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'.
+2026-06-07 17:16:42.870  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] analytics.db.stage                       : DB_STAGE_END stageId=9674619 method=CategoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc durationMs=3 traceId='9cc601abc1994554b7b604f993a02eed' eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'
+2026-06-07 17:16:42.871  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] c.e.gqw.shop.service.CatalogService      : Method finished successfully CatalogService.categoryTree: operation='execute business operation', layer=SERVICE, durationMs=161, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'.
+2026-06-07 17:16:42.875  INFO [trace:9cc601abc1994554b7b604f993a02eed] [event:65d185da-b1ed-4cb2-bc45-e4b48076bc2e] [module:SHOP] --- [nio-8080-exec-8] c.e.g.shop.controller.CatalogController  : Method finished successfully CatalogController.category: operation='handle incoming request', layer=CONTROLLER, durationMs=316, traceId='9cc601abc1994554b7b604f993a02eed', eventUid='65d185da-b1ed-4cb2-bc45-e4b48076bc2e'.
+2026-06-07 17:16:44.606  INFO [trace:46238ba1e1864817a976e7a50eb614b5] [event:e9791c5d-e02c-481e-9dbb-39238cfe5891] [module:SHOP] --- [nio-8080-exec-9] c.e.gqw.shop.controller.CartController   : Method started CartController.toggleCartItemApi (operation='переключение состояния товара в корзине через API', layer=CONTROLLER, traceId='46238ba1e1864817a976e7a50eb614b5', eventUid='e9791c5d-e02c-481e-9dbb-39238cfe5891').
+2026-06-07 17:16:44.608  INFO [trace:46238ba1e1864817a976e7a50eb614b5] [event:e9791c5d-e02c-481e-9dbb-39238cfe5891] [module:SHOP] --- [nio-8080-exec-9] c.example.gqw.shop.service.CartService   : Method started CartService.toggleOne (operation='поштучное переключение наличия товара в корзине', layer=SERVICE, traceId='46238ba1e1864817a976e7a50eb614b5', eventUid='e9791c5d-e02c-481e-9dbb-39238cfe5891').
+2026-06-07 17:16:44.610  INFO [trace:46238ba1e1864817a976e7a50eb614b5] [event:e9791c5d-e02c-481e-9dbb-39238cfe5891] [module:SHOP] --- [nio-8080-exec-9] c.e.gqw.shop.service.CurrentUserService  : Method started CurrentUserService.findCurrentUser (operation='read data', layer=SERVICE, traceId='46238ba1e1864817a976e7a50eb614b5', eventUid='e9791c5d-e02c-481e-9dbb-39238cfe5891').
+2026-06-07 17:16:44.610  INFO [trace:46238ba1e1864817a976e7a50eb614b5] [event:e9791c5d-e02c-481e-9dbb-39238cfe5891] [module:SHOP] --- [nio-8080-exec-9] c.e.gqw.shop.service.CurrentUserService  : Method finished successfully CurrentUserService.findCurrentUser: operation='read data', layer=SERVICE, durationMs=0, traceId='46238ba1e1864817a976e7a50eb614b5', eventUid='e9791c5d-e02c-481e-9dbb-39238cfe5891'.
+2026-06-07 17:16:44.614  INFO [trace:46238ba1e1864817a976e7a50eb614b5] [event:e9791c5d-e02c-481e-9dbb-39238cfe5891] [module:SHOP] --- [nio-8080-exec-9] analytics.db.stage                       : DB_STAGE_START stageId=9674625 method=CrudRepository.findById traceId='46238ba1e1864817a976e7a50eb614b5' eventUid='e9791c5d-e02c-481e-9dbb-39238cfe5891'
+2026-06-07 17:16:44.618  INFO [trace:46238ba1e1864817a976e7a50eb614b5] [event:e9791c5d-e02c-481e-9dbb-39238cfe5891] [module:SHOP] --- [nio-8080-exec-9] jdk.proxy6.$Proxy250                     : Database call completed successfully CrudRepository.findById: layer=DATABASE, stageId=9674625, durationMs=3, traceId='46238ba1e1864817a976e7a50eb614b5', eventUid='e9791c5d-e02c-481e-9dbb-39238cfe5891'.
+2026-06-07 17:16:44.618  INFO [trace:46238ba1e1864817a976e7a50eb614b5] [event:e9791c5d-e02c-481e-9dbb-39238cfe5891] [module:SHOP] --- [nio-8080-exec-9] analytics.db.stage                       : DB_STAGE_END stageId=9674625 method=CrudRepository.findById durationMs=3 traceId='46238ba1e1864817a976e7a50eb614b5' eventUid='e9791c5d-e02c-481e-9dbb-39238cfe5891'
+2026-06-07 17:16:44.622  INFO [trace:46238ba1e1864817a976e7a50eb614b5] [event:e9791c5d-e02c-481e-9dbb-39238cfe5891] [module:SHOP] --- [nio-8080-exec-9] analytics.db.stage                       : DB_STAGE_START stageId=9674626 method=CartItemRepository.findAllBySessionIdAndProduct traceId='46238ba1e1864817a976e7a50eb614b5' eventUid='e9791c5d-e02c-481e-9dbb-39238cfe5891'
+2026-06-07 17:16:44.624  INFO [trace:46238ba1e1864817a976e7a50eb614b5] [event:e9791c5d-e02c-481e-9dbb-39238cfe5891] [module:SHOP] --- [nio-8080-exec-9] jdk.proxy6.$Proxy265                     : Database call completed successfully CartItemRepository.findAllBySessionIdAndProduct: layer=DATABASE, stageId=9674626, durationMs=2, traceId='46238ba1e1864817a976e7a50eb614b5', eventUid='e9791c5d-e02c-481e-9dbb-39238cfe5891'.
+2026-06-07 17:16:44.624  INFO [trace:46238ba1e1864817a976e7a50eb614b5] [event:e9791c5d-e02c-481e-9dbb-39238cfe5891] [module:SHOP] --- [nio-8080-exec-9] analytics.db.stage                       : DB_STAGE_END stageId=9674626 method=CartItemRepository.findAllBySessionIdAndProduct durationMs=2 traceId='46238ba1e1864817a976e7a50eb614b5' eventUid='e9791c5d-e02c-481e-9dbb-39238cfe5891'
+2026-06-07 17:16:44.628  INFO [trace:46238ba1e1864817a976e7a50eb614b5] [event:e9791c5d-e02c-481e-9dbb-39238cfe5891] [module:SHOP] --- [nio-8080-exec-9] analytics.db.stage                       : DB_STAGE_START stageId=9674627 method=CrudRepository.save traceId='46238ba1e1864817a976e7a50eb614b5' eventUid='e9791c5d-e02c-481e-9dbb-39238cfe5891'
+2026-06-07 17:16:44.641  INFO [trace:46238ba1e1864817a976e7a50eb614b5] [event:e9791c5d-e02c-481e-9dbb-39238cfe5891] [module:SHOP] --- [nio-8080-exec-9] jdk.proxy6.$Proxy265                     : Database call completed successfully CrudRepository.save: layer=DATABASE, stageId=9674627, durationMs=12, traceId='46238ba1e1864817a976e7a50eb614b5', eventUid='e9791c5d-e02c-481e-9dbb-39238cfe5891'.
+2026-06-07 17:16:44.641  INFO [trace:46238ba1e1864817a976e7a50eb614b5] [event:e9791c5d-e02c-481e-9dbb-39238cfe5891] [module:SHOP] --- [nio-8080-exec-9] analytics.db.stage                       : DB_STAGE_END stageId=9674627 method=CrudRepository.save durationMs=12 traceId='46238ba1e1864817a976e7a50eb614b5' eventUid='e9791c5d-e02c-481e-9dbb-39238cfe5891'
+2026-06-07 17:16:44.642  INFO [trace:46238ba1e1864817a976e7a50eb614b5] [event:e9791c5d-e02c-481e-9dbb-39238cfe5891] [module:SHOP] --- [nio-8080-exec-9] c.example.gqw.shop.service.CartService   : Method finished successfully CartService.toggleOne: operation='поштучное переключение наличия товара в корзине', layer=SERVICE, durationMs=33, traceId='46238ba1e1864817a976e7a50eb614b5', eventUid='e9791c5d-e02c-481e-9dbb-39238cfe5891'.
+2026-06-07 17:16:44.646  INFO [trace:46238ba1e1864817a976e7a50eb614b5] [event:e9791c5d-e02c-481e-9dbb-39238cfe5891] [module:SHOP] --- [nio-8080-exec-9] c.example.gqw.shop.service.CartService   : Method started CartService.quantityForProduct (operation='execute business operation', layer=SERVICE, traceId='46238ba1e1864817a976e7a50eb614b5', eventUid='e9791c5d-e02c-481e-9dbb-39238cfe5891').
+2026-06-07 17:16:44.648  INFO [trace:46238ba1e1864817a976e7a50eb614b5] [event:e9791c5d-e02c-481e-9dbb-39238cfe5891] [module:SHOP] --- [nio-8080-exec-9] c.e.gqw.shop.service.CurrentUserService  : Method started CurrentUserService.findCurrentUser (operation='read data', layer=SERVICE, traceId='46238ba1e1864817a976e7a50eb614b5', eventUid='e9791c5d-e02c-481e-9dbb-39238cfe5891').
+2026-06-07 17:16:44.648  INFO [trace:46238ba1e1864817a976e7a50eb614b5] [event:e9791c5d-e02c-481e-9dbb-39238cfe5891] [module:SHOP] --- [nio-8080-exec-9] c.e.gqw.shop.service.CurrentUserService  : Method finished successfully CurrentUserService.findCurrentUser: operation='read data', layer=SERVICE, durationMs=0, traceId='46238ba1e1864817a976e7a50eb614b5', eventUid='e9791c5d-e02c-481e-9dbb-39238cfe5891'.
+2026-06-07 17:16:44.651  INFO [trace:46238ba1e1864817a976e7a50eb614b5] [event:e9791c5d-e02c-481e-9dbb-39238cfe5891] [module:SHOP] --- [nio-8080-exec-9] analytics.db.stage                       : DB_STAGE_START stageId=9674630 method=CrudRepository.findById traceId='46238ba1e1864817a976e7a50eb614b5' eventUid='e9791c5d-e02c-481e-9dbb-39238cfe5891'
+2026-06-07 17:16:44.654  INFO [trace:46238ba1e1864817a976e7a50eb614b5] [event:e9791c5d-e02c-481e-9dbb-39238cfe5891] [module:SHOP] --- [nio-8080-exec-9] jdk.proxy6.$Proxy250                     : Database call completed successfully CrudRepository.findById: layer=DATABASE, stageId=9674630, durationMs=2, traceId='46238ba1e1864817a976e7a50eb614b5', eventUid='e9791c5d-e02c-481e-9dbb-39238cfe5891'.
+2026-06-07 17:16:44.654  INFO [trace:46238ba1e1864817a976e7a50eb614b5] [event:e9791c5d-e02c-481e-9dbb-39238cfe5891] [module:SHOP] --- [nio-8080-exec-9] analytics.db.stage                       : DB_STAGE_END stageId=9674630 method=CrudRepository.findById durationMs=2 traceId='46238ba1e1864817a976e7a50eb614b5' eventUid='e9791c5d-e02c-481e-9dbb-39238cfe5891'
+2026-06-07 17:16:44.657  INFO [trace:46238ba1e1864817a976e7a50eb614b5] [event:e9791c5d-e02c-481e-9dbb-39238cfe5891] [module:SHOP] --- [nio-8080-exec-9] analytics.db.stage                       : DB_STAGE_START stageId=9674631 method=CartItemRepository.findAllBySessionIdAndProduct traceId='46238ba1e1864817a976e7a50eb614b5' eventUid='e9791c5d-e02c-481e-9dbb-39238cfe5891'
+2026-06-07 17:16:44.660  INFO [trace:46238ba1e1864817a976e7a50eb614b5] [event:e9791c5d-e02c-481e-9dbb-39238cfe5891] [module:SHOP] --- [nio-8080-exec-9] jdk.proxy6.$Proxy265                     : Database call completed successfully CartItemRepository.findAllBySessionIdAndProduct: layer=DATABASE, stageId=9674631, durationMs=2, traceId='46238ba1e1864817a976e7a50eb614b5', eventUid='e9791c5d-e02c-481e-9dbb-39238cfe5891'.
+2026-06-07 17:16:44.660  INFO [trace:46238ba1e1864817a976e7a50eb614b5] [event:e9791c5d-e02c-481e-9dbb-39238cfe5891] [module:SHOP] --- [nio-8080-exec-9] analytics.db.stage                       : DB_STAGE_END stageId=9674631 method=CartItemRepository.findAllBySessionIdAndProduct durationMs=2 traceId='46238ba1e1864817a976e7a50eb614b5' eventUid='e9791c5d-e02c-481e-9dbb-39238cfe5891'
+2026-06-07 17:16:44.662  INFO [trace:46238ba1e1864817a976e7a50eb614b5] [event:e9791c5d-e02c-481e-9dbb-39238cfe5891] [module:SHOP] --- [nio-8080-exec-9] c.example.gqw.shop.service.CartService   : Method finished successfully CartService.quantityForProduct: operation='execute business operation', layer=SERVICE, durationMs=16, traceId='46238ba1e1864817a976e7a50eb614b5', eventUid='e9791c5d-e02c-481e-9dbb-39238cfe5891'.
+2026-06-07 17:16:44.667  INFO [trace:46238ba1e1864817a976e7a50eb614b5] [event:e9791c5d-e02c-481e-9dbb-39238cfe5891] [module:SHOP] --- [nio-8080-exec-9] c.example.gqw.shop.service.CartService   : Method started CartService.items (operation='read data', layer=SERVICE, traceId='46238ba1e1864817a976e7a50eb614b5', eventUid='e9791c5d-e02c-481e-9dbb-39238cfe5891').
+2026-06-07 17:16:44.669  INFO [trace:46238ba1e1864817a976e7a50eb614b5] [event:e9791c5d-e02c-481e-9dbb-39238cfe5891] [module:SHOP] --- [nio-8080-exec-9] c.e.gqw.shop.service.CurrentUserService  : Method started CurrentUserService.findCurrentUser (operation='read data', layer=SERVICE, traceId='46238ba1e1864817a976e7a50eb614b5', eventUid='e9791c5d-e02c-481e-9dbb-39238cfe5891').
+2026-06-07 17:16:44.670  INFO [trace:46238ba1e1864817a976e7a50eb614b5] [event:e9791c5d-e02c-481e-9dbb-39238cfe5891] [module:SHOP] --- [nio-8080-exec-9] c.e.gqw.shop.service.CurrentUserService  : Method finished successfully CurrentUserService.findCurrentUser: operation='read data', layer=SERVICE, durationMs=1, traceId='46238ba1e1864817a976e7a50eb614b5', eventUid='e9791c5d-e02c-481e-9dbb-39238cfe5891'.
+2026-06-07 17:16:44.677  INFO [trace:46238ba1e1864817a976e7a50eb614b5] [event:e9791c5d-e02c-481e-9dbb-39238cfe5891] [module:SHOP] --- [nio-8080-exec-9] analytics.db.stage                       : DB_STAGE_START stageId=9674634 method=CartItemRepository.findBySessionId traceId='46238ba1e1864817a976e7a50eb614b5' eventUid='e9791c5d-e02c-481e-9dbb-39238cfe5891'
+2026-06-07 17:16:44.681  INFO [trace:46238ba1e1864817a976e7a50eb614b5] [event:e9791c5d-e02c-481e-9dbb-39238cfe5891] [module:SHOP] --- [nio-8080-exec-9] jdk.proxy6.$Proxy265                     : Database call completed successfully CartItemRepository.findBySessionId: layer=DATABASE, stageId=9674634, durationMs=3, traceId='46238ba1e1864817a976e7a50eb614b5', eventUid='e9791c5d-e02c-481e-9dbb-39238cfe5891'.
+2026-06-07 17:16:44.681  INFO [trace:46238ba1e1864817a976e7a50eb614b5] [event:e9791c5d-e02c-481e-9dbb-39238cfe5891] [module:SHOP] --- [nio-8080-exec-9] analytics.db.stage                       : DB_STAGE_END stageId=9674634 method=CartItemRepository.findBySessionId durationMs=3 traceId='46238ba1e1864817a976e7a50eb614b5' eventUid='e9791c5d-e02c-481e-9dbb-39238cfe5891'
+2026-06-07 17:16:44.682  INFO [trace:46238ba1e1864817a976e7a50eb614b5] [event:e9791c5d-e02c-481e-9dbb-39238cfe5891] [module:SHOP] --- [nio-8080-exec-9] c.example.gqw.shop.service.CartService   : Method finished successfully CartService.items: operation='read data', layer=SERVICE, durationMs=15, traceId='46238ba1e1864817a976e7a50eb614b5', eventUid='e9791c5d-e02c-481e-9dbb-39238cfe5891'.
+2026-06-07 17:16:44.687  INFO [trace:46238ba1e1864817a976e7a50eb614b5] [event:e9791c5d-e02c-481e-9dbb-39238cfe5891] [module:SHOP] --- [nio-8080-exec-9] c.e.gqw.shop.controller.CartController   : Method finished successfully CartController.toggleCartItemApi: operation='переключение состояния товара в корзине через API', layer=CONTROLLER, durationMs=80, traceId='46238ba1e1864817a976e7a50eb614b5', eventUid='e9791c5d-e02c-481e-9dbb-39238cfe5891'.
+2026-06-07 17:16:45.231  INFO [trace:546ae704e6c04d0990b1775c90f78139] [event:ef1f13b3-58f7-4c19-9d3b-eef98d36a12c] [module:SHOP] --- [nio-8080-exec-2] c.e.g.s.controller.WishlistController    : Method started WishlistController.toggleWishlistApi (operation='handle incoming request', layer=CONTROLLER, traceId='546ae704e6c04d0990b1775c90f78139', eventUid='ef1f13b3-58f7-4c19-9d3b-eef98d36a12c').
+2026-06-07 17:16:45.234  INFO [trace:546ae704e6c04d0990b1775c90f78139] [event:ef1f13b3-58f7-4c19-9d3b-eef98d36a12c] [module:SHOP] --- [nio-8080-exec-2] c.e.gqw.shop.service.WishlistService     : Method started WishlistService.toggle (operation='переключение состояния избранного', layer=SERVICE, traceId='546ae704e6c04d0990b1775c90f78139', eventUid='ef1f13b3-58f7-4c19-9d3b-eef98d36a12c').
+2026-06-07 17:16:45.236  INFO [trace:546ae704e6c04d0990b1775c90f78139] [event:ef1f13b3-58f7-4c19-9d3b-eef98d36a12c] [module:SHOP] --- [nio-8080-exec-2] analytics.db.stage                       : DB_STAGE_START stageId=9674637 method=WishlistItemRepository.deleteByCreatedAtBeforeAndSessionIdIsNotNull traceId='546ae704e6c04d0990b1775c90f78139' eventUid='ef1f13b3-58f7-4c19-9d3b-eef98d36a12c'
+2026-06-07 17:16:45.236  INFO [trace:546ae704e6c04d0990b1775c90f78139] [event:ef1f13b3-58f7-4c19-9d3b-eef98d36a12c] [module:SHOP] --- [nio-8080-exec-2] jdk.proxy6.$Proxy269                     : Database call completed successfully WishlistItemRepository.deleteByCreatedAtBeforeAndSessionIdIsNotNull: layer=DATABASE, stageId=9674637, durationMs=0, traceId='546ae704e6c04d0990b1775c90f78139', eventUid='ef1f13b3-58f7-4c19-9d3b-eef98d36a12c'.
+2026-06-07 17:16:45.236  INFO [trace:546ae704e6c04d0990b1775c90f78139] [event:ef1f13b3-58f7-4c19-9d3b-eef98d36a12c] [module:SHOP] --- [nio-8080-exec-2] analytics.db.stage                       : DB_STAGE_END stageId=9674637 method=WishlistItemRepository.deleteByCreatedAtBeforeAndSessionIdIsNotNull durationMs=0 traceId='546ae704e6c04d0990b1775c90f78139' eventUid='ef1f13b3-58f7-4c19-9d3b-eef98d36a12c'
+2026-06-07 17:16:45.244  INFO [trace:546ae704e6c04d0990b1775c90f78139] [event:ef1f13b3-58f7-4c19-9d3b-eef98d36a12c] [module:SHOP] --- [nio-8080-exec-2] analytics.db.stage                       : DB_STAGE_START stageId=9674638 method=CrudRepository.findById traceId='546ae704e6c04d0990b1775c90f78139' eventUid='ef1f13b3-58f7-4c19-9d3b-eef98d36a12c'
+2026-06-07 17:16:45.244  INFO [trace:546ae704e6c04d0990b1775c90f78139] [event:ef1f13b3-58f7-4c19-9d3b-eef98d36a12c] [module:SHOP] --- [nio-8080-exec-2] jdk.proxy6.$Proxy250                     : Database call completed successfully CrudRepository.findById: layer=DATABASE, stageId=9674638, durationMs=0, traceId='546ae704e6c04d0990b1775c90f78139', eventUid='ef1f13b3-58f7-4c19-9d3b-eef98d36a12c'.
+2026-06-07 17:16:45.244  INFO [trace:546ae704e6c04d0990b1775c90f78139] [event:ef1f13b3-58f7-4c19-9d3b-eef98d36a12c] [module:SHOP] --- [nio-8080-exec-2] analytics.db.stage                       : DB_STAGE_END stageId=9674638 method=CrudRepository.findById durationMs=0 traceId='546ae704e6c04d0990b1775c90f78139' eventUid='ef1f13b3-58f7-4c19-9d3b-eef98d36a12c'
+2026-06-07 17:16:45.244  INFO [trace:546ae704e6c04d0990b1775c90f78139] [event:ef1f13b3-58f7-4c19-9d3b-eef98d36a12c] [module:SHOP] --- [nio-8080-exec-2] c.e.gqw.shop.service.CurrentUserService  : Method started CurrentUserService.findCurrentUser (operation='read data', layer=SERVICE, traceId='546ae704e6c04d0990b1775c90f78139', eventUid='ef1f13b3-58f7-4c19-9d3b-eef98d36a12c').
+2026-06-07 17:16:45.244  INFO [trace:546ae704e6c04d0990b1775c90f78139] [event:ef1f13b3-58f7-4c19-9d3b-eef98d36a12c] [module:SHOP] --- [nio-8080-exec-2] c.e.gqw.shop.service.CurrentUserService  : Method finished successfully CurrentUserService.findCurrentUser: operation='read data', layer=SERVICE, durationMs=0, traceId='546ae704e6c04d0990b1775c90f78139', eventUid='ef1f13b3-58f7-4c19-9d3b-eef98d36a12c'.
+2026-06-07 17:16:45.252  INFO [trace:546ae704e6c04d0990b1775c90f78139] [event:ef1f13b3-58f7-4c19-9d3b-eef98d36a12c] [module:SHOP] --- [nio-8080-exec-2] analytics.db.stage                       : DB_STAGE_START stageId=9674640 method=WishlistItemRepository.findBySessionIdAndProduct traceId='546ae704e6c04d0990b1775c90f78139' eventUid='ef1f13b3-58f7-4c19-9d3b-eef98d36a12c'
+2026-06-07 17:16:45.252  INFO [trace:546ae704e6c04d0990b1775c90f78139] [event:ef1f13b3-58f7-4c19-9d3b-eef98d36a12c] [module:SHOP] --- [nio-8080-exec-2] jdk.proxy6.$Proxy269                     : Database call completed successfully WishlistItemRepository.findBySessionIdAndProduct: layer=DATABASE, stageId=9674640, durationMs=0, traceId='546ae704e6c04d0990b1775c90f78139', eventUid='ef1f13b3-58f7-4c19-9d3b-eef98d36a12c'.
+2026-06-07 17:16:45.252  INFO [trace:546ae704e6c04d0990b1775c90f78139] [event:ef1f13b3-58f7-4c19-9d3b-eef98d36a12c] [module:SHOP] --- [nio-8080-exec-2] analytics.db.stage                       : DB_STAGE_END stageId=9674640 method=WishlistItemRepository.findBySessionIdAndProduct durationMs=0 traceId='546ae704e6c04d0990b1775c90f78139' eventUid='ef1f13b3-58f7-4c19-9d3b-eef98d36a12c'
+2026-06-07 17:16:45.254  INFO [trace:546ae704e6c04d0990b1775c90f78139] [event:ef1f13b3-58f7-4c19-9d3b-eef98d36a12c] [module:SHOP] --- [nio-8080-exec-2] analytics.db.stage                       : DB_STAGE_START stageId=9674641 method=CrudRepository.save traceId='546ae704e6c04d0990b1775c90f78139' eventUid='ef1f13b3-58f7-4c19-9d3b-eef98d36a12c'
+2026-06-07 17:16:45.292  INFO [trace:546ae704e6c04d0990b1775c90f78139] [event:ef1f13b3-58f7-4c19-9d3b-eef98d36a12c] [module:SHOP] --- [nio-8080-exec-2] jdk.proxy6.$Proxy269                     : Database call completed successfully CrudRepository.save: layer=DATABASE, stageId=9674641, durationMs=37, traceId='546ae704e6c04d0990b1775c90f78139', eventUid='ef1f13b3-58f7-4c19-9d3b-eef98d36a12c'.
+2026-06-07 17:16:45.292  INFO [trace:546ae704e6c04d0990b1775c90f78139] [event:ef1f13b3-58f7-4c19-9d3b-eef98d36a12c] [module:SHOP] --- [nio-8080-exec-2] analytics.db.stage                       : DB_STAGE_END stageId=9674641 method=CrudRepository.save durationMs=37 traceId='546ae704e6c04d0990b1775c90f78139' eventUid='ef1f13b3-58f7-4c19-9d3b-eef98d36a12c'
+2026-06-07 17:16:45.292  INFO [trace:546ae704e6c04d0990b1775c90f78139] [event:ef1f13b3-58f7-4c19-9d3b-eef98d36a12c] [module:SHOP] --- [nio-8080-exec-2] c.e.gqw.shop.service.WishlistService     : Method finished successfully WishlistService.toggle: operation='переключение состояния избранного', layer=SERVICE, durationMs=58, traceId='546ae704e6c04d0990b1775c90f78139', eventUid='ef1f13b3-58f7-4c19-9d3b-eef98d36a12c'.
+2026-06-07 17:16:45.300  INFO [trace:546ae704e6c04d0990b1775c90f78139] [event:ef1f13b3-58f7-4c19-9d3b-eef98d36a12c] [module:SHOP] --- [nio-8080-exec-2] c.e.gqw.shop.service.WishlistService     : Method started WishlistService.count (operation='count data', layer=SERVICE, traceId='546ae704e6c04d0990b1775c90f78139', eventUid='ef1f13b3-58f7-4c19-9d3b-eef98d36a12c').
+2026-06-07 17:16:45.301  INFO [trace:546ae704e6c04d0990b1775c90f78139] [event:ef1f13b3-58f7-4c19-9d3b-eef98d36a12c] [module:SHOP] --- [nio-8080-exec-2] c.e.gqw.shop.service.CurrentUserService  : Method started CurrentUserService.findCurrentUser (operation='read data', layer=SERVICE, traceId='546ae704e6c04d0990b1775c90f78139', eventUid='ef1f13b3-58f7-4c19-9d3b-eef98d36a12c').
+2026-06-07 17:16:45.301  INFO [trace:546ae704e6c04d0990b1775c90f78139] [event:ef1f13b3-58f7-4c19-9d3b-eef98d36a12c] [module:SHOP] --- [nio-8080-exec-2] c.e.gqw.shop.service.CurrentUserService  : Method finished successfully CurrentUserService.findCurrentUser: operation='read data', layer=SERVICE, durationMs=0, traceId='546ae704e6c04d0990b1775c90f78139', eventUid='ef1f13b3-58f7-4c19-9d3b-eef98d36a12c'.
+2026-06-07 17:16:45.305  INFO [trace:546ae704e6c04d0990b1775c90f78139] [event:ef1f13b3-58f7-4c19-9d3b-eef98d36a12c] [module:SHOP] --- [nio-8080-exec-2] analytics.db.stage                       : DB_STAGE_START stageId=9674644 method=WishlistItemRepository.findBySessionId traceId='546ae704e6c04d0990b1775c90f78139' eventUid='ef1f13b3-58f7-4c19-9d3b-eef98d36a12c'
+2026-06-07 17:16:45.308  INFO [trace:546ae704e6c04d0990b1775c90f78139] [event:ef1f13b3-58f7-4c19-9d3b-eef98d36a12c] [module:SHOP] --- [nio-8080-exec-2] jdk.proxy6.$Proxy269                     : Database call completed successfully WishlistItemRepository.findBySessionId: layer=DATABASE, stageId=9674644, durationMs=2, traceId='546ae704e6c04d0990b1775c90f78139', eventUid='ef1f13b3-58f7-4c19-9d3b-eef98d36a12c'.
+2026-06-07 17:16:45.308  INFO [trace:546ae704e6c04d0990b1775c90f78139] [event:ef1f13b3-58f7-4c19-9d3b-eef98d36a12c] [module:SHOP] --- [nio-8080-exec-2] analytics.db.stage                       : DB_STAGE_END stageId=9674644 method=WishlistItemRepository.findBySessionId durationMs=2 traceId='546ae704e6c04d0990b1775c90f78139' eventUid='ef1f13b3-58f7-4c19-9d3b-eef98d36a12c'
+2026-06-07 17:16:45.309  INFO [trace:546ae704e6c04d0990b1775c90f78139] [event:ef1f13b3-58f7-4c19-9d3b-eef98d36a12c] [module:SHOP] --- [nio-8080-exec-2] c.e.gqw.shop.service.WishlistService     : Method finished successfully WishlistService.count: operation='count data', layer=SERVICE, durationMs=9, traceId='546ae704e6c04d0990b1775c90f78139', eventUid='ef1f13b3-58f7-4c19-9d3b-eef98d36a12c'.
+2026-06-07 17:16:45.310  INFO [trace:546ae704e6c04d0990b1775c90f78139] [event:ef1f13b3-58f7-4c19-9d3b-eef98d36a12c] [module:SHOP] --- [nio-8080-exec-2] c.e.g.s.controller.WishlistController    : Method finished successfully WishlistController.toggleWishlistApi: operation='handle incoming request', layer=CONTROLLER, durationMs=78, traceId='546ae704e6c04d0990b1775c90f78139', eventUid='ef1f13b3-58f7-4c19-9d3b-eef98d36a12c'.

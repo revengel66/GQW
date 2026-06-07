@@ -69,6 +69,9 @@ class AnalyticsIntegrationTest {
     private AnalyticsStageMetricRepository analyticsStageMetricRepository;
 
     @Autowired
+    private AnalyticsLayerTestFacade analyticsLayerTestFacade;
+
+    @Autowired
     private EventTypeRepository eventTypeRepository;
 
     @Autowired
@@ -106,6 +109,8 @@ class AnalyticsIntegrationTest {
         seedStageType("CONTROLLER", "Controller", "HTTP controller execution.");
         seedStageType("SERVICE", "Service", "Service method execution.");
         seedStageType("DATABASE", "Database", "Repository/database execution.");
+        seedStageType("FACADE", "Facade", "Facade execution.");
+        seedStageType("INACTIVE_LAYER_FOR_TEST", "Inactive layer", "Inactive layer test.", false);
         seedEventType(
             "ANNOTATION_METRIC_EVENT",
             "Annotation metric test event",
@@ -134,7 +139,14 @@ class AnalyticsIntegrationTest {
     }
 
     private void seedStageType(String code, String name, String description) {
+        seedStageType(code, name, description, true);
+    }
+
+    private void seedStageType(String code, String name, String description, boolean active) {
         if (stageTypeRepository.existsById(code)) {
+            StageType existing = stageTypeRepository.findById(code).orElseThrow();
+            existing.setIsActive(active);
+            stageTypeRepository.save(existing);
             return;
         }
         StageType stageType = new StageType();
@@ -142,7 +154,7 @@ class AnalyticsIntegrationTest {
         stageType.setName(name);
         stageType.setDescription(description);
         stageType.setIsSystem(true);
-        stageType.setIsActive(true);
+        stageType.setIsActive(active);
         stageTypeRepository.save(stageType);
     }
 
@@ -317,6 +329,99 @@ class AnalyticsIntegrationTest {
         AnalyticsStageMetric databaseMetric = findMetric(metrics, "ANNOTATION_DB_METRIC");
         assertEquals(0, new BigDecimal("2").compareTo(databaseMetric.getMetricValueNum()));
         assertTrue(metrics.stream().filter(metric -> "DB_QUERY_COUNT".equals(metric.getMetricTypeCode())).count() <= 1);
+    }
+
+    @Test
+    void trackAnalyticsLayerCreatesCustomStageInsideActiveEvent() throws Exception {
+        MvcResult result = mockMvc.perform(get("/test/analytics/layers/facade"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("\"size\":2")))
+            .andReturn();
+
+        List<AnalyticsStage> stages = loadRecordedStages(result);
+        List<String> codes = stages.stream().map(AnalyticsStage::getStageTypeCode).toList();
+
+        assertTrue(codes.contains("CONTROLLER"));
+        assertTrue(codes.contains("FACADE"));
+        assertTrue(codes.contains("SERVICE"));
+        assertTrue(codes.contains("DATABASE"));
+        assertTrue(codes.indexOf("CONTROLLER") < codes.indexOf("FACADE"));
+        assertTrue(codes.indexOf("FACADE") < codes.indexOf("SERVICE"));
+        assertTrue(codes.indexOf("SERVICE") < codes.indexOf("DATABASE"));
+        assertEquals(1, codes.stream().filter("FACADE"::equals).count());
+        assertEquals(1, codes.stream().filter("SERVICE"::equals).count());
+    }
+
+    @Test
+    void requestWithoutCustomLayerDoesNotCreateFacadeStage() throws Exception {
+        MvcResult result = mockMvc.perform(get("/test/analytics/layers/no-facade"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("\"size\":2")))
+            .andReturn();
+
+        List<String> codes = loadRecordedStages(result).stream()
+            .map(AnalyticsStage::getStageTypeCode)
+            .toList();
+
+        assertTrue(codes.contains("CONTROLLER"));
+        assertTrue(codes.contains("SERVICE"));
+        assertTrue(codes.contains("DATABASE"));
+        assertFalse(codes.contains("FACADE"));
+    }
+
+    @Test
+    void stageMetricInsideCustomLayerIsWrittenIntoCustomStage() throws Exception {
+        MvcResult result = mockMvc.perform(get("/test/analytics/layers/facade-metric"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("\"size\":4")))
+            .andReturn();
+
+        AnalyticsStage facadeStage = findStageWithMetric(result, "FACADE", "ANNOTATION_SERVICE_METRIC");
+        List<AnalyticsStageMetric> metrics = analyticsStageMetricRepository.findByStageId(facadeStage.getId());
+        AnalyticsStageMetric numericMetric = findMetric(metrics, "ANNOTATION_SERVICE_METRIC");
+        assertEquals(0, new BigDecimal("4").compareTo(numericMetric.getMetricValueNum()));
+        AnalyticsStageMetric textMetric = findMetric(metrics, "ANNOTATION_TEXT_METRIC");
+        assertEquals("facade-stage", textMetric.getMetricValueText());
+    }
+
+    @Test
+    void unknownCustomLayerIsLoggedAndBusinessRequestContinues(CapturedOutput output) throws Exception {
+        MvcResult result = mockMvc.perform(get("/test/analytics/layers/unknown"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("\"value\":\"ok\"")))
+            .andReturn();
+
+        assertFalse(stageTypeRepository.existsById("UNKNOWN_LAYER_FOR_TEST"));
+        List<String> codes = loadRecordedStages(result).stream()
+            .map(AnalyticsStage::getStageTypeCode)
+            .toList();
+        assertFalse(codes.contains("UNKNOWN_LAYER_FOR_TEST"));
+        assertTrue(output.toString().contains("unknown stage type code=UNKNOWN_LAYER_FOR_TEST"));
+    }
+
+    @Test
+    void inactiveCustomLayerIsLoggedAndBusinessRequestContinues(CapturedOutput output) throws Exception {
+        MvcResult result = mockMvc.perform(get("/test/analytics/layers/inactive"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("\"value\":\"ok\"")))
+            .andReturn();
+
+        List<String> codes = loadRecordedStages(result).stream()
+            .map(AnalyticsStage::getStageTypeCode)
+            .toList();
+        assertFalse(codes.contains("INACTIVE_LAYER_FOR_TEST"));
+        assertTrue(output.toString().contains("inactive stage type code=INACTIVE_LAYER_FOR_TEST"));
+    }
+
+    @Test
+    void customLayerDoesNotCreateEventWithoutActiveEventContext() {
+        long eventsBefore = analyticsEventRepository.count();
+        long stagesBefore = analyticsStageRepository.count();
+
+        assertEquals(4, analyticsLayerTestFacade.facadeMetric().size());
+
+        assertEquals(eventsBefore, analyticsEventRepository.count());
+        assertEquals(stagesBefore, analyticsStageRepository.count());
     }
 
     @Test
@@ -551,6 +656,11 @@ class AnalyticsIntegrationTest {
                 .anyMatch(metric -> metricTypeCode.equals(metric.getMetricTypeCode())))
             .findFirst()
             .orElseThrow();
+    }
+
+    private List<AnalyticsStage> loadRecordedStages(MvcResult result) {
+        AnalyticsEvent event = loadRecordedEvent(result);
+        return analyticsStageRepository.findByEventIdOrderByStageOrder(event.getId());
     }
 
     private AnalyticsStageMetric findMetric(List<AnalyticsStageMetric> metrics, String metricTypeCode) {

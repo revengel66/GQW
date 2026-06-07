@@ -43098,3 +43098,257 @@ where alias_type = 'METRIC'
 2026-06-07 16:33:47.855 DEBUG [trace:42530eaa7a9042899a7da3bcd1732a78] [event:] [module:ADMIN] --- [    Test worker] o.s.web.servlet.view.RedirectView        : View name [redirect:], model {}
 2026-06-07 16:36:09.938  WARN [trace:003665b453114429b185ff7d6ec8f275] [event:] [module:ADMIN] --- [nio-8080-exec-3] com.example.gqw.config.TraceIdFilter     : SLOW HTTP GET /analytics-admin/dictionaries -> 200 (6317 ms)
 2026-06-07 16:36:13.196  WARN [trace:0b8f7ba4f0e546dfbae0899ff622296c] [event:] [module:ADMIN] --- [nio-8080-exec-1] com.example.gqw.config.TraceIdFilter     : SLOW HTTP GET /analytics-admin/api/universal/module-breakdown -> 200 (9457 ms)
+2026-06-07 16:49:05.781  WARN [trace:1905534b90714caea6993a47b293a033] [event:] [module:ADMIN] --- [nio-8080-exec-7] com.example.gqw.config.TraceIdFilter     : SLOW HTTP GET /analytics-admin/dictionaries -> 200 (5369 ms)
+2026-06-07 16:49:07.971  WARN [trace:d15f220f366b46689aa51bf1c230c828] [event:] [module:ADMIN] --- [nio-8080-exec-5] com.example.gqw.config.TraceIdFilter     : SLOW HTTP GET /analytics-admin/api/universal/module-breakdown -> 200 (9178 ms)
+2026-06-07 16:49:26.868  WARN [trace:7e38668150cc46e3866ad023aa2f26ca] [event:] [module:ADMIN] --- [nio-8080-exec-8] com.example.gqw.config.TraceIdFilter     : SLOW HTTP GET /analytics-admin/api/universal/module-breakdown -> 200 (5784 ms)
+2026-06-07 16:49:56.499  WARN [trace:69bdb132b131437bba3fc37d91c3a9f6] [event:] [module:ADMIN] --- [nio-8080-exec-7] com.example.gqw.config.TraceIdFilter     : SLOW HTTP GET /analytics-admin/api/universal/module-breakdown -> 200 (4812 ms)
+2026-06-07 16:49:58.058  WARN [trace:25e68310540e41ecbf90ab3213d91027] [event:] [module:ADMIN] --- [io-8080-exec-10] com.example.gqw.config.TraceIdFilter     : SLOW HTTP GET /analytics-admin/api/universal/module-root-cause -> 200 (1555 ms)
+2026-06-07 17:13:59.484  WARN [trace:4d264e4de45a485185c1c5a42be98be2] [event:] [module:ADMIN] --- [nio-8080-exec-6] com.example.gqw.config.TraceIdFilter     : SLOW HTTP GET /analytics-admin/api/universal -> 200 (1868 ms)
+2026-06-07 17:14:01.858  WARN [trace:979aa8cca1554707bf0fbf1cfe06c471] [event:] [module:ADMIN] --- [nio-8080-exec-1] com.example.gqw.config.TraceIdFilter     : SLOW HTTP GET /analytics-admin/api/universal/attribute-breakdown -> 200 (1528 ms)
+2026-06-07 17:14:02.288  WARN [trace:bdadcb327ea94c62a63b67d6990723da] [event:] [module:ADMIN] --- [nio-8080-exec-6] com.example.gqw.config.TraceIdFilter     : SLOW HTTP GET /analytics-admin/api/universal/root-cause -> 200 (2602 ms)
+2026-06-07 17:14:24.549  WARN [trace:4971abc399ac4c569855cd5de6350e99] [event:] [module:ADMIN] --- [nio-8080-exec-2] com.example.gqw.config.TraceIdFilter     : SLOW HTTP GET /analytics-admin/api/universal/module-breakdown -> 200 (25066 ms)
+2026-06-07 17:16:34.002 DEBUG [trace:92978095fa8449af9f9db35b9d18b9b3] [event:] [module:ADMIN] --- [    Test worker] s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.gqw.analytics.controller.AnalyticsEventController#events(Instant, Instant, String, List, String, Boolean, String, String, Integer, String, String, String, String, BigDecimal, BigDecimal, String, String, Boolean, Integer, Integer)
+2026-06-07 17:16:34.026 DEBUG [trace:92978095fa8449af9f9db35b9d18b9b3] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select et1_0.code,et1_0.description,et1_0.is_active,et1_0.is_system,et1_0.module_code,et1_0.name from analytics.event_type et1_0 where et1_0.code=?
+2026-06-07 17:16:34.026 DEBUG [trace:92978095fa8449af9f9db35b9d18b9b3] [event:] [module:ADMIN] --- [    Test worker] m.m.a.RequestResponseBodyMethodProcessor : Using 'application/json', given [application/json] and supported [application/json, application/*+json]
+2026-06-07 17:16:34.026 DEBUG [trace:92978095fa8449af9f9db35b9d18b9b3] [event:] [module:ADMIN] --- [    Test worker] m.m.a.RequestResponseBodyMethodProcessor : Writing [EventListResponse[total=0, page=0, size=20, hasMore=false, items=[]]]
+2026-06-07 17:16:34.119 DEBUG [trace:5d8e37bc9ed44e1bbf8155f02fad0a20] [event:] [module:ADMIN] --- [    Test worker] s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.gqw.analytics.controller.AnalyticsEventController#events(Instant, Instant, String, List, String, Boolean, String, String, Integer, String, String, String, String, BigDecimal, BigDecimal, String, String, Boolean, Integer, Integer)
+2026-06-07 17:16:34.121 DEBUG [trace:5d8e37bc9ed44e1bbf8155f02fad0a20] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select et1_0.code,et1_0.description,et1_0.is_active,et1_0.is_system,et1_0.module_code,et1_0.name from analytics.event_type et1_0 where et1_0.code=?
+2026-06-07 17:16:34.121 DEBUG [trace:5d8e37bc9ed44e1bbf8155f02fad0a20] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select et1_0.code,et1_0.description,et1_0.is_active,et1_0.is_system,et1_0.module_code,et1_0.name from analytics.event_type et1_0 where et1_0.code=?
+2026-06-07 17:16:34.160 DEBUG [trace:5d8e37bc9ed44e1bbf8155f02fad0a20] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select e.*
+  from analytics.event e
+  join analytics.event_type et on et.code = e.event_type_code
+ where e.started_at between ? and ?
+   and et.is_system = ?
+   and (? = false or e.event_type_code in (?))
+   and (? is null or e.module_code = ?)
+   and (
+        ? is null
+        or exists (
+            select 1
+              from analytics.stage stage_filter
+             where stage_filter.event_id = e.id
+               and stage_filter.stage_type_code = ?
+        )
+   )
+   and (? is null or e.is_error = ?)
+   and (? is null or concat(coalesce(e.status_code, 0), '|', coalesce(nullif(trim(e.error_message), ''), 'UNKNOWN')) = ?)
+   and (? is null or e.duration_ms >= ?)
+   and (? is null or lower(coalesce(e.request_path, '')) like lower(concat('%', ?, '%')))
+   and (
+        ? is null
+        or (? = 'NONE' and coalesce(e.is_error, false) = false)
+        or (? = 'VALIDATION' and coalesce(e.is_error, false) = true and coalesce(e.status_code, 0) < 500 and (
+            lower(coalesce(e.error_message, '')) like '%required request parameter%'
+            or lower(coalesce(e.error_message, '')) like '%validation%'
+            or lower(coalesce(e.error_message, '')) like '%bind%'
+            or lower(coalesce(e.error_message, '')) like '%failed to convert%'
+            or lower(coalesce(e.error_message, '')) like '%cannot be null%'
+            or lower(coalesce(e.error_message, '')) like '%must not%'
+            or lower(coalesce(e.error_message, '')) like '%некоррект%'
+            or lower(coalesce(e.error_message, '')) like '%не заполн%'
+            or lower(coalesce(e.error_message, '')) like '%обязатель%'
+            or lower(coalesce(e.error_message, '')) like '%валидац%'
+        ))
+        or (? = 'BUSINESS' and coalesce(e.is_error, false) = true and (
+            (e.status_code = 400 and not (
+                lower(coalesce(e.error_message, '')) like '%required request parameter%'
+                or lower(coalesce(e.error_message, '')) like '%validation%'
+                or lower(coalesce(e.error_message, '')) like '%bind%'
+                or lower(coalesce(e.error_message, '')) like '%failed to convert%'
+                or lower(coalesce(e.error_message, '')) like '%cannot be null%'
+                or lower(coalesce(e.error_message, '')) like '%must not%'
+                or lower(coalesce(e.error_message, '')) like '%некоррект%'
+                or lower(coalesce(e.error_message, '')) like '%не заполн%'
+                or lower(coalesce(e.error_message, '')) like '%обязатель%'
+                or lower(coalesce(e.error_message, '')) like '%валидац%'
+            ))
+            or e.status_code between 401 and 499
+        ))
+        or (? = 'SYSTEM' and coalesce(e.is_error, false) = true and (
+            coalesce(e.status_code, 0) >= 500
+            or (
+                (e.status_code is null or e.status_code < 400 or e.status_code > 499)
+                and not (
+                    lower(coalesce(e.error_message, '')) like '%required request parameter%'
+                    or lower(coalesce(e.error_message, '')) like '%validation%'
+                    or lower(coalesce(e.error_message, '')) like '%bind%'
+                    or lower(coalesce(e.error_message, '')) like '%failed to convert%'
+                    or lower(coalesce(e.error_message, '')) like '%cannot be null%'
+                    or lower(coalesce(e.error_message, '')) like '%must not%'
+                    or lower(coalesce(e.error_message, '')) like '%некоррект%'
+                    or lower(coalesce(e.error_message, '')) like '%не заполн%'
+                    or lower(coalesce(e.error_message, '')) like '%обязатель%'
+                    or lower(coalesce(e.error_message, '')) like '%валидац%'
+                )
+            )
+        ))
+   )
+   and (
+        ? is null
+        or exists (
+            select 1
+              from analytics.event_attribute a
+             where a.event_id = e.id
+               and a.attribute_type_code = ?
+               and (
+                    ? is null
+                    or lower(coalesce(a.attr_value, coalesce(a.attr_value_json, ''))) like lower(concat('%', ?, '%'))
+               )
+        )
+   )
+   and (
+        ? = false
+        or exists (
+            select 1
+              from analytics.stage s
+              join analytics.stage_metric m on m.stage_id = s.id
+             where s.event_id = e.id
+               and (? is null or m.metric_type_code = ?)
+               and (? is null or m.metric_value_num >= ?)
+               and (? is null or m.metric_value_num <= ?)
+        )
+   )
+ order by
+   case when ? = 'durationMs' and ? = true then e.duration_ms end asc nulls last,
+   case when ? = 'durationMs' and ? = false then e.duration_ms end desc nulls last,
+   case when ? = 'statusCode' and ? = true then e.status_code end asc nulls last,
+   case when ? = 'statusCode' and ? = false then e.status_code end desc nulls last,
+   case when ? = 'eventTypeCode' and ? = true then e.event_type_code end asc nulls last,
+   case when ? = 'eventTypeCode' and ? = false then e.event_type_code end desc nulls last,
+   case when ? = 'traceId' and ? = true then e.trace_id end asc nulls last,
+   case when ? = 'traceId' and ? = false then e.trace_id end desc nulls last,
+   case when ? = 'requestPath' and ? = true then e.request_path end asc nulls last,
+   case when ? = 'requestPath' and ? = false then e.request_path end desc nulls last,
+   case when ? = 'isError' and ? = true then e.is_error end asc nulls last,
+   case when ? = 'isError' and ? = false then e.is_error end desc nulls last,
+   case when ? = 'metricValue' and ? = true then (
+        select min(m.metric_value_num)
+          from analytics.stage s
+          join analytics.stage_metric m on m.stage_id = s.id
+         where s.event_id = e.id
+           and (? is null or m.metric_type_code = ?)
+   ) end asc nulls last,
+   case when ? = 'metricValue' and ? = false then (
+        select min(m.metric_value_num)
+          from analytics.stage s
+          join analytics.stage_metric m on m.stage_id = s.id
+         where s.event_id = e.id
+           and (? is null or m.metric_type_code = ?)
+   ) end desc nulls last,
+   case when ? = 'startedAt' and ? = true then e.started_at end asc nulls last,
+   case when ? = 'startedAt' and ? = false then e.started_at end desc nulls last,
+   e.started_at desc,
+   e.id desc fetch first ? rows only
+
+2026-06-07 17:16:34.184 DEBUG [trace:5d8e37bc9ed44e1bbf8155f02fad0a20] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select as1_0.id,as1_0.created_at,as1_0.duration_ms,as1_0.ended_at,as1_0.error_message,as1_0.event_id,as1_0.is_error,as1_0.log_ended_at,as1_0.log_started_at,as1_0.stage_order,as1_0.stage_type_code,as1_0.started_at from analytics.stage as1_0 where as1_0.event_id in (?) order by as1_0.event_id,as1_0.stage_order
+2026-06-07 17:16:34.188 DEBUG [trace:5d8e37bc9ed44e1bbf8155f02fad0a20] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select aea1_0.id,aea1_0.attr_value,aea1_0.attr_value_json,aea1_0.attribute_type_code,aea1_0.created_at,aea1_0.event_id from analytics.event_attribute aea1_0 where aea1_0.event_id in (?)
+2026-06-07 17:16:34.192 DEBUG [trace:5d8e37bc9ed44e1bbf8155f02fad0a20] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select et1_0.code,et1_0.description,et1_0.is_active,et1_0.is_system,et1_0.module_code,et1_0.name from analytics.event_type et1_0 where et1_0.is_active=true order by et1_0.name
+2026-06-07 17:16:34.196 DEBUG [trace:5d8e37bc9ed44e1bbf8155f02fad0a20] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select mt1_0.code,mt1_0.description,mt1_0.is_active,mt1_0.name from analytics.module_type mt1_0 where mt1_0.is_active=true order by mt1_0.name
+2026-06-07 17:16:34.199 DEBUG [trace:5d8e37bc9ed44e1bbf8155f02fad0a20] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select st1_0.code,st1_0.description,st1_0.is_active,st1_0.is_system,st1_0.name from analytics.stage_type st1_0 where st1_0.is_active=true order by st1_0.name
+2026-06-07 17:16:34.202 DEBUG [trace:5d8e37bc9ed44e1bbf8155f02fad0a20] [event:] [module:ADMIN] --- [    Test worker] m.m.a.RequestResponseBodyMethodProcessor : Using 'application/json', given [application/json] and supported [application/json, application/*+json]
+2026-06-07 17:16:34.209 DEBUG [trace:5d8e37bc9ed44e1bbf8155f02fad0a20] [event:] [module:ADMIN] --- [    Test worker] m.m.a.RequestResponseBodyMethodProcessor : Writing [EventListResponse[total=1, page=0, size=20, hasMore=false, items=[EventListItemDto[eventId=4, eventU (truncated)...]
+2026-06-07 17:16:34.218 DEBUG [trace:cb86d8a32a634fe391233d5f7998e4f8] [event:] [module:ADMIN] --- [    Test worker] s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.gqw.analytics.controller.AnalyticsFilterOptionsController#filterOptions(Instant, Instant, String, String, String, String, Boolean)
+2026-06-07 17:16:34.223 DEBUG [trace:cb86d8a32a634fe391233d5f7998e4f8] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select et1_0.code,et1_0.description,et1_0.is_active,et1_0.is_system,et1_0.module_code,et1_0.name from analytics.event_type et1_0 where et1_0.is_system=true order by et1_0.code
+2026-06-07 17:16:34.225 DEBUG [trace:cb86d8a32a634fe391233d5f7998e4f8] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select et1_0.code,et1_0.description,et1_0.is_active,et1_0.is_system,et1_0.module_code,et1_0.name from analytics.event_type et1_0 where et1_0.is_active=true order by et1_0.name
+2026-06-07 17:16:34.226 DEBUG [trace:cb86d8a32a634fe391233d5f7998e4f8] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select mt1_0.code,mt1_0.description,mt1_0.is_active,mt1_0.name from analytics.module_type mt1_0 where mt1_0.is_active=true order by mt1_0.name
+2026-06-07 17:16:34.228 DEBUG [trace:cb86d8a32a634fe391233d5f7998e4f8] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select eat1_0.code,eat1_0.description,eat1_0.is_active,eat1_0.is_system,eat1_0.name,eat1_0.unit_default,eat1_0.value_kind from analytics.event_attribute_type eat1_0 where eat1_0.is_active=true order by eat1_0.name
+2026-06-07 17:16:34.236 DEBUG [trace:cb86d8a32a634fe391233d5f7998e4f8] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select distinct ae1_0.module_code from analytics.event ae1_0 where ae1_0.started_at between ? and ? and ae1_0.module_code is not null and ae1_0.event_type_code in (?,?) order by ae1_0.module_code
+2026-06-07 17:16:34.239 DEBUG [trace:cb86d8a32a634fe391233d5f7998e4f8] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select distinct ae1_0.event_type_code from analytics.event ae1_0 where ae1_0.started_at between ? and ? and (? is null or ae1_0.module_code=?) order by ae1_0.event_type_code
+2026-06-07 17:16:34.243 DEBUG [trace:cb86d8a32a634fe391233d5f7998e4f8] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select distinct aea1_0.attribute_type_code from analytics.event_attribute aea1_0 where exists(select 1 from analytics.event ae1_0 where ae1_0.id=aea1_0.event_id and ae1_0.started_at between ? and ? and (? is null or ae1_0.module_code=?) and (? is null or ae1_0.event_type_code=?)) order by aea1_0.attribute_type_code
+2026-06-07 17:16:34.243 DEBUG [trace:cb86d8a32a634fe391233d5f7998e4f8] [event:] [module:ADMIN] --- [    Test worker] m.m.a.RequestResponseBodyMethodProcessor : Using 'application/json', given [application/json] and supported [application/json, application/*+json]
+2026-06-07 17:16:34.243 DEBUG [trace:cb86d8a32a634fe391233d5f7998e4f8] [event:] [module:ADMIN] --- [    Test worker] m.m.a.RequestResponseBodyMethodProcessor : Writing [FilterOptionsResponse[modules=[OptionDto[code=DEFAULT, name=DEFAULT]], eventTypes=[OptionDto[code=FR (truncated)...]
+2026-06-07 17:16:34.260 DEBUG [trace:644c63014ba847debce928ebb64855e2] [event:] [module:ADMIN] --- [    Test worker] s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.gqw.analytics.controller.AnalyticsUniversalController#universal(Instant, Instant, Boolean, String, List, String, String, String, String, String, BigDecimal, BigDecimal, String, String, BigDecimal, BigDecimal, List, List, Integer, Boolean, Boolean, Boolean)
+2026-06-07 17:16:34.268 DEBUG [trace:644c63014ba847debce928ebb64855e2] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select et1_0.code,et1_0.description,et1_0.is_active,et1_0.is_system,et1_0.module_code,et1_0.name from analytics.event_type et1_0 where et1_0.is_system=true order by et1_0.code
+2026-06-07 17:16:34.268 DEBUG [trace:644c63014ba847debce928ebb64855e2] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select ae1_0.id,ae1_0.created_at,ae1_0.duration_ms,ae1_0.ended_at,ae1_0.error_message,ae1_0.event_type_code,ae1_0.event_uid,ae1_0.http_method,ae1_0.is_error,ae1_0.module_code,ae1_0.request_path,ae1_0.session_id,ae1_0.started_at,ae1_0.status_code,ae1_0.trace_id,ae1_0.user_id from analytics.event ae1_0 where ae1_0.started_at between ? and ? and (? is null or ae1_0.event_type_code=?) and (? is null or ae1_0.module_code=?) order by ae1_0.started_at
+2026-06-07 17:16:34.268 DEBUG [trace:644c63014ba847debce928ebb64855e2] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select as1_0.id,as1_0.created_at,as1_0.duration_ms,as1_0.ended_at,as1_0.error_message,as1_0.event_id,as1_0.is_error,as1_0.log_ended_at,as1_0.log_started_at,as1_0.stage_order,as1_0.stage_type_code,as1_0.started_at from analytics.stage as1_0 where as1_0.event_id in (?) order by as1_0.event_id,as1_0.stage_order
+2026-06-07 17:16:34.268 DEBUG [trace:644c63014ba847debce928ebb64855e2] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select st1_0.code,st1_0.description,st1_0.is_active,st1_0.is_system,st1_0.name from analytics.stage_type st1_0 where st1_0.is_active=true order by st1_0.name
+2026-06-07 17:16:34.276 DEBUG [trace:644c63014ba847debce928ebb64855e2] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select et1_0.code,et1_0.description,et1_0.is_active,et1_0.is_system,et1_0.module_code,et1_0.name from analytics.event_type et1_0 where et1_0.is_active=true order by et1_0.name
+2026-06-07 17:16:34.279 DEBUG [trace:644c63014ba847debce928ebb64855e2] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select eat1_0.code,eat1_0.description,eat1_0.is_active,eat1_0.is_system,eat1_0.name,eat1_0.unit_default,eat1_0.value_kind from analytics.event_attribute_type eat1_0 where eat1_0.is_active=true order by eat1_0.name
+2026-06-07 17:16:34.285 DEBUG [trace:644c63014ba847debce928ebb64855e2] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select aea1_0.id,aea1_0.attr_value,aea1_0.attr_value_json,aea1_0.attribute_type_code,aea1_0.created_at,aea1_0.event_id from analytics.event_attribute aea1_0 where aea1_0.event_id in (?)
+2026-06-07 17:16:34.285  INFO [trace:644c63014ba847debce928ebb64855e2] [event:] [module:ADMIN] --- [    Test worker] c.e.g.a.s.AnalyticsInsightsService       : [UNIVERSAL_PERF] service path=raw totalMs=18 rawQueryMs=2 javaFilterMs=0 stageBatchLoadMs=1 javaGroupingMs=9 attributesMs=1 responseBuildMs=0 includeEventStageBreakdown=false counts events=1 stages=0 series=26 stageRows=0 eventBreakdown=1 eventSeries=1 eventStageBreakdown=0 attrs=0
+2026-06-07 17:16:34.285  INFO [trace:644c63014ba847debce928ebb64855e2] [event:] [module:ADMIN] --- [    Test worker] c.e.g.a.c.AnalyticsUniversalController   : [UNIVERSAL_PERF] controller endpoint=/api/universal totalMs=20 from=2026-06-06T13:16:34.001901200Z to=2026-06-07T14:16:34.001901200Z module=null eventTypes=1 stage=0 attr=null includeEventStageBreakdown=false counts series=26 stages=0 events=1 eventSeries=1 eventStageBreakdown=0
+2026-06-07 17:16:34.285 DEBUG [trace:644c63014ba847debce928ebb64855e2] [event:] [module:ADMIN] --- [    Test worker] m.m.a.RequestResponseBodyMethodProcessor : Using 'application/json', given [application/json] and supported [application/json, application/*+json]
+2026-06-07 17:16:34.303 DEBUG [trace:644c63014ba847debce928ebb64855e2] [event:] [module:ADMIN] --- [    Test worker] m.m.a.RequestResponseBodyMethodProcessor : Writing [UniversalResponse[from=2026-06-06T13:16:34.001901200Z, to=2026-06-07T14:16:34.001901200Z, bucketMinu (truncated)...]
+2026-06-07 17:16:34.318 DEBUG [trace:0f88be1d530446a9ab9247cde2740371] [event:] [module:ADMIN] --- [    Test worker] s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.gqw.analytics.controller.AnalyticsEventController#eventDetails(UUID)
+2026-06-07 17:16:34.318 DEBUG [trace:0f88be1d530446a9ab9247cde2740371] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select ae1_0.id,ae1_0.created_at,ae1_0.duration_ms,ae1_0.ended_at,ae1_0.error_message,ae1_0.event_type_code,ae1_0.event_uid,ae1_0.http_method,ae1_0.is_error,ae1_0.module_code,ae1_0.request_path,ae1_0.session_id,ae1_0.started_at,ae1_0.status_code,ae1_0.trace_id,ae1_0.user_id from analytics.event ae1_0 where ae1_0.event_uid=?
+2026-06-07 17:16:34.318 DEBUG [trace:0f88be1d530446a9ab9247cde2740371] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select as1_0.id,as1_0.created_at,as1_0.duration_ms,as1_0.ended_at,as1_0.error_message,as1_0.event_id,as1_0.is_error,as1_0.log_ended_at,as1_0.log_started_at,as1_0.stage_order,as1_0.stage_type_code,as1_0.started_at from analytics.stage as1_0 where as1_0.event_id=? order by as1_0.stage_order
+2026-06-07 17:16:34.318 DEBUG [trace:0f88be1d530446a9ab9247cde2740371] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select aea1_0.id,aea1_0.attr_value,aea1_0.attr_value_json,aea1_0.attribute_type_code,aea1_0.created_at,aea1_0.event_id from analytics.event_attribute aea1_0 where aea1_0.event_id=?
+2026-06-07 17:16:34.318 DEBUG [trace:0f88be1d530446a9ab9247cde2740371] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select et1_0.code,et1_0.description,et1_0.is_active,et1_0.is_system,et1_0.module_code,et1_0.name from analytics.event_type et1_0 where et1_0.is_active=true order by et1_0.name
+2026-06-07 17:16:34.318 DEBUG [trace:0f88be1d530446a9ab9247cde2740371] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select mt1_0.code,mt1_0.description,mt1_0.is_active,mt1_0.name from analytics.module_type mt1_0 where mt1_0.is_active=true order by mt1_0.name
+2026-06-07 17:16:34.318 DEBUG [trace:0f88be1d530446a9ab9247cde2740371] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select st1_0.code,st1_0.description,st1_0.is_active,st1_0.is_system,st1_0.name from analytics.stage_type st1_0 where st1_0.is_active=true order by st1_0.name
+2026-06-07 17:16:34.327 DEBUG [trace:0f88be1d530446a9ab9247cde2740371] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select smt1_0.code,smt1_0.description,smt1_0.is_active,smt1_0.is_system,smt1_0.name,smt1_0.reading_guide,smt1_0.unit_default,smt1_0.value_kind from analytics.stage_metric_type smt1_0 where smt1_0.is_active=true order by smt1_0.name
+2026-06-07 17:16:34.327 DEBUG [trace:0f88be1d530446a9ab9247cde2740371] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select eat1_0.code,eat1_0.description,eat1_0.is_active,eat1_0.is_system,eat1_0.name,eat1_0.unit_default,eat1_0.value_kind from analytics.event_attribute_type eat1_0 where eat1_0.is_active=true order by eat1_0.name
+2026-06-07 17:16:34.712 DEBUG [trace:0f88be1d530446a9ab9247cde2740371] [event:] [module:ADMIN] --- [    Test worker] o.s.jdbc.core.JdbcTemplate               : Executing prepared SQL query
+2026-06-07 17:16:34.712 DEBUG [trace:0f88be1d530446a9ab9247cde2740371] [event:] [module:ADMIN] --- [    Test worker] o.s.jdbc.core.JdbcTemplate               : Executing prepared SQL statement [select to_regclass(?) is not null]
+2026-06-07 17:16:34.718 DEBUG [trace:0f88be1d530446a9ab9247cde2740371] [event:] [module:ADMIN] --- [    Test worker] o.s.jdbc.core.JdbcTemplate               : Executing prepared SQL query
+2026-06-07 17:16:34.718 DEBUG [trace:0f88be1d530446a9ab9247cde2740371] [event:] [module:ADMIN] --- [    Test worker] o.s.jdbc.core.JdbcTemplate               : Executing prepared SQL statement [    select count(*)
+    from information_schema.tables
+    where lower(table_schema) = lower(?)
+      and lower(table_name) = lower(?)
+]
+2026-06-07 17:16:34.719 DEBUG [trace:0f88be1d530446a9ab9247cde2740371] [event:] [module:ADMIN] --- [    Test worker] o.s.jdbc.core.JdbcTemplate               : Executing prepared SQL query
+2026-06-07 17:16:34.719 DEBUG [trace:0f88be1d530446a9ab9247cde2740371] [event:] [module:ADMIN] --- [    Test worker] o.s.jdbc.core.JdbcTemplate               : Executing prepared SQL statement [select to_regclass(?) is not null]
+2026-06-07 17:16:34.719 DEBUG [trace:0f88be1d530446a9ab9247cde2740371] [event:] [module:ADMIN] --- [    Test worker] o.s.jdbc.core.JdbcTemplate               : Executing prepared SQL query
+2026-06-07 17:16:34.719 DEBUG [trace:0f88be1d530446a9ab9247cde2740371] [event:] [module:ADMIN] --- [    Test worker] o.s.jdbc.core.JdbcTemplate               : Executing prepared SQL statement [    select count(*)
+    from information_schema.tables
+    where lower(table_schema) = lower(?)
+      and lower(table_name) = lower(?)
+]
+2026-06-07 17:16:34.722 DEBUG [trace:0f88be1d530446a9ab9247cde2740371] [event:] [module:ADMIN] --- [    Test worker] m.m.a.RequestResponseBodyMethodProcessor : Using 'application/json', given [application/json] and supported [application/json, application/*+json]
+2026-06-07 17:16:34.737 DEBUG [trace:0f88be1d530446a9ab9247cde2740371] [event:] [module:ADMIN] --- [    Test worker] m.m.a.RequestResponseBodyMethodProcessor : Writing [EventDetailsResponse[eventUid=7fc098fb-fef9-4025-8be1-3e7101c8ac3d, startedAt=2026-06-07T13:16:33.99 (truncated)...]
+2026-06-07 17:16:35.568 DEBUG [trace:94334fdcde6844c38c31515cb259ccf1] [event:] [module:ADMIN] --- [    Test worker] s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.gqw.analytics.controller.AnalyticsDictionaryController#dictionaries(String, Boolean)
+2026-06-07 17:16:35.569 DEBUG [trace:94334fdcde6844c38c31515cb259ccf1] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select mt1_0.code,mt1_0.description,mt1_0.is_active,mt1_0.name from analytics.module_type mt1_0 where mt1_0.is_active=true order by mt1_0.name
+2026-06-07 17:16:35.572 DEBUG [trace:94334fdcde6844c38c31515cb259ccf1] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select et1_0.code,et1_0.description,et1_0.is_active,et1_0.is_system,et1_0.module_code,et1_0.name from analytics.event_type et1_0 where et1_0.is_active=true and et1_0.is_system=false order by et1_0.name
+2026-06-07 17:16:35.573 DEBUG [trace:94334fdcde6844c38c31515cb259ccf1] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select st1_0.code,st1_0.description,st1_0.is_active,st1_0.is_system,st1_0.name from analytics.stage_type st1_0 where st1_0.is_active=true order by st1_0.name
+2026-06-07 17:16:35.575 DEBUG [trace:94334fdcde6844c38c31515cb259ccf1] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select smt1_0.code,smt1_0.description,smt1_0.is_active,smt1_0.is_system,smt1_0.name,smt1_0.reading_guide,smt1_0.unit_default,smt1_0.value_kind from analytics.stage_metric_type smt1_0 where smt1_0.is_active=true order by smt1_0.name
+2026-06-07 17:16:35.576 DEBUG [trace:94334fdcde6844c38c31515cb259ccf1] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select eat1_0.code,eat1_0.description,eat1_0.is_active,eat1_0.is_system,eat1_0.name,eat1_0.unit_default,eat1_0.value_kind from analytics.event_attribute_type eat1_0 where eat1_0.is_active=true order by eat1_0.name
+2026-06-07 17:16:35.578 DEBUG [trace:94334fdcde6844c38c31515cb259ccf1] [event:] [module:ADMIN] --- [    Test worker] m.m.a.RequestResponseBodyMethodProcessor : Using 'application/json', given [application/json] and supported [application/json, application/*+json]
+2026-06-07 17:16:35.579 DEBUG [trace:94334fdcde6844c38c31515cb259ccf1] [event:] [module:ADMIN] --- [    Test worker] m.m.a.RequestResponseBodyMethodProcessor : Writing [DictionariesResponse[modules=[], eventTypes=[OptionDto[code=ANNOTATION_METRIC_EVENT, name=Annotation (truncated)...]
+2026-06-07 17:16:35.752 DEBUG [trace:d7975a73e6f545fcac0b3ba3adf02b35] [event:] [module:ADMIN] --- [    Test worker] s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.gqw.analytics.controller.AnalyticsAdminController#precheckDeleteStageMetricType(String, String)
+2026-06-07 17:16:35.753 DEBUG [trace:d7975a73e6f545fcac0b3ba3adf02b35] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select count(*) from analytics.admin_user aau1_0
+2026-06-07 17:16:35.754 DEBUG [trace:d7975a73e6f545fcac0b3ba3adf02b35] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select smt1_0.code,smt1_0.description,smt1_0.is_active,smt1_0.is_system,smt1_0.name,smt1_0.reading_guide,smt1_0.unit_default,smt1_0.value_kind from analytics.stage_metric_type smt1_0 where smt1_0.code=?
+2026-06-07 17:16:35.783 DEBUG [trace:d7975a73e6f545fcac0b3ba3adf02b35] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select count(asm1_0.id) from analytics.stage_metric asm1_0 where asm1_0.metric_type_code=?
+2026-06-07 17:16:35.785 DEBUG [trace:d7975a73e6f545fcac0b3ba3adf02b35] [event:] [module:ADMIN] --- [    Test worker] o.s.jdbc.core.JdbcTemplate               : Executing prepared SQL query
+2026-06-07 17:16:35.785 DEBUG [trace:d7975a73e6f545fcac0b3ba3adf02b35] [event:] [module:ADMIN] --- [    Test worker] o.s.jdbc.core.JdbcTemplate               : Executing prepared SQL statement [select count(*) from analytics.stage_metric_rollup_bucket where metric_type_code = ?]
+2026-06-07 17:16:35.786 DEBUG [trace:d7975a73e6f545fcac0b3ba3adf02b35] [event:] [module:ADMIN] --- [    Test worker] m.m.a.RequestResponseBodyMethodProcessor : Using 'application/json', given [*/*] and supported [application/json, application/*+json]
+2026-06-07 17:16:35.787 DEBUG [trace:d7975a73e6f545fcac0b3ba3adf02b35] [event:] [module:ADMIN] --- [    Test worker] m.m.a.RequestResponseBodyMethodProcessor : Writing [{ok=true, code=ANNOTATION_SERVICE_METRIC, deletable=false, reason=Нельзя удалить метрику: она исполь (truncated)...]
+2026-06-07 17:16:35.789 DEBUG [trace:81b4382fc02846ee9c991e400965b527] [event:] [module:ADMIN] --- [    Test worker] s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.gqw.analytics.controller.AnalyticsAdminController#deleteStageMetricType(String, String, RedirectAttributes)
+2026-06-07 17:16:35.789 DEBUG [trace:81b4382fc02846ee9c991e400965b527] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select count(*) from analytics.admin_user aau1_0
+2026-06-07 17:16:35.794 DEBUG [trace:81b4382fc02846ee9c991e400965b527] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select smt1_0.code,smt1_0.description,smt1_0.is_active,smt1_0.is_system,smt1_0.name,smt1_0.reading_guide,smt1_0.unit_default,smt1_0.value_kind from analytics.stage_metric_type smt1_0 where smt1_0.code=?
+2026-06-07 17:16:35.806 DEBUG [trace:81b4382fc02846ee9c991e400965b527] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select count(asm1_0.id) from analytics.stage_metric asm1_0 where asm1_0.metric_type_code=?
+2026-06-07 17:16:35.807 DEBUG [trace:81b4382fc02846ee9c991e400965b527] [event:] [module:ADMIN] --- [    Test worker] o.s.jdbc.core.JdbcTemplate               : Executing prepared SQL query
+2026-06-07 17:16:35.807 DEBUG [trace:81b4382fc02846ee9c991e400965b527] [event:] [module:ADMIN] --- [    Test worker] o.s.jdbc.core.JdbcTemplate               : Executing prepared SQL statement [select count(*) from analytics.stage_metric_rollup_bucket where metric_type_code = ?]
+2026-06-07 17:16:35.812 DEBUG [trace:81b4382fc02846ee9c991e400965b527] [event:] [module:ADMIN] --- [    Test worker] o.s.web.servlet.view.RedirectView        : View name [redirect:], model {}
+2026-06-07 17:16:36.454  WARN [trace:3d44e120194b4021aacd84c598dc1391] [event:] [module:ADMIN] --- [    Test worker] com.example.gqw.config.TraceIdFilter     : HTTP GET /analytics/api/dictionaries -> 403 (1 ms) | handler='-' | error='-' | cause='-' | query='-' | userAgent='-'
+2026-06-07 17:16:36.482 DEBUG [trace:de44ced1725a4f80b99c35bddb332cab] [event:] [module:ADMIN] --- [    Test worker] s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.gqw.analytics.controller.AnalyticsAdminController#precheckDeleteStageMetricType(String, String)
+2026-06-07 17:16:36.482 DEBUG [trace:de44ced1725a4f80b99c35bddb332cab] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select count(*) from analytics.admin_user aau1_0
+2026-06-07 17:16:36.482 DEBUG [trace:de44ced1725a4f80b99c35bddb332cab] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select smt1_0.code,smt1_0.description,smt1_0.is_active,smt1_0.is_system,smt1_0.name,smt1_0.reading_guide,smt1_0.unit_default,smt1_0.value_kind from analytics.stage_metric_type smt1_0 where smt1_0.code=?
+2026-06-07 17:16:36.485 DEBUG [trace:de44ced1725a4f80b99c35bddb332cab] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select count(asm1_0.id) from analytics.stage_metric asm1_0 where asm1_0.metric_type_code=?
+2026-06-07 17:16:36.485 DEBUG [trace:de44ced1725a4f80b99c35bddb332cab] [event:] [module:ADMIN] --- [    Test worker] o.s.jdbc.core.JdbcTemplate               : Executing prepared SQL query
+2026-06-07 17:16:36.491 DEBUG [trace:de44ced1725a4f80b99c35bddb332cab] [event:] [module:ADMIN] --- [    Test worker] o.s.jdbc.core.JdbcTemplate               : Executing prepared SQL statement [select count(*) from analytics.stage_metric_rollup_bucket where metric_type_code = ?]
+2026-06-07 17:16:36.491 DEBUG [trace:de44ced1725a4f80b99c35bddb332cab] [event:] [module:ADMIN] --- [    Test worker] m.m.a.RequestResponseBodyMethodProcessor : Using 'application/json', given [*/*] and supported [application/json, application/*+json]
+2026-06-07 17:16:36.491 DEBUG [trace:de44ced1725a4f80b99c35bddb332cab] [event:] [module:ADMIN] --- [    Test worker] m.m.a.RequestResponseBodyMethodProcessor : Writing [{ok=true, code=UNUSED_DELETE_METRIC, deletable=true, reason=, usages=[], metricValueCount=1, rollupC (truncated)...]
+2026-06-07 17:16:36.493 DEBUG [trace:b5951ba03c28416a8f777c44af29bdf8] [event:] [module:ADMIN] --- [    Test worker] s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.gqw.analytics.controller.AnalyticsAdminController#deleteStageMetricType(String, String, RedirectAttributes)
+2026-06-07 17:16:36.493 DEBUG [trace:b5951ba03c28416a8f777c44af29bdf8] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select count(*) from analytics.admin_user aau1_0
+2026-06-07 17:16:36.494 DEBUG [trace:b5951ba03c28416a8f777c44af29bdf8] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select smt1_0.code,smt1_0.description,smt1_0.is_active,smt1_0.is_system,smt1_0.name,smt1_0.reading_guide,smt1_0.unit_default,smt1_0.value_kind from analytics.stage_metric_type smt1_0 where smt1_0.code=?
+2026-06-07 17:16:36.501 DEBUG [trace:b5951ba03c28416a8f777c44af29bdf8] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : select count(asm1_0.id) from analytics.stage_metric asm1_0 where asm1_0.metric_type_code=?
+2026-06-07 17:16:36.501 DEBUG [trace:b5951ba03c28416a8f777c44af29bdf8] [event:] [module:ADMIN] --- [    Test worker] o.s.jdbc.core.JdbcTemplate               : Executing prepared SQL query
+2026-06-07 17:16:36.501 DEBUG [trace:b5951ba03c28416a8f777c44af29bdf8] [event:] [module:ADMIN] --- [    Test worker] o.s.jdbc.core.JdbcTemplate               : Executing prepared SQL statement [select count(*) from analytics.stage_metric_rollup_bucket where metric_type_code = ?]
+2026-06-07 17:16:36.501 DEBUG [trace:b5951ba03c28416a8f777c44af29bdf8] [event:] [module:ADMIN] --- [    Test worker] o.s.jdbc.core.JdbcTemplate               : Executing prepared SQL update
+2026-06-07 17:16:36.501 DEBUG [trace:b5951ba03c28416a8f777c44af29bdf8] [event:] [module:ADMIN] --- [    Test worker] o.s.jdbc.core.JdbcTemplate               : Executing prepared SQL statement [delete from analytics.stage_metric_rollup_bucket where metric_type_code = ?]
+2026-06-07 17:16:36.501 DEBUG [trace:b5951ba03c28416a8f777c44af29bdf8] [event:] [module:ADMIN] --- [    Test worker] o.s.jdbc.core.JdbcTemplate               : Executing prepared SQL update
+2026-06-07 17:16:36.501 DEBUG [trace:b5951ba03c28416a8f777c44af29bdf8] [event:] [module:ADMIN] --- [    Test worker] o.s.jdbc.core.JdbcTemplate               : Executing prepared SQL statement [delete from analytics.stage_metric where metric_type_code = ?]
+2026-06-07 17:16:36.501 DEBUG [trace:b5951ba03c28416a8f777c44af29bdf8] [event:] [module:ADMIN] --- [    Test worker] o.s.jdbc.core.JdbcTemplate               : Executing prepared SQL update
+2026-06-07 17:16:36.501 DEBUG [trace:b5951ba03c28416a8f777c44af29bdf8] [event:] [module:ADMIN] --- [    Test worker] o.s.jdbc.core.JdbcTemplate               : Executing prepared SQL statement [delete from analytics.code_alias
+where alias_type = 'METRIC'
+  and (source_code = ? or target_code = ?)
+]
+2026-06-07 17:16:36.513 DEBUG [trace:b5951ba03c28416a8f777c44af29bdf8] [event:] [module:ADMIN] --- [    Test worker] org.hibernate.SQL                        : delete from analytics.stage_metric_type where code=?
+2026-06-07 17:16:36.517 DEBUG [trace:b5951ba03c28416a8f777c44af29bdf8] [event:] [module:ADMIN] --- [    Test worker] o.s.web.servlet.view.RedirectView        : View name [redirect:], model {}
+2026-06-07 17:16:37.924  WARN [trace:c3f029da51534d10b1b8e6d69b073db1] [event:] [module:ADMIN] --- [nio-8080-exec-3] com.example.gqw.config.TraceIdFilter     : SLOW HTTP GET /analytics-admin/dictionaries -> 200 (8194 ms)
+2026-06-07 17:16:56.259  WARN [trace:9dd0b821d5c146bc9752d92a67c6e3bf] [event:] [module:ADMIN] --- [nio-8080-exec-3] com.example.gqw.config.TraceIdFilter     : SLOW HTTP GET /analytics-admin/api/universal/module-breakdown -> 200 (4960 ms)
+2026-06-07 17:17:33.297  WARN [trace:e9e11266af0249249244d5eef1837b3f] [event:] [module:ADMIN] --- [nio-8080-exec-6] com.example.gqw.config.TraceIdFilter     : SLOW HTTP GET /analytics-admin/dictionaries -> 200 (4904 ms)
+2026-06-07 17:21:33.311  WARN [trace:c44777ff60274ca989b2ee67ddb21fcd] [event:] [module:ADMIN] --- [nio-8080-exec-9] com.example.gqw.config.TraceIdFilter     : SLOW HTTP GET /analytics-admin/api/universal/module-breakdown -> 200 (4708 ms)
+2026-06-07 17:21:34.827  WARN [trace:e5d582cdb40c482abdb7cdac810e2c55] [event:] [module:ADMIN] --- [nio-8080-exec-2] com.example.gqw.config.TraceIdFilter     : SLOW HTTP GET /analytics-admin/api/universal/module-root-cause -> 200 (1506 ms)
+2026-06-07 17:34:43.813  WARN [trace:05b89fb6d55d4ceb8a4ecd2f187f7dad] [event:] [module:ADMIN] --- [nio-8080-exec-7] com.example.gqw.config.TraceIdFilter     : SLOW HTTP GET /analytics-admin/dictionaries -> 200 (4572 ms)
+2026-06-07 17:37:30.411  WARN [trace:cbc007b5a2aa4ad7a928e3957604cf73] [event:] [module:ADMIN] --- [io-8080-exec-10] com.example.gqw.config.TraceIdFilter     : SLOW HTTP GET /analytics-admin/dictionaries -> 200 (3031 ms)

@@ -8,7 +8,9 @@ import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.reflect.MethodSignature;
+import org.springframework.aop.support.AopUtils;
 import org.springframework.core.Ordered;
+import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
@@ -36,6 +38,9 @@ public class AnalyticsServiceStageAspect {
             return joinPoint.proceed();
         }
         if (isAnalyticsInfrastructure(joinPoint)) {
+            return joinPoint.proceed();
+        }
+        if (hasCustomAnalyticsLayer(joinPoint)) {
             return joinPoint.proceed();
         }
 
@@ -140,5 +145,21 @@ public class AnalyticsServiceStageAspect {
 
     private static boolean isAnalyticsType(String typeName) {
         return typeName != null && typeName.startsWith(ANALYTICS_PACKAGE_PREFIX);
+    }
+
+    private static boolean hasCustomAnalyticsLayer(ProceedingJoinPoint joinPoint) {
+        MethodSignature signature = (MethodSignature) joinPoint.getSignature();
+        java.lang.reflect.Method signatureMethod = signature.getMethod();
+        Object target = joinPoint.getTarget();
+        java.lang.reflect.Method method = target == null
+            ? signatureMethod
+            : AopUtils.getMostSpecificMethod(signatureMethod, target.getClass());
+        if (AnnotationUtils.findAnnotation(method, TrackAnalyticsLayer.class) != null) {
+            return true;
+        }
+        if (target != null && AnnotationUtils.findAnnotation(target.getClass(), TrackAnalyticsLayer.class) != null) {
+            return true;
+        }
+        return AnnotationUtils.findAnnotation(signature.getDeclaringType(), TrackAnalyticsLayer.class) != null;
     }
 }
