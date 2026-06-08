@@ -1,5 +1,7 @@
 package com.example.gqw.analytics.service;
 
+import org.springframework.beans.factory.annotation.Qualifier;
+
 import com.example.gqw.analytics.web.dto.AnalyticsApiDto.TimeSeriesPointDto;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -46,7 +48,7 @@ public class AnalyticsTimeRollupService {
     private volatile Instant lastScheduledRefreshAt;
 
     public AnalyticsTimeRollupService(
-        NamedParameterJdbcTemplate jdbcTemplate,
+        @Qualifier("analyticsNamedParameterJdbcTemplate") NamedParameterJdbcTemplate jdbcTemplate,
         AnalyticsRuntimeSettingsService runtimeSettingsService,
         @Value("${app.analytics.time-rollup.enabled:true}") boolean enabled,
         @Value("${app.analytics.time-rollup.refresh-interval-minutes:5}") int refreshIntervalMinutes,
@@ -62,7 +64,7 @@ public class AnalyticsTimeRollupService {
         this.defaultBootstrapLookbackDays = Math.max(1, bootstrapLookbackDays);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public boolean isEnabled() {
         if (!runtimeSettingsService.getBoolean(AnalyticsRuntimeSettingsService.KEY_TIME_ROLLUP_ENABLED, defaultEnabled)) {
             return false;
@@ -95,7 +97,7 @@ public class AnalyticsTimeRollupService {
         return best;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public List<AggregatePoint> loadEventAggregatePoints(
         Instant from,
         Instant to,
@@ -132,7 +134,7 @@ public class AnalyticsTimeRollupService {
         return merged;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public List<AggregatePoint> loadEventAggregatePoints(
         Instant from,
         Instant to,
@@ -147,7 +149,7 @@ public class AnalyticsTimeRollupService {
         return queryRawEventPoints(from, to, moduleCode, eventTypeCodes, targetBucketMinutes, isError);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public List<AggregatePoint> loadStageAggregatePoints(
         Instant from,
         Instant to,
@@ -193,7 +195,7 @@ public class AnalyticsTimeRollupService {
         return merged;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public List<AggregatePoint> loadStageAggregatePointsByEvent(
         Instant from,
         Instant to,
@@ -240,7 +242,7 @@ public class AnalyticsTimeRollupService {
     }
 
     @Scheduled(cron = "0 * * * * *")
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public void scheduledRefresh() {
         int intervalMinutes = runtimeSettingsService.getInt(
             AnalyticsRuntimeSettingsService.KEY_TIME_ROLLUP_REFRESH_INTERVAL_MINUTES,
@@ -281,7 +283,7 @@ public class AnalyticsTimeRollupService {
         }
     }
 
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public void initializeIfNeeded() {
         synchronized (refreshLock) {
             refreshAllGranularities();

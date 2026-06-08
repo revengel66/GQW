@@ -7,17 +7,17 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AnalyticsCodeResolverService {
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public String resolveEventTypeCode(String code) {
         return normalizeCode(code);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public String resolveAttributeTypeCode(String code) {
         return normalizeCode(code);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public String resolveMetricTypeCode(String code) {
         return normalizeCode(code);
     }

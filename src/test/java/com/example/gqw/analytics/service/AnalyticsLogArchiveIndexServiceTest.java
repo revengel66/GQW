@@ -119,7 +119,10 @@ class AnalyticsLogArchiveIndexServiceTest {
         Files.createDirectories(archiveDir);
         Files.writeString(archiveDir.resolve("SHOP.2026-06-03.10.log.gz"), "not indexed yet");
 
-        AnalyticsLogViewService logViewService = new AnalyticsLogViewService(logIndexService);
+        AnalyticsLogViewService logViewService = new AnalyticsLogViewService(
+            logIndexService,
+            new AnalyticsLoggingPolicy(settingsService)
+        );
         ReflectionTestUtils.setField(logViewService, "appLogFilePath", tempDir.resolve("logs").resolve("gqw.log").toString());
         ReflectionTestUtils.setField(logViewService, "moduleLogDir", tempDir.resolve("logs").resolve("analytics").resolve("modules").toString());
 

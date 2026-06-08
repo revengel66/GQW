@@ -1,5 +1,7 @@
 package com.example.gqw.analytics.config;
 
+import org.springframework.beans.factory.annotation.Qualifier;
+
 import javax.sql.DataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,8 +26,8 @@ public class AnalyticsMetricNamesPatchConfig {
 
     @Bean
     CommandLineRunner patchAnalyticsMetricNames(
-        DataSource dataSource,
-        JdbcTemplate jdbcTemplate
+        @Qualifier("analyticsDataSource") DataSource dataSource,
+        @Qualifier("analyticsJdbcTemplate") JdbcTemplate jdbcTemplate
     ) {
         return args -> {
             if (!schemaExists(jdbcTemplate, "analytics")) {

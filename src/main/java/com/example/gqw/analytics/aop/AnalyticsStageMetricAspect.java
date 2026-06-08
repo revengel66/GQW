@@ -3,6 +3,8 @@ package com.example.gqw.analytics.aop;
 import com.example.gqw.analytics.entity.MetricValueKind;
 import com.example.gqw.analytics.entity.StageMetricType;
 import com.example.gqw.analytics.repository.StageMetricTypeRepository;
+import com.example.gqw.analytics.service.AnalyticsInstrumentationPolicy;
+import com.example.gqw.analytics.service.AnalyticsLoggingPolicy;
 import com.example.gqw.analytics.service.AnalyticsTrackingApi;
 import com.example.gqw.config.TraceIdFilter;
 import jakarta.servlet.http.HttpServletRequest;
@@ -38,19 +40,28 @@ public class AnalyticsStageMetricAspect {
 
     private final AnalyticsTrackingApi analyticsTrackingApi;
     private final StageMetricTypeRepository stageMetricTypeRepository;
+    private final AnalyticsInstrumentationPolicy instrumentationPolicy;
+    private final AnalyticsLoggingPolicy loggingPolicy;
     private final ExpressionParser expressionParser = new SpelExpressionParser();
     private final ParameterNameDiscoverer parameterNameDiscoverer = new DefaultParameterNameDiscoverer();
 
     public AnalyticsStageMetricAspect(
         AnalyticsTrackingApi analyticsTrackingApi,
-        StageMetricTypeRepository stageMetricTypeRepository
+        StageMetricTypeRepository stageMetricTypeRepository,
+        AnalyticsInstrumentationPolicy instrumentationPolicy,
+        AnalyticsLoggingPolicy loggingPolicy
     ) {
         this.analyticsTrackingApi = analyticsTrackingApi;
         this.stageMetricTypeRepository = stageMetricTypeRepository;
+        this.instrumentationPolicy = instrumentationPolicy;
+        this.loggingPolicy = loggingPolicy;
     }
 
     @Around("@annotation(com.example.gqw.analytics.aop.TrackAnalyticsStageMetric)")
     public Object aroundStageMetric(ProceedingJoinPoint joinPoint) throws Throwable {
+        if (!instrumentationPolicy.isEnabled()) {
+            return joinPoint.proceed();
+        }
         Method method = resolveAnnotatedMethod(joinPoint);
         TrackAnalyticsStageMetric annotation = AnnotationUtils.findAnnotation(method, TrackAnalyticsStageMetric.class);
         if (annotation == null) {
@@ -265,13 +276,16 @@ public class AnalyticsStageMetricAspect {
         String reason,
         RuntimeException exception
     ) {
+        if (!loggingPolicy.isStrictWarningsEnabled()) {
+            return;
+        }
         AnalyticsEventContext context = AnalyticsEventContextHolder.get();
         String eventUid = context == null ? "" : String.valueOf(context.eventUid());
         String traceId = MDC.get(TraceIdFilter.TRACE_ID_MDC_KEY);
         String path = request == null ? "" : request.getRequestURI();
         if (exception == null) {
             log.warn(
-                "Analytics stage metric skipped: code={}, expression={}, class={}, method={}, path={}, traceId={}, eventUid={}, stageId={}, required={}, reason={}",
+                "Analytics metric skipped: code={}, expression={}, class={}, method={}, path={}, traceId={}, eventUid={}, stageId={}, required={}, reason={}",
                 metric.code(),
                 metric.value(),
                 method.getDeclaringClass().getSimpleName(),
@@ -286,7 +300,7 @@ public class AnalyticsStageMetricAspect {
             return;
         }
         log.warn(
-            "Analytics stage metric skipped: code={}, expression={}, class={}, method={}, path={}, traceId={}, eventUid={}, stageId={}, required={}, reason={}",
+            "Analytics metric skipped: code={}, expression={}, class={}, method={}, path={}, traceId={}, eventUid={}, stageId={}, required={}, reason={}",
             metric.code(),
             metric.value(),
             method.getDeclaringClass().getSimpleName(),

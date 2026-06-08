@@ -1,5 +1,6 @@
 package com.example.gqw;
 
+import com.example.gqw.analytics.aop.TrackAnalyticsAttribute;
 import com.example.gqw.analytics.aop.TrackAnalyticsEvent;
 import com.example.gqw.analytics.aop.TrackAnalyticsMetric;
 import java.util.Map;
@@ -33,6 +34,50 @@ public class AnalyticsMetricAnnotationTestController {
         return Map.of("ok", true);
     }
 
+    @GetMapping("/test/analytics/events/unknown")
+    @TrackAnalyticsEvent(code = "UNKNOWN_EVENT_FOR_TEST", trackPayloadSize = false)
+    public Map<String, Object> unknownEvent() {
+        return Map.of("ok", true);
+    }
+
+    @GetMapping("/test/analytics/events/inactive")
+    @TrackAnalyticsEvent(code = "INACTIVE_EVENT_FOR_TEST", trackPayloadSize = false)
+    public Map<String, Object> inactiveEvent() {
+        return Map.of("ok", true);
+    }
+
+    @GetMapping("/test/analytics/modules/unknown")
+    @TrackAnalyticsEvent(code = "UNKNOWN_MODULE_EVENT_FOR_TEST", trackPayloadSize = false)
+    public Map<String, Object> unknownModule() {
+        return Map.of("ok", true);
+    }
+
+    @GetMapping("/test/analytics/modules/inactive")
+    @TrackAnalyticsEvent(code = "INACTIVE_MODULE_EVENT_FOR_TEST", trackPayloadSize = false)
+    public Map<String, Object> inactiveModule() {
+        return Map.of("ok", true);
+    }
+
+    @GetMapping("/test/analytics/attributes/unknown")
+    @TrackAnalyticsEvent(
+        code = "ANNOTATION_METRIC_EVENT",
+        attributes = @TrackAnalyticsAttribute(code = "UNKNOWN_ATTRIBUTE_FOR_TEST", value = "'value'"),
+        trackPayloadSize = false
+    )
+    public Map<String, Object> unknownAttribute() {
+        return Map.of("ok", true);
+    }
+
+    @GetMapping("/test/analytics/attributes/inactive")
+    @TrackAnalyticsEvent(
+        code = "ANNOTATION_METRIC_EVENT",
+        attributes = @TrackAnalyticsAttribute(code = "INACTIVE_ATTRIBUTE_FOR_TEST", value = "'value'"),
+        trackPayloadSize = false
+    )
+    public Map<String, Object> inactiveAttribute() {
+        return Map.of("ok", true);
+    }
+
     @GetMapping("/test/analytics/metrics/unknown")
     @TrackAnalyticsEvent(
         code = "ANNOTATION_METRIC_EVENT",
@@ -40,6 +85,16 @@ public class AnalyticsMetricAnnotationTestController {
         trackPayloadSize = false
     )
     public Map<String, Object> unknown() {
+        return Map.of("ok", true);
+    }
+
+    @GetMapping("/test/analytics/metrics/inactive")
+    @TrackAnalyticsEvent(
+        code = "ANNOTATION_METRIC_EVENT",
+        metrics = @TrackAnalyticsMetric(code = "INACTIVE_METRIC_FOR_TEST", value = "'7'"),
+        trackPayloadSize = false
+    )
+    public Map<String, Object> inactiveMetric() {
         return Map.of("ok", true);
     }
 

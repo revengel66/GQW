@@ -1,5 +1,7 @@
 package com.example.gqw.analytics.service;
 
+import org.springframework.beans.factory.annotation.Qualifier;
+
 import com.example.gqw.analytics.web.dto.AnalyticsApiDto.EventLogEntryDto;
 import com.example.gqw.analytics.web.dto.AnalyticsApiDto.EventLogExcerptDto;
 import java.io.BufferedInputStream;
@@ -75,7 +77,7 @@ public class AnalyticsLogArchiveIndexService {
     private String moduleLogDir;
 
     public AnalyticsLogArchiveIndexService(
-        NamedParameterJdbcTemplate jdbcTemplate,
+        @Qualifier("analyticsNamedParameterJdbcTemplate") NamedParameterJdbcTemplate jdbcTemplate,
         AnalyticsRuntimeSettingsService runtimeSettingsService
     ) {
         this.jdbcTemplate = jdbcTemplate;
@@ -121,7 +123,7 @@ public class AnalyticsLogArchiveIndexService {
         cleanupOldLogsNow();
     }
 
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public LogIndexRunResult indexAvailableFilesNow() {
         long startedAt = System.nanoTime();
         if (!running.compareAndSet(false, true)) {
@@ -221,7 +223,7 @@ public class AnalyticsLogArchiveIndexService {
         }
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public IndexedTraceLookup findIndexedTrace(String traceId, String eventUid, String moduleCode) {
         String normalizedTrace = trim(traceId);
         if (normalizedTrace == null || !tableExists("analytics.log_trace_index")) {
@@ -353,7 +355,7 @@ public class AnalyticsLogArchiveIndexService {
         return rows;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public LogIndexDiagnostics diagnostics() {
         LogFileCounts fileCounts = countFilesOnDisk();
         if (!tableExists("analytics.log_file_index")) {
@@ -751,7 +753,7 @@ public class AnalyticsLogArchiveIndexService {
         );
     }
 
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public LogRetentionCleanupResult cleanupOldLogsNow() {
         long startedAt = System.nanoTime();
         boolean enabled = runtimeSettingsService.getBoolean(

@@ -1,5 +1,7 @@
 package com.example.gqw.config;
 
+import org.springframework.beans.factory.annotation.Qualifier;
+
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -13,7 +15,7 @@ public class AnalyticsTimeRollupSchemaConfig {
 
     @Bean
     @Order(205)
-    CommandLineRunner ensureAnalyticsTimeRollupSchema(JdbcTemplate jdbcTemplate) {
+    CommandLineRunner ensureAnalyticsTimeRollupSchema(@Qualifier("analyticsJdbcTemplate") JdbcTemplate jdbcTemplate) {
         return args -> {
             if (!tableExists(jdbcTemplate, "analytics.event") || !tableExists(jdbcTemplate, "analytics.stage")) {
                 return;
@@ -28,6 +30,12 @@ public class AnalyticsTimeRollupSchemaConfig {
                         updated_at timestamp with time zone not null default now(),
                         primary key (scope_code, granularity_minutes)
                     )
+                """
+            );
+            jdbcTemplate.execute(
+                """
+                    create unique index if not exists idx_time_rollup_watermark_scope_granularity
+                    on analytics.time_rollup_watermark (scope_code, granularity_minutes)
                 """
             );
 
@@ -78,6 +86,12 @@ public class AnalyticsTimeRollupSchemaConfig {
             );
             jdbcTemplate.execute(
                 """
+                    create unique index if not exists event_rollup_bucket_pkey
+                    on analytics.event_rollup_bucket (bucket_start, granularity_minutes, module_code, event_type_code)
+                """
+            );
+            jdbcTemplate.execute(
+                """
                     create index if not exists idx_event_rollup_bucket_only
                     on analytics.event_rollup_bucket (granularity_minutes, bucket_start)
                 """
@@ -86,6 +100,12 @@ public class AnalyticsTimeRollupSchemaConfig {
                 """
                     create index if not exists idx_stage_rollup_scope_bucket
                     on analytics.stage_rollup_bucket (granularity_minutes, module_code, event_type_code, stage_type_code, bucket_start)
+                """
+            );
+            jdbcTemplate.execute(
+                """
+                    create unique index if not exists stage_rollup_bucket_pkey
+                    on analytics.stage_rollup_bucket (bucket_start, granularity_minutes, module_code, event_type_code, stage_type_code)
                 """
             );
             jdbcTemplate.execute(

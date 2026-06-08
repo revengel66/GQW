@@ -1,7 +1,7 @@
 package com.example.gqw.analytics.repository;
 
 import com.example.gqw.analytics.entity.EventAttributeType;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -14,7 +14,7 @@ public interface EventAttributeTypeRepository extends JpaRepository<EventAttribu
     java.util.List<EventAttributeType> findByIsSystemTrueOrderByCodeAsc();
 
     @Modifying
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     @Query(value = """
         INSERT INTO analytics.event_attribute_type(code, name, description, value_kind, unit_default, is_system, is_active)
         VALUES (:code, :name, :description, :valueKind, :unitDefault, :isSystem, :isActive)

@@ -61,6 +61,15 @@ public class AnalyticsLogViewService {
     private static final Pattern DETAILS_PATTERN = Pattern.compile(
         "^Method call details (?<class>[A-Za-z0-9_$]+)\\.(?<method>[A-Za-z0-9_$]+): layer=(?<layer>[A-Z_]+),.*$"
     );
+    private static final Pattern LAYER_STAGE_START_PATTERN = Pattern.compile(
+        "^LAYER_STAGE_START stageId=\\d+ layer=(?<layer>[A-Z_]+) operation='(?<op>[^']*)'.*$"
+    );
+    private static final Pattern LAYER_STAGE_END_PATTERN = Pattern.compile(
+        "^LAYER_STAGE_END stageId=\\d+ layer=(?<layer>[A-Z_]+) operation='(?<op>[^']*)'.*$"
+    );
+    private static final Pattern LAYER_STAGE_ERROR_PATTERN = Pattern.compile(
+        "^LAYER_STAGE_ERROR stageId=\\d+ layer=(?<layer>[A-Z_]+) operation='(?<op>[^']*)'.*$"
+    );
     private static final Pattern DB_STAGE_START_PATTERN = Pattern.compile(
         "^DB_STAGE_START stageId=(?<stageId>\\d+) method=(?<class>[A-Za-z0-9_$]+)\\.(?<method>[A-Za-z0-9_$]+).*"
     );
@@ -90,9 +99,14 @@ public class AnalyticsLogViewService {
     private String moduleLogDir;
 
     private final AnalyticsLogArchiveIndexService logArchiveIndexService;
+    private final AnalyticsLoggingPolicy loggingPolicy;
 
-    public AnalyticsLogViewService(AnalyticsLogArchiveIndexService logArchiveIndexService) {
+    public AnalyticsLogViewService(
+        AnalyticsLogArchiveIndexService logArchiveIndexService,
+        AnalyticsLoggingPolicy loggingPolicy
+    ) {
         this.logArchiveIndexService = logArchiveIndexService;
+        this.loggingPolicy = loggingPolicy;
     }
 
     public TraceLogLookupResult loadTraceLogs(
@@ -149,6 +163,7 @@ public class AnalyticsLogViewService {
             List<EventLogEntryDto> archiveRows = "ARCHIVE_AVAILABLE".equals(indexed.status())
                 ? logArchiveIndexService.loadTraceLinesFromArchive(indexed, traceId, eventUid)
                 : List.of();
+            archiveRows = filterUserLogsIfNeeded(archiveRows);
             boolean archiveReadable = "ARCHIVE_AVAILABLE".equals(indexed.status()) && !archiveRows.isEmpty();
             String status = archiveReadable ? "ARCHIVE_AVAILABLE" : indexed.status();
             String message = switch (status) {
@@ -217,6 +232,9 @@ public class AnalyticsLogViewService {
         Map<String, EventLogEntryDto> unique = new LinkedHashMap<>();
         for (ParsedLogLine line : parsed) {
             EventLogEntryDto dto = line.toDto();
+            if (!shouldIncludeLogRow(dto)) {
+                continue;
+            }
             if ("SKIP".equalsIgnoreCase(dto.status())) {
                 continue;
             }
@@ -224,6 +242,52 @@ public class AnalyticsLogViewService {
             unique.putIfAbsent(key, dto);
         }
         return List.copyOf(unique.values());
+    }
+
+    private List<EventLogEntryDto> filterUserLogsIfNeeded(List<EventLogEntryDto> rows) {
+        if (rows == null || rows.isEmpty()) {
+            return List.of();
+        }
+        if (loggingPolicy.isUserLogCaptureEnabled()) {
+            return rows;
+        }
+        return rows.stream()
+            .filter(this::isBuiltInAnalyticsLog)
+            .toList();
+    }
+
+    private boolean shouldIncludeLogRow(EventLogEntryDto dto) {
+        return loggingPolicy.isUserLogCaptureEnabled() || isBuiltInAnalyticsLog(dto);
+    }
+
+    private boolean isBuiltInAnalyticsLog(EventLogEntryDto dto) {
+        if (dto == null) {
+            return false;
+        }
+        String message = dto.rawMessage() == null ? "" : dto.rawMessage();
+        if (METHOD_START_PATTERN.matcher(message).matches()
+            || METHOD_OK_PATTERN.matcher(message).matches()
+            || BUSINESS_ERROR_PATTERN.matcher(message).matches()
+            || TECH_ERROR_PATTERN.matcher(message).matches()
+            || HTTP_ERROR_METHOD_PATTERN.matcher(message).matches()
+            || DETAILS_PATTERN.matcher(message).matches()
+            || LAYER_STAGE_START_PATTERN.matcher(message).matches()
+            || LAYER_STAGE_END_PATTERN.matcher(message).matches()
+            || LAYER_STAGE_ERROR_PATTERN.matcher(message).matches()
+            || DB_STAGE_START_PATTERN.matcher(message).matches()
+            || DB_STAGE_END_PATTERN.matcher(message).matches()
+            || DB_STAGE_ERROR_PATTERN.matcher(message).matches()
+            || DB_CALL_COMPLETED_PATTERN.matcher(message).matches()
+            || DB_CALL_OK_PATTERN.matcher(message).matches()
+            || DB_CALL_ERROR_PATTERN.matcher(message).matches()
+            || HTTP_PATTERN.matcher(message).matches()
+            || SLOW_HTTP_PATTERN.matcher(message).matches()) {
+            return true;
+        }
+        return message.startsWith("Analytics ")
+            || message.startsWith("AUTO CRUD analytics ")
+            || message.startsWith("[LOG_INDEX]")
+            || message.startsWith("[LOG_RETENTION]");
     }
 
     static EventLogEntryDto normalizedLogEntryDto(
@@ -430,6 +494,39 @@ public class AnalyticsLogViewService {
                 null,
                 null,
                 "Method call details"
+            );
+        }
+        matcher = LAYER_STAGE_START_PATTERN.matcher(safeMessage);
+        if (matcher.matches()) {
+            return new ParsedNormalization(
+                "START",
+                matcher.group("layer"),
+                matcher.group("layer"),
+                matcher.group("op"),
+                null,
+                "Layer stage start"
+            );
+        }
+        matcher = LAYER_STAGE_END_PATTERN.matcher(safeMessage);
+        if (matcher.matches()) {
+            return new ParsedNormalization(
+                "OK",
+                matcher.group("layer"),
+                matcher.group("layer"),
+                matcher.group("op"),
+                null,
+                "Layer stage finished"
+            );
+        }
+        matcher = LAYER_STAGE_ERROR_PATTERN.matcher(safeMessage);
+        if (matcher.matches()) {
+            return new ParsedNormalization(
+                "ERROR",
+                matcher.group("layer"),
+                matcher.group("layer"),
+                matcher.group("op"),
+                null,
+                "Layer stage failed"
             );
         }
         matcher = DB_STAGE_START_PATTERN.matcher(safeMessage);

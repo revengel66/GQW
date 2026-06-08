@@ -2,6 +2,7 @@ package com.example.gqw.analytics.service;
 
 import com.example.gqw.analytics.entity.AnalyticsEvent;
 import com.example.gqw.analytics.entity.AnalyticsStage;
+import com.example.gqw.analytics.entity.StageType;
 import com.example.gqw.analytics.repository.AnalyticsStageRepository;
 import com.example.gqw.analytics.repository.StageTypeRepository;
 import java.time.Duration;
@@ -21,10 +22,13 @@ public class AnalyticsStageService {
         this.stageTypeRepository = stageTypeRepository;
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(transactionManager = "analyticsTransactionManager", propagation = Propagation.REQUIRES_NEW)
     public AnalyticsStage createStage(AnalyticsEvent event, String stageTypeCode, int stageOrder) {
-        stageTypeRepository.findById(stageTypeCode)
+        StageType stageType = stageTypeRepository.findById(stageTypeCode)
             .orElseThrow(() -> new IllegalArgumentException("Unknown stage type: " + stageTypeCode));
+        if (!Boolean.TRUE.equals(stageType.getIsActive())) {
+            throw new IllegalArgumentException("Inactive stage type: " + stageTypeCode);
+        }
 
         AnalyticsStage stage = new AnalyticsStage();
         stage.setEventId(event.getId());
@@ -35,7 +39,7 @@ public class AnalyticsStageService {
         return stageRepository.save(stage);
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(transactionManager = "analyticsTransactionManager", propagation = Propagation.REQUIRES_NEW)
     public void finishStageSuccess(Long stageId) {
         AnalyticsStage stage = stageRepository.findById(stageId)
             .orElseThrow(() -> new IllegalArgumentException("Stage not found: " + stageId));
@@ -46,7 +50,7 @@ public class AnalyticsStageService {
         stageRepository.save(stage);
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(transactionManager = "analyticsTransactionManager", propagation = Propagation.REQUIRES_NEW)
     public void finishStageError(Long stageId, String errorMessage) {
         AnalyticsStage stage = stageRepository.findById(stageId)
             .orElseThrow(() -> new IllegalArgumentException("Stage not found: " + stageId));
@@ -58,7 +62,7 @@ public class AnalyticsStageService {
         stageRepository.save(stage);
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(transactionManager = "analyticsTransactionManager", propagation = Propagation.REQUIRES_NEW)
     public void markStageLogWindow(Long stageId, Instant logStartedAt, Instant logEndedAt) {
         if (stageId == null || logStartedAt == null || logEndedAt == null) {
             return;

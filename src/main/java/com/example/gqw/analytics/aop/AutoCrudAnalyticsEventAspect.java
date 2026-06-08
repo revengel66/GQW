@@ -2,6 +2,7 @@ package com.example.gqw.analytics.aop;
 
 import com.example.gqw.analytics.entity.EventType;
 import com.example.gqw.analytics.service.AnalyticsHttpErrorTrackingService;
+import com.example.gqw.analytics.service.AnalyticsInstrumentationPolicy;
 import com.example.gqw.analytics.service.AnalyticsTrackingApi;
 import com.example.gqw.analytics.service.ErrorClassClassifier;
 import com.example.gqw.config.TraceIdFilter;
@@ -41,13 +42,21 @@ public class AutoCrudAnalyticsEventAspect {
 
     private static final Logger log = LoggerFactory.getLogger(AutoCrudAnalyticsEventAspect.class);
     private final AnalyticsTrackingApi analyticsTrackingApi;
+    private final AnalyticsInstrumentationPolicy instrumentationPolicy;
 
-    public AutoCrudAnalyticsEventAspect(AnalyticsTrackingApi analyticsTrackingApi) {
+    public AutoCrudAnalyticsEventAspect(
+        AnalyticsTrackingApi analyticsTrackingApi,
+        AnalyticsInstrumentationPolicy instrumentationPolicy
+    ) {
         this.analyticsTrackingApi = analyticsTrackingApi;
+        this.instrumentationPolicy = instrumentationPolicy;
     }
 
     @Around("execution(public * com.example.gqw.admin.controller..*(..)) || execution(public * com.example.gqw.shop.controller..*(..))")
     public Object aroundControllerCrud(ProceedingJoinPoint joinPoint) throws Throwable {
+        if (!instrumentationPolicy.isEnabled()) {
+            return joinPoint.proceed();
+        }
         Method method = resolveMethod(joinPoint);
         if (!isRequestMapped(method)) {
             return joinPoint.proceed();

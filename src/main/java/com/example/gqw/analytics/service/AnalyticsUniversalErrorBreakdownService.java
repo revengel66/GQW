@@ -1,5 +1,7 @@
 package com.example.gqw.analytics.service;
 
+import org.springframework.beans.factory.annotation.Qualifier;
+
 import com.example.gqw.analytics.web.dto.AnalyticsApiDto.UniversalErrorBreakdownResponse;
 import com.example.gqw.analytics.web.dto.AnalyticsApiDto.UniversalErrorBreakdownRowDto;
 import com.example.gqw.analytics.web.dto.AnalyticsApiDto.UniversalRootCauseFactorDto;
@@ -28,7 +30,7 @@ public class AnalyticsUniversalErrorBreakdownService {
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
 
-    public AnalyticsUniversalErrorBreakdownService(NamedParameterJdbcTemplate jdbcTemplate) {
+    public AnalyticsUniversalErrorBreakdownService(@Qualifier("analyticsNamedParameterJdbcTemplate") NamedParameterJdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
     }
 

@@ -12,7 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 public interface AggregatedMetricRepository extends JpaRepository<AggregatedMetric, Long> {
 
     @Modifying
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     @Query("""
         delete from AggregatedMetric m
         where m.periodStart = :periodStart and m.periodEnd = :periodEnd

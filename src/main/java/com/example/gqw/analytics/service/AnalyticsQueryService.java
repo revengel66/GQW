@@ -51,7 +51,7 @@ public class AnalyticsQueryService {
         this.eventAttributeRepository = eventAttributeRepository;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public DashboardResponseDto getDashboardData(Instant from, Instant to, String eventTypeCode, String stageTypeCode) {
         List<AggregatedMetric> metrics = aggregatedMetricRepository.findByFilter(from, to, eventTypeCode, stageTypeCode);
         if (metrics.isEmpty()) {
@@ -70,7 +70,7 @@ public class AnalyticsQueryService {
         return new DashboardResponseDto(total, avgMs, p95, errorRate, points);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public EventListResponseDto getEventList(
         Instant from,
         Instant to,
@@ -101,7 +101,7 @@ public class AnalyticsQueryService {
         return new EventListResponseDto(items, pageData.getTotalElements(), pageData.getNumber(), pageData.getSize());
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public EventDetailsResponseDto getEventDetails(UUID eventUid) {
         AnalyticsEvent event = eventRepository.findByEventUid(eventUid)
             .orElseThrow(() -> new IllegalArgumentException("Event not found: " + eventUid));
@@ -113,14 +113,14 @@ public class AnalyticsQueryService {
         return new EventDetailsResponseDto(event, stages, metrics, attributes);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public List<AnalyticsEventAttribute> getEventAttributes(UUID eventUid) {
         AnalyticsEvent event = eventRepository.findByEventUid(eventUid)
             .orElseThrow(() -> new IllegalArgumentException("Event not found: " + eventUid));
         return eventAttributeRepository.findByEventId(event.getId());
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public EventDashboardResponseDto getEventDashboardData(Instant from, Instant to, String eventTypeCode) {
         List<AggregatedMetric> metrics = aggregatedMetricRepository.findByFilter(from, to, eventTypeCode, null);
         if (metrics.isEmpty()) {

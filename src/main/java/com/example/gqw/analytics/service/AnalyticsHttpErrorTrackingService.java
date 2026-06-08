@@ -47,13 +47,21 @@ public class AnalyticsHttpErrorTrackingService {
     private static final Deque<String> PENDING_FALLBACK_ORDER = new ConcurrentLinkedDeque<>();
     private static final Set<String> PENDING_FLUSH_IN_PROGRESS = ConcurrentHashMap.newKeySet();
 
+    private final AnalyticsInstrumentationPolicy instrumentationPolicy;
     private final AnalyticsTrackingApi analyticsTrackingApi;
 
-    public AnalyticsHttpErrorTrackingService(AnalyticsTrackingApi analyticsTrackingApi) {
+    public AnalyticsHttpErrorTrackingService(
+        AnalyticsInstrumentationPolicy instrumentationPolicy,
+        AnalyticsTrackingApi analyticsTrackingApi
+    ) {
+        this.instrumentationPolicy = instrumentationPolicy;
         this.analyticsTrackingApi = analyticsTrackingApi;
     }
 
     public void trackIfMissing(HttpServletRequest request, int statusCode, Throwable throwable) {
+        if (!instrumentationPolicy.isEnabled()) {
+            return;
+        }
         if (request == null || statusCode < 400) {
             return;
         }
@@ -90,6 +98,9 @@ public class AnalyticsHttpErrorTrackingService {
 
     @Scheduled(fixedDelayString = "${app.analytics.http-fallback.retry-delay-ms:5000}")
     public void flushPendingFallbackErrorsScheduled() {
+        if (!instrumentationPolicy.isEnabled()) {
+            return;
+        }
         flushPendingFallbackErrorsInternal(true);
     }
 

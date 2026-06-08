@@ -1,5 +1,7 @@
 package com.example.gqw.config;
 
+import org.springframework.beans.factory.annotation.Qualifier;
+
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -13,7 +15,7 @@ public class AnalyticsLogIndexSchemaConfig {
 
     @Bean
     @Order(207)
-    CommandLineRunner ensureAnalyticsLogIndexSchema(JdbcTemplate jdbcTemplate) {
+    CommandLineRunner ensureAnalyticsLogIndexSchema(@Qualifier("analyticsJdbcTemplate") JdbcTemplate jdbcTemplate) {
         return args -> {
             if (!schemaExists(jdbcTemplate, "analytics")) {
                 return;

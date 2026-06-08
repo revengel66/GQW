@@ -1,5 +1,7 @@
 package com.example.gqw.analytics.service;
 
+import org.springframework.beans.factory.annotation.Qualifier;
+
 import com.example.gqw.analytics.web.dto.AnalyticsApiDto.TimeSeriesPointDto;
 import com.example.gqw.analytics.web.dto.AnalyticsApiDto.TopValueDto;
 import java.math.BigDecimal;
@@ -43,7 +45,7 @@ public class AnalyticsStageMetricRollupService {
     private volatile Instant lastScheduledRefreshAt;
 
     public AnalyticsStageMetricRollupService(
-        NamedParameterJdbcTemplate jdbcTemplate,
+        @Qualifier("analyticsNamedParameterJdbcTemplate") NamedParameterJdbcTemplate jdbcTemplate,
         AnalyticsRuntimeSettingsService runtimeSettingsService,
         @Value("${app.analytics.stage-metric-rollup.enabled:true}") boolean enabled,
         @Value("${app.analytics.stage-metric-rollup.refresh-interval-minutes:5}") int refreshIntervalMinutes,
@@ -59,7 +61,7 @@ public class AnalyticsStageMetricRollupService {
         this.defaultBootstrapLookbackDays = Math.max(1, bootstrapLookbackDays);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public boolean isEnabled() {
         if (!runtimeSettingsService.getBoolean(
             AnalyticsRuntimeSettingsService.KEY_STAGE_METRIC_ROLLUP_ENABLED,
@@ -72,7 +74,7 @@ public class AnalyticsStageMetricRollupService {
     }
 
     @Scheduled(cron = "0 * * * * *")
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public void scheduledRefresh() {
         int intervalMinutes = runtimeSettingsService.getInt(
             AnalyticsRuntimeSettingsService.KEY_STAGE_METRIC_ROLLUP_REFRESH_INTERVAL_MINUTES,
@@ -91,7 +93,7 @@ public class AnalyticsStageMetricRollupService {
         }
     }
 
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public void initializeIfNeeded() {
         synchronized (refreshLock) {
             refreshAllGranularities();
@@ -120,7 +122,7 @@ public class AnalyticsStageMetricRollupService {
         }
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public List<MetricSummaryPoint> loadMetricSummaries(
         Instant from,
         Instant to,
@@ -150,7 +152,7 @@ public class AnalyticsStageMetricRollupService {
         return mergeMetricSummaries(result);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public List<TimeSeriesPointDto> loadNumericSeries(
         Instant from,
         Instant to,
@@ -207,7 +209,7 @@ public class AnalyticsStageMetricRollupService {
         return seriesFromPoints(from, to, targetBucketMinutes, mergeSeriesPoints(points));
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public List<TopValueDto> loadTopValues(
         Instant from,
         Instant to,

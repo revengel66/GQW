@@ -3,6 +3,8 @@ package com.example.gqw.analytics.logging;
 import com.example.gqw.analytics.aop.TrackAnalyticsEvent;
 import com.example.gqw.analytics.aop.AnalyticsEventAspect;
 import com.example.gqw.analytics.aop.AnalyticsEventContextHolder;
+import com.example.gqw.analytics.service.AnalyticsInstrumentationPolicy;
+import com.example.gqw.analytics.service.AnalyticsLoggingPolicy;
 import com.example.gqw.analytics.service.AnalyticsTrackingApi;
 import com.example.gqw.config.TraceIdFilter;
 import java.lang.reflect.Method;
@@ -43,6 +45,8 @@ public class AnalyticsMethodLoggingAspect {
     private static final long REPOSITORY_WARN_MS = 250L;
 
     private final AnalyticsTrackingApi analyticsTrackingApi;
+    private final AnalyticsInstrumentationPolicy instrumentationPolicy;
+    private final AnalyticsLoggingPolicy loggingPolicy;
     private final List<AnalyticsOperationDescriptionResolver> operationDescriptionResolvers;
     private final String basePackage;
     private final boolean controllerEnabled;
@@ -51,6 +55,8 @@ public class AnalyticsMethodLoggingAspect {
 
     public AnalyticsMethodLoggingAspect(
         AnalyticsTrackingApi analyticsTrackingApi,
+        AnalyticsInstrumentationPolicy instrumentationPolicy,
+        AnalyticsLoggingPolicy loggingPolicy,
         List<AnalyticsOperationDescriptionResolver> operationDescriptionResolvers,
         @Value("${app.analytics.method-logging.base-package:}") String basePackage,
         @Value("${app.analytics.method-logging.controller-enabled:true}") boolean controllerEnabled,
@@ -58,6 +64,8 @@ public class AnalyticsMethodLoggingAspect {
         @Value("${app.analytics.method-logging.repository-enabled:false}") boolean repositoryEnabled
     ) {
         this.analyticsTrackingApi = analyticsTrackingApi;
+        this.instrumentationPolicy = instrumentationPolicy;
+        this.loggingPolicy = loggingPolicy;
         this.operationDescriptionResolvers = operationDescriptionResolvers;
         this.basePackage = basePackage == null ? "" : basePackage.trim();
         this.controllerEnabled = controllerEnabled;
@@ -79,13 +87,16 @@ public class AnalyticsMethodLoggingAspect {
         if (isAnalyticsInfrastructure(joinPoint)) {
             return joinPoint.proceed();
         }
+        if (!instrumentationPolicy.isEnabled()) {
+            return joinPoint.proceed();
+        }
 
         Logger log = resolveLogger(joinPoint);
         MethodSignature signature = (MethodSignature) joinPoint.getSignature();
         String className = signature.getDeclaringType().getSimpleName();
         String methodName = signature.getName();
         String layer = resolveLayer(signature.getDeclaringTypeName());
-        if (!isLayerEnabled(layer)) {
+        if (!isLayerEnabled(layer) || !loggingPolicy.isLayerEnabled(layer)) {
             return joinPoint.proceed();
         }
         String operation = resolveOperationDescription(joinPoint, signature, className, methodName, layer);
@@ -96,7 +107,7 @@ public class AnalyticsMethodLoggingAspect {
 
         Instant startedAt = Instant.now();
         Instant logWindowStartedAt = Instant.now();
-        if (log.isTraceEnabled()) {
+        if (loggingPolicy.isInfoEnabled() && log.isTraceEnabled()) {
             log.trace(
                 "Method call details {}.{}: layer={}, traceId='{}', eventUid='{}', args={}",
                 className,
@@ -107,7 +118,7 @@ public class AnalyticsMethodLoggingAspect {
                 argsSummary
             );
         }
-        if (log.isDebugEnabled()) {
+        if (loggingPolicy.isInfoEnabled() && log.isDebugEnabled()) {
             log.debug(
                 "Method started {}.{} (operation='{}', layer={}, traceId='{}', eventUid='{}').",
                 className,
@@ -118,15 +129,17 @@ public class AnalyticsMethodLoggingAspect {
                 analyticsEventUid
             );
         }
-        log.info(
-            "Method started {}.{} (operation='{}', layer={}, traceId='{}', eventUid='{}').",
-            className,
-            methodName,
-            operation,
-            layer,
-            traceId,
-            analyticsEventUid
-        );
+        if (loggingPolicy.isInfoEnabled()) {
+            log.info(
+                "Method started {}.{} (operation='{}', layer={}, traceId='{}', eventUid='{}').",
+                className,
+                methodName,
+                operation,
+                layer,
+                traceId,
+                analyticsEventUid
+            );
+        }
 
         try {
             Object result = joinPoint.proceed();
@@ -136,7 +149,7 @@ public class AnalyticsMethodLoggingAspect {
             int responseStatus = resolveHttpStatus(result);
             boolean isHttpError = responseStatus >= 400;
 
-            if (isHttpError) {
+            if (isHttpError && loggingPolicy.isWarnEnabled()) {
                 log.warn(
                     "HTTP error in {}.{}: operation='{}', layer={}, status={}, durationMs={}, traceId='{}', eventUid='{}', response='{}'.",
                     className,
@@ -149,7 +162,7 @@ public class AnalyticsMethodLoggingAspect {
                     analyticsEventUid,
                     resultSummary
                 );
-            } else {
+            } else if (!isHttpError && loggingPolicy.isInfoEnabled()) {
                 log.info(
                     "Method finished successfully {}.{}: operation='{}', layer={}, durationMs={}, traceId='{}', eventUid='{}'.",
                     className,
@@ -161,7 +174,7 @@ public class AnalyticsMethodLoggingAspect {
                     analyticsEventUid
                 );
             }
-            if (log.isDebugEnabled()) {
+            if (loggingPolicy.isInfoEnabled() && log.isDebugEnabled()) {
                 log.debug(
                     "Method result {}.{}: {}",
                     className,
@@ -169,7 +182,7 @@ public class AnalyticsMethodLoggingAspect {
                     resultSummary
                 );
             }
-            if (durationMs >= warnThresholdForLayer(layer)) {
+            if (durationMs >= warnThresholdForLayer(layer) && loggingPolicy.isWarnEnabled()) {
                 log.warn(
                     "Slow execution {}.{}: operation='{}', layer={}, durationMs={}, traceId='{}', eventUid='{}'.",
                     className,
@@ -187,39 +200,43 @@ public class AnalyticsMethodLoggingAspect {
         } catch (IllegalArgumentException | IllegalStateException ex) {
             Instant endedAt = Instant.now();
             long durationMs = Duration.between(startedAt, endedAt).toMillis();
-            log.warn(
-                "Business error in {}.{}: operation='{}', layer={}, durationMs={}, traceId='{}', eventUid='{}', error='{}', cause='{}', args={}",
-                className,
-                methodName,
-                operation,
-                layer,
-                durationMs,
-                traceId,
-                analyticsEventUid,
-                summarizeThrowable(ex),
-                summarizeRootCause(ex),
-                argsSummary
-            );
+            if (loggingPolicy.isWarnEnabled()) {
+                log.warn(
+                    "Business error in {}.{}: operation='{}', layer={}, durationMs={}, traceId='{}', eventUid='{}', error='{}', cause='{}', args={}",
+                    className,
+                    methodName,
+                    operation,
+                    layer,
+                    durationMs,
+                    traceId,
+                    analyticsEventUid,
+                    summarizeThrowable(ex),
+                    summarizeRootCause(ex),
+                    argsSummary
+                );
+            }
             Instant logWindowEndedAt = Instant.now();
             markStageLogWindow(currentStageId, logWindowStartedAt, logWindowEndedAt);
             throw ex;
         } catch (Throwable ex) {
             Instant endedAt = Instant.now();
             long durationMs = Duration.between(startedAt, endedAt).toMillis();
-            log.error(
-                "Technical error in {}.{}: operation='{}', layer={}, durationMs={}, traceId='{}', eventUid='{}', error='{}', cause='{}', args={}",
-                className,
-                methodName,
-                operation,
-                layer,
-                durationMs,
-                traceId,
-                analyticsEventUid,
-                summarizeThrowable(ex),
-                summarizeRootCause(ex),
-                argsSummary,
-                ex
-            );
+            if (loggingPolicy.isErrorEnabled()) {
+                log.error(
+                    "Technical error in {}.{}: operation='{}', layer={}, durationMs={}, traceId='{}', eventUid='{}', error='{}', cause='{}', args={}",
+                    className,
+                    methodName,
+                    operation,
+                    layer,
+                    durationMs,
+                    traceId,
+                    analyticsEventUid,
+                    summarizeThrowable(ex),
+                    summarizeRootCause(ex),
+                    argsSummary,
+                    ex
+                );
+            }
             Instant logWindowEndedAt = Instant.now();
             markStageLogWindow(currentStageId, logWindowStartedAt, logWindowEndedAt);
             throw ex;

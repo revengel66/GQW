@@ -25,12 +25,12 @@ public class AnalyticsAdminAuthService {
         this.passwordEncoder = passwordEncoder;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public boolean isSetupComplete() {
         return adminUserRepository.count() > 0;
     }
 
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public AnalyticsAdminUser registerInitial(String usernameRaw, String passwordRaw) {
         if (isSetupComplete()) {
             throw new IllegalStateException("Учётная запись аналитики уже создана");
@@ -43,7 +43,7 @@ public class AnalyticsAdminAuthService {
         return adminUserRepository.save(user);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public AnalyticsAdminUser authenticate(String usernameRaw, String passwordRaw) {
         String username = normalizeUsername(usernameRaw);
         String password = normalizePassword(passwordRaw);
@@ -55,7 +55,7 @@ public class AnalyticsAdminAuthService {
         return user;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public AnalyticsAdminUser requireById(Long userId) {
         if (userId == null) {
             throw new IllegalArgumentException("Пользователь аналитики не найден");
@@ -64,7 +64,7 @@ public class AnalyticsAdminAuthService {
             .orElseThrow(() -> new IllegalArgumentException("Пользователь аналитики не найден"));
     }
 
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public AnalyticsAdminUser updateCredentials(
         Long userId,
         String newUsernameRaw,

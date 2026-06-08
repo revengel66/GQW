@@ -2,12 +2,18 @@ package com.example.gqw.analytics.aop;
 
 import com.example.gqw.analytics.service.AnalyticsTrackingApi;
 import com.example.gqw.analytics.service.ErrorClassClassifier;
+import com.example.gqw.analytics.service.AnalyticsInstrumentationPolicy;
+import com.example.gqw.analytics.service.AnalyticsLoggingPolicy;
+import com.example.gqw.config.TraceIdFilter;
 import java.math.BigDecimal;
 import java.time.Instant;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.reflect.MethodSignature;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.aop.support.AopUtils;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.AnnotationUtils;
@@ -21,11 +27,20 @@ public class AnalyticsServiceStageAspect {
 
     private static final String ANALYTICS_PACKAGE_PREFIX =
         AnalyticsServiceStageAspect.class.getPackageName().replace(".aop", "") + ".";
+    private static final Logger log = LoggerFactory.getLogger(AnalyticsServiceStageAspect.class);
 
     private final AnalyticsTrackingApi analyticsTrackingApi;
+    private final AnalyticsInstrumentationPolicy instrumentationPolicy;
+    private final AnalyticsLoggingPolicy loggingPolicy;
 
-    public AnalyticsServiceStageAspect(AnalyticsTrackingApi analyticsTrackingApi) {
+    public AnalyticsServiceStageAspect(
+        AnalyticsTrackingApi analyticsTrackingApi,
+        AnalyticsInstrumentationPolicy instrumentationPolicy,
+        AnalyticsLoggingPolicy loggingPolicy
+    ) {
         this.analyticsTrackingApi = analyticsTrackingApi;
+        this.instrumentationPolicy = instrumentationPolicy;
+        this.loggingPolicy = loggingPolicy;
     }
 
     @Around(
@@ -40,6 +55,9 @@ public class AnalyticsServiceStageAspect {
         if (isAnalyticsInfrastructure(joinPoint)) {
             return joinPoint.proceed();
         }
+        if (!instrumentationPolicy.isEnabled()) {
+            return joinPoint.proceed();
+        }
         if (hasCustomAnalyticsLayer(joinPoint)) {
             return joinPoint.proceed();
         }
@@ -47,7 +65,18 @@ public class AnalyticsServiceStageAspect {
         Long stageId;
         try {
             stageId = analyticsTrackingApi.startStage(context.eventUid(), "SERVICE", context.nextStageOrder());
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException exception) {
+            if (loggingPolicy.isStrictWarningsEnabled()) {
+                log.warn(
+                    "Analytics stage skipped: stageType=SERVICE class={} method={} traceId={} eventUid={} reason={}",
+                    joinPoint.getSignature().getDeclaringTypeName(),
+                    joinPoint.getSignature().getName(),
+                    safeMdc(TraceIdFilter.TRACE_ID_MDC_KEY),
+                    context.eventUid(),
+                    exception.getMessage(),
+                    exception
+                );
+            }
             return joinPoint.proceed();
         }
         context.pushStageId(stageId);
@@ -161,5 +190,10 @@ public class AnalyticsServiceStageAspect {
             return true;
         }
         return AnnotationUtils.findAnnotation(signature.getDeclaringType(), TrackAnalyticsLayer.class) != null;
+    }
+
+    private static String safeMdc(String key) {
+        String value = MDC.get(key);
+        return value == null ? "" : value;
     }
 }

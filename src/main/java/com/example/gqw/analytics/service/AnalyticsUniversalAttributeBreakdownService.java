@@ -1,5 +1,7 @@
 package com.example.gqw.analytics.service;
 
+import org.springframework.beans.factory.annotation.Qualifier;
+
 import com.example.gqw.analytics.web.dto.AnalyticsApiDto.UniversalAttributeBreakdownResponse;
 import com.example.gqw.analytics.web.dto.AnalyticsApiDto.UniversalAttributeBreakdownRowDto;
 import java.math.BigDecimal;
@@ -26,7 +28,7 @@ public class AnalyticsUniversalAttributeBreakdownService {
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
 
-    public AnalyticsUniversalAttributeBreakdownService(NamedParameterJdbcTemplate jdbcTemplate) {
+    public AnalyticsUniversalAttributeBreakdownService(@Qualifier("analyticsNamedParameterJdbcTemplate") NamedParameterJdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
     }
 

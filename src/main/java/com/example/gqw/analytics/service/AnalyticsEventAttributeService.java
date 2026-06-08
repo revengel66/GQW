@@ -26,7 +26,7 @@ public class AnalyticsEventAttributeService {
         this.codeResolverService = codeResolverService;
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(transactionManager = "analyticsTransactionManager", propagation = Propagation.REQUIRES_NEW)
     public void addTextAttribute(Long eventId, String attributeTypeCode, String value) {
         String resolvedCode = codeResolverService.resolveAttributeTypeCode(attributeTypeCode);
         EventAttributeType type = eventAttributeTypeRepository.findById(resolvedCode)
@@ -46,7 +46,7 @@ public class AnalyticsEventAttributeService {
         eventAttributeRepository.save(attribute);
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(transactionManager = "analyticsTransactionManager", propagation = Propagation.REQUIRES_NEW)
     public void addJsonAttribute(Long eventId, String attributeTypeCode, String valueJson) {
         String resolvedCode = codeResolverService.resolveAttributeTypeCode(attributeTypeCode);
         EventAttributeType type = eventAttributeTypeRepository.findById(resolvedCode)

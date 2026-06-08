@@ -1,5 +1,7 @@
 package com.example.gqw.config;
 
+import org.springframework.beans.factory.annotation.Qualifier;
+
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -11,7 +13,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 public class AnalyticsResponseStageCleanupConfig {
 
     @Bean
-    CommandLineRunner cleanupResponseStageData(JdbcTemplate jdbcTemplate) {
+    CommandLineRunner cleanupResponseStageData(@Qualifier("analyticsJdbcTemplate") JdbcTemplate jdbcTemplate) {
         return args -> {
             if (!tableExists(jdbcTemplate, "analytics.stage_type")) {
                 return;

@@ -1,5 +1,7 @@
 package com.example.gqw.analytics.service;
 
+import org.springframework.beans.factory.annotation.Qualifier;
+
 import com.example.gqw.analytics.entity.AnalyticsCodeAlias;
 import com.example.gqw.analytics.entity.AnalyticsCodeAliasType;
 import com.example.gqw.analytics.entity.EventAttributeType;
@@ -18,11 +20,14 @@ import com.example.gqw.analytics.repository.EventTypeRepository;
 import com.example.gqw.analytics.repository.ModuleTypeRepository;
 import com.example.gqw.analytics.repository.StageTypeRepository;
 import com.example.gqw.analytics.repository.StageMetricTypeRepository;
-import java.util.LinkedHashMap;
+import java.sql.ResultSet;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -54,7 +59,7 @@ public class AnalyticsDictionaryAdminService {
         AnalyticsEventAttributeRepository analyticsEventAttributeRepository,
         AnalyticsStageMetricRepository analyticsStageMetricRepository,
         AnalyticsEventTypeMaintenanceService analyticsEventTypeMaintenanceService,
-        JdbcTemplate jdbcTemplate
+        @Qualifier("analyticsJdbcTemplate") JdbcTemplate jdbcTemplate
     ) {
         this.eventTypeRepository = eventTypeRepository;
         this.moduleTypeRepository = moduleTypeRepository;
@@ -70,7 +75,7 @@ public class AnalyticsDictionaryAdminService {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public List<ModuleType> allModules() {
         return moduleTypeRepository.findAll().stream()
             .filter(module -> !EventType.DEFAULT_MODULE_CODE.equalsIgnoreCase(module.getCode()))
@@ -78,7 +83,7 @@ public class AnalyticsDictionaryAdminService {
             .toList();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public List<EventType> allEventTypes(String moduleCodeRaw) {
         String moduleCode = normalizeCode(moduleCodeRaw, false);
         List<EventType> source = moduleCode == null
@@ -89,52 +94,17 @@ public class AnalyticsDictionaryAdminService {
             .toList();
     }
 
-    @Transactional(readOnly = true)
-    public Map<String, Long> eventTypeEventCounts(List<EventType> eventTypes) {
-        Map<String, Long> counts = new LinkedHashMap<>();
-        if (eventTypes == null) {
-            return counts;
-        }
-        for (EventType type : eventTypes) {
-            if (type == null || type.getCode() == null || type.getCode().isBlank()) {
-                continue;
-            }
-            counts.put(type.getCode(), analyticsEventRepository.countByEventTypeCode(type.getCode()));
-        }
-        return counts;
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
+    public long eventTypeEventCount(String eventTypeCode) {
+        return analyticsEventRepository.countByEventTypeCode(normalizeCode(eventTypeCode, true));
     }
 
-    @Transactional(readOnly = true)
-    public Map<String, Long> eventAttributeValueCounts(List<EventAttributeType> attributeTypes) {
-        Map<String, Long> counts = new LinkedHashMap<>();
-        if (attributeTypes == null) {
-            return counts;
-        }
-        for (EventAttributeType type : attributeTypes) {
-            if (type == null || type.getCode() == null || type.getCode().isBlank()) {
-                continue;
-            }
-            counts.put(type.getCode(), analyticsEventAttributeRepository.countByAttributeTypeCode(type.getCode()));
-        }
-        return counts;
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
+    public long eventAttributeValueCount(String attributeTypeCode) {
+        return analyticsEventAttributeRepository.countByAttributeTypeCode(normalizeCode(attributeTypeCode, true));
     }
 
-    @Transactional(readOnly = true)
-    public Map<String, Long> stageMetricValueCounts(List<StageMetricType> metricTypes) {
-        Map<String, Long> counts = new LinkedHashMap<>();
-        if (metricTypes == null) {
-            return counts;
-        }
-        for (StageMetricType type : metricTypes) {
-            if (type == null || type.getCode() == null || type.getCode().isBlank()) {
-                continue;
-            }
-            counts.put(type.getCode(), analyticsStageMetricRepository.countByMetricTypeCode(type.getCode()));
-        }
-        return counts;
-    }
-
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public void createOrUpdateModuleType(
         String originalCodeRaw,
         String codeRaw,
@@ -156,8 +126,8 @@ public class AnalyticsDictionaryAdminService {
             if (existing != null) {
                 throw new IllegalArgumentException("Код модуля уже существует: " + code);
             }
-            old.setIsActive(false);
-            moduleTypeRepository.save(old);
+            renameModuleType(originalCode, code, name, description);
+            return;
         }
 
         ModuleType entity = existing != null ? existing : new ModuleType();
@@ -170,33 +140,33 @@ public class AnalyticsDictionaryAdminService {
         moduleTypeRepository.save(entity);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public List<EventAttributeType> allEventAttributeTypes() {
         return attributeTypeRepository.findAll().stream()
             .sorted((a, b) -> a.getCode().compareToIgnoreCase(b.getCode()))
             .toList();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public List<StageType> allStageTypes() {
         return stageTypeRepository.findAll().stream()
             .sorted((a, b) -> a.getCode().compareToIgnoreCase(b.getCode()))
             .toList();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public List<StageMetricType> allStageMetricTypes() {
         return metricTypeRepository.findAll().stream()
             .sorted((a, b) -> a.getCode().compareToIgnoreCase(b.getCode()))
             .toList();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public List<AnalyticsCodeAlias> allAliases(AnalyticsCodeAliasType aliasType) {
         return aliasRepository.findAllByAliasTypeOrderBySourceCodeAsc(aliasType);
     }
 
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public void createOrUpdateEventType(
         String originalCodeRaw,
         String codeRaw,
@@ -221,8 +191,8 @@ public class AnalyticsDictionaryAdminService {
             if (existing != null && !originalCode.equals(code)) {
                 throw new IllegalArgumentException("Код события уже существует: " + code);
             }
-            old.setIsActive(false);
-            eventTypeRepository.save(old);
+            renameEventType(originalCode, code, moduleCode, name, description);
+            return;
         }
 
         EventType entity = existing != null ? existing : new EventType();
@@ -243,7 +213,7 @@ public class AnalyticsDictionaryAdminService {
         }
     }
 
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public void createOrUpdateEventAttributeType(
         String originalCodeRaw,
         String codeRaw,
@@ -270,8 +240,8 @@ public class AnalyticsDictionaryAdminService {
             if (existing != null) {
                 throw new IllegalArgumentException("Код атрибута уже существует: " + code);
             }
-            old.setIsActive(false);
-            attributeTypeRepository.save(old);
+            renameEventAttributeType(originalCode, code, name, description, valueKind, unitDefault);
+            return;
         }
 
         EventAttributeType entity = existing != null ? existing : new EventAttributeType();
@@ -289,7 +259,7 @@ public class AnalyticsDictionaryAdminService {
         attributeTypeRepository.save(entity);
     }
 
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public void createOrUpdateStageMetricType(
         String originalCodeRaw,
         String codeRaw,
@@ -318,8 +288,8 @@ public class AnalyticsDictionaryAdminService {
             if (existing != null) {
                 throw new IllegalArgumentException("Код метрики уже существует: " + code);
             }
-            old.setIsActive(false);
-            metricTypeRepository.save(old);
+            renameStageMetricType(originalCode, code, name, description, readingGuide, valueKind, unitDefault);
+            return;
         }
 
         StageMetricType entity = existing != null ? existing : new StageMetricType();
@@ -338,7 +308,7 @@ public class AnalyticsDictionaryAdminService {
         metricTypeRepository.save(entity);
     }
 
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public void createOrUpdateStageType(
         String originalCodeRaw,
         String codeRaw,
@@ -361,8 +331,8 @@ public class AnalyticsDictionaryAdminService {
             if (existing != null) {
                 throw new IllegalArgumentException("Код этапа уже существует: " + code);
             }
-            old.setIsActive(false);
-            stageTypeRepository.save(old);
+            renameStageType(originalCode, code, name, description);
+            return;
         }
 
         StageType entity = existing != null ? existing : new StageType();
@@ -378,7 +348,7 @@ public class AnalyticsDictionaryAdminService {
         stageTypeRepository.save(entity);
     }
 
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public boolean toggleEventType(String codeRaw) {
         String code = normalizeCode(codeRaw, true);
         EventType entity = eventTypeRepository.findById(code)
@@ -389,7 +359,7 @@ public class AnalyticsDictionaryAdminService {
         return nextState;
     }
 
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public boolean toggleModuleType(String codeRaw) {
         String code = normalizeCode(codeRaw, true);
         if (EventType.DEFAULT_MODULE_CODE.equals(code)) {
@@ -403,7 +373,7 @@ public class AnalyticsDictionaryAdminService {
         return nextState;
     }
 
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public boolean toggleEventAttributeType(String codeRaw) {
         String code = normalizeCode(codeRaw, true);
         EventAttributeType entity = attributeTypeRepository.findById(code)
@@ -414,7 +384,7 @@ public class AnalyticsDictionaryAdminService {
         return nextState;
     }
 
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public boolean toggleStageMetricType(String codeRaw) {
         String code = normalizeCode(codeRaw, true);
         StageMetricType entity = metricTypeRepository.findById(code)
@@ -425,7 +395,7 @@ public class AnalyticsDictionaryAdminService {
         return nextState;
     }
 
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public boolean toggleStageType(String codeRaw) {
         String code = normalizeCode(codeRaw, true);
         StageType entity = stageTypeRepository.findById(code)
@@ -436,7 +406,7 @@ public class AnalyticsDictionaryAdminService {
         return nextState;
     }
 
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public void upsertAlias(AnalyticsCodeAliasType aliasType, String sourceCodeRaw, String targetCodeRaw) {
         String sourceCode = normalizeCode(sourceCodeRaw, true);
         String targetCode = normalizeCode(targetCodeRaw, true);
@@ -452,7 +422,7 @@ public class AnalyticsDictionaryAdminService {
         aliasRepository.save(alias);
     }
 
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public boolean toggleAlias(Long aliasId) {
         AnalyticsCodeAlias alias = aliasRepository.findById(aliasId)
             .orElseThrow(() -> new IllegalArgumentException("Alias не найден"));
@@ -462,7 +432,7 @@ public class AnalyticsDictionaryAdminService {
         return nextState;
     }
 
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public void deleteModuleType(String codeRaw) {
         ModuleDeletePrecheck precheck = precheckDeleteModuleType(codeRaw);
         if (!precheck.deletable()) {
@@ -509,7 +479,7 @@ public class AnalyticsDictionaryAdminService {
         moduleTypeRepository.delete(precheck.moduleType());
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public ModuleDeletePrecheck precheckDeleteModuleType(String codeRaw) {
         String code = normalizeCode(codeRaw, true);
         if (EventType.DEFAULT_MODULE_CODE.equals(code)) {
@@ -557,7 +527,7 @@ public class AnalyticsDictionaryAdminService {
         return new ModuleDeletePrecheck(moduleType, code, deletable, reason, usages, eventTypeCount, eventCount);
     }
 
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public void deleteEventType(String codeRaw) {
         String code = normalizeCode(codeRaw, true);
         EventType eventTypeForDelete = eventTypeRepository.findById(code)
@@ -621,7 +591,7 @@ public class AnalyticsDictionaryAdminService {
         eventTypeRepository.delete(eventType);
     }
 
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public void deleteEventAttributeType(String codeRaw) {
         String code = normalizeCode(codeRaw, true);
         if (isSystemEventAttributeCode(code)) {
@@ -653,7 +623,7 @@ public class AnalyticsDictionaryAdminService {
         attributeTypeRepository.delete(attributeType);
     }
 
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public void deleteStageMetricType(String codeRaw) {
         MetricDeletePrecheck precheck = precheckDeleteStageMetricType(codeRaw);
         if (!precheck.deletable()) {
@@ -673,7 +643,7 @@ public class AnalyticsDictionaryAdminService {
         metricTypeRepository.delete(precheck.metricType());
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public MetricDeletePrecheck precheckDeleteStageMetricType(String codeRaw) {
         String code = normalizeCode(codeRaw, true);
         StageMetricType metricType = metricTypeRepository.findById(code)
@@ -707,7 +677,7 @@ public class AnalyticsDictionaryAdminService {
         return new MetricDeletePrecheck(metricType, code, deletable, reason, usages, metricValueCount, rollupCount);
     }
 
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public void deleteStageType(String codeRaw) {
         StageDeletePrecheck precheck = precheckDeleteStageType(codeRaw);
         if (!precheck.deletable()) {
@@ -716,7 +686,7 @@ public class AnalyticsDictionaryAdminService {
         stageTypeRepository.delete(precheck.stageType());
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public StageDeletePrecheck precheckDeleteStageType(String codeRaw) {
         String code = normalizeCode(codeRaw, true);
         if (isSystemStageCode(code)) {
@@ -749,28 +719,28 @@ public class AnalyticsDictionaryAdminService {
         );
     }
 
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public void deleteAlias(Long aliasId) {
         AnalyticsCodeAlias alias = aliasRepository.findById(aliasId)
             .orElseThrow(() -> new IllegalArgumentException("Alias не найден"));
         aliasRepository.delete(alias);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public Set<String> builtInStageMetricCodes() {
         return metricTypeRepository.findByIsSystemTrueOrderByCodeAsc().stream()
             .map(StageMetricType::getCode)
             .collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new));
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public Set<String> builtInStageCodes() {
         return stageTypeRepository.findByIsSystemTrueOrderByCodeAsc().stream()
             .map(StageType::getCode)
             .collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new));
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public Set<String> builtInEventAttributeCodes() {
         return attributeTypeRepository.findByIsSystemTrueOrderByCodeAsc().stream()
             .map(EventAttributeType::getCode)
@@ -802,6 +772,230 @@ public class AnalyticsDictionaryAdminService {
         return stageTypeRepository.findById(code)
             .map(StageType::getIsSystem)
             .orElse(false);
+    }
+
+    private void renameModuleType(String oldCode, String newCode, String name, String description) {
+        moduleTypeRepository.findById(oldCode)
+            .orElseThrow(() -> new IllegalArgumentException("Module not found: " + oldCode));
+        updateIfColumnsExist("analytics.event_type", "update analytics.event_type set module_code = ? where module_code = ?", newCode, oldCode);
+        updateIfColumnsExist("analytics.event", "update analytics.event set module_code = ? where module_code = ?", newCode, oldCode);
+        updateIfColumnsExist("analytics.aggregated_metric", "update analytics.aggregated_metric set module_code = ? where module_code = ?", newCode, oldCode);
+        updateIfColumnsExist("analytics.event_rollup_bucket", "update analytics.event_rollup_bucket set module_code = ? where module_code = ?", newCode, oldCode);
+        updateIfColumnsExist("analytics.stage_rollup_bucket", "update analytics.stage_rollup_bucket set module_code = ? where module_code = ?", newCode, oldCode);
+        updateIfColumnsExist("analytics.stage_metric_rollup_bucket", "update analytics.stage_metric_rollup_bucket set module_code = ? where module_code = ?", newCode, oldCode);
+        updateIfColumnsExist("analytics.filter_event_type_day", "update analytics.filter_event_type_day set module_code = ? where module_code = ?", newCode, oldCode);
+        updateIfColumnsExist("analytics.filter_attr_value_day", "update analytics.filter_attr_value_day set module_code = ? where module_code = ?", newCode, oldCode);
+        updateIfColumnsExist("analytics.log_file_index", "update analytics.log_file_index set module_code = ? where module_code = ?", newCode, oldCode);
+        updateIfColumnsExist("analytics.log_trace_index", "update analytics.log_trace_index set module_code = ? where module_code = ?", newCode, oldCode);
+        updateIfColumnsExist("analytics.log_problem_excerpt", "update analytics.log_problem_excerpt set module_code = ? where module_code = ?", newCode, oldCode);
+        int updated = jdbcTemplate.update(
+            "update analytics.module_type set code = ?, name = ?, description = ? where code = ?",
+            newCode,
+            name,
+            description,
+            oldCode
+        );
+        if (updated != 1) {
+            throw new IllegalStateException("Module rename failed: " + oldCode + " -> " + newCode);
+        }
+    }
+
+    private void renameEventType(String oldCode, String newCode, String moduleCode, String name, String description) {
+        eventTypeRepository.findById(oldCode)
+            .orElseThrow(() -> new IllegalArgumentException("Event type not found: " + oldCode));
+        updateIfColumnsExist(
+            "analytics.event",
+            "update analytics.event set event_type_code = ?, module_code = ? where event_type_code = ?",
+            newCode,
+            moduleCode,
+            oldCode
+        );
+        updateIfColumnsExist(
+            "analytics.aggregated_metric",
+            "update analytics.aggregated_metric set event_type_code = ? where event_type_code = ?",
+            newCode,
+            oldCode
+        );
+        updateIfColumnsExist(
+            "analytics.event_rollup_bucket",
+            "update analytics.event_rollup_bucket set event_type_code = ?, module_code = ? where event_type_code = ?",
+            newCode,
+            moduleCode,
+            oldCode
+        );
+        updateIfColumnsExist(
+            "analytics.stage_rollup_bucket",
+            "update analytics.stage_rollup_bucket set event_type_code = ?, module_code = ? where event_type_code = ?",
+            newCode,
+            moduleCode,
+            oldCode
+        );
+        updateIfColumnsExist(
+            "analytics.stage_metric_rollup_bucket",
+            "update analytics.stage_metric_rollup_bucket set event_type_code = ?, module_code = ? where event_type_code = ?",
+            newCode,
+            moduleCode,
+            oldCode
+        );
+        updateIfColumnsExist(
+            "analytics.filter_event_type_day",
+            "update analytics.filter_event_type_day set event_type_code = ?, module_code = ? where event_type_code = ?",
+            newCode,
+            moduleCode,
+            oldCode
+        );
+        updateIfColumnsExist(
+            "analytics.filter_attr_value_day",
+            "update analytics.filter_attr_value_day set event_type_code = ?, module_code = ? where event_type_code = ?",
+            newCode,
+            moduleCode,
+            oldCode
+        );
+        int updated = jdbcTemplate.update(
+            "update analytics.event_type set code = ?, module_code = ?, name = ?, description = ? where code = ?",
+            newCode,
+            moduleCode,
+            name,
+            description,
+            oldCode
+        );
+        if (updated != 1) {
+            throw new IllegalStateException("Event type rename failed: " + oldCode + " -> " + newCode);
+        }
+    }
+
+    private void renameEventAttributeType(
+        String oldCode,
+        String newCode,
+        String name,
+        String description,
+        MetricValueKind valueKind,
+        String unitDefault
+    ) {
+        attributeTypeRepository.findById(oldCode)
+            .orElseThrow(() -> new IllegalArgumentException("Attribute type not found: " + oldCode));
+        updateIfColumnsExist("analytics.event_attribute", "update analytics.event_attribute set attribute_type_code = ? where attribute_type_code = ?", newCode, oldCode);
+        updateIfColumnsExist("analytics.filter_attr_value_day", "update analytics.filter_attr_value_day set attribute_type_code = ? where attribute_type_code = ?", newCode, oldCode);
+        int updated = jdbcTemplate.update(
+            """
+                update analytics.event_attribute_type
+                   set code = ?, name = ?, description = ?, value_kind = ?, unit_default = ?
+                 where code = ?
+                """,
+            newCode,
+            name,
+            description,
+            valueKind.name(),
+            unitDefault,
+            oldCode
+        );
+        if (updated != 1) {
+            throw new IllegalStateException("Attribute type rename failed: " + oldCode + " -> " + newCode);
+        }
+    }
+
+    private void renameStageType(String oldCode, String newCode, String name, String description) {
+        stageTypeRepository.findById(oldCode)
+            .orElseThrow(() -> new IllegalArgumentException("Stage type not found: " + oldCode));
+        updateIfColumnsExist("analytics.stage", "update analytics.stage set stage_type_code = ? where stage_type_code = ?", newCode, oldCode);
+        updateIfColumnsExist("analytics.aggregated_metric", "update analytics.aggregated_metric set stage_type_code = ? where stage_type_code = ?", newCode, oldCode);
+        updateIfColumnsExist("analytics.stage_rollup_bucket", "update analytics.stage_rollup_bucket set stage_type_code = ? where stage_type_code = ?", newCode, oldCode);
+        updateIfColumnsExist("analytics.stage_metric_rollup_bucket", "update analytics.stage_metric_rollup_bucket set stage_type_code = ? where stage_type_code = ?", newCode, oldCode);
+        int updated = jdbcTemplate.update(
+            "update analytics.stage_type set code = ?, name = ?, description = ? where code = ?",
+            newCode,
+            name,
+            description,
+            oldCode
+        );
+        if (updated != 1) {
+            throw new IllegalStateException("Stage type rename failed: " + oldCode + " -> " + newCode);
+        }
+    }
+
+    private void renameStageMetricType(
+        String oldCode,
+        String newCode,
+        String name,
+        String description,
+        String readingGuide,
+        MetricValueKind valueKind,
+        String unitDefault
+    ) {
+        metricTypeRepository.findById(oldCode)
+            .orElseThrow(() -> new IllegalArgumentException("Metric type not found: " + oldCode));
+        updateIfColumnsExist("analytics.stage_metric", "update analytics.stage_metric set metric_type_code = ? where metric_type_code = ?", newCode, oldCode);
+        updateIfColumnsExist("analytics.stage_metric_rollup_bucket", "update analytics.stage_metric_rollup_bucket set metric_type_code = ? where metric_type_code = ?", newCode, oldCode);
+        int updated = jdbcTemplate.update(
+            """
+                update analytics.stage_metric_type
+                   set code = ?, name = ?, description = ?, reading_guide = ?, value_kind = ?, unit_default = ?
+                 where code = ?
+                """,
+            newCode,
+            name,
+            description,
+            readingGuide,
+            valueKind.name(),
+            unitDefault,
+            oldCode
+        );
+        if (updated != 1) {
+            throw new IllegalStateException("Metric type rename failed: " + oldCode + " -> " + newCode);
+        }
+    }
+
+    private void updateIfColumnsExist(String qualifiedTable, String sql, Object... args) {
+        Set<String> requiredColumns = columnsMentionedInUpdate(sql);
+        if (!tableHasColumns(qualifiedTable, requiredColumns)) {
+            return;
+        }
+        jdbcTemplate.update(sql, args);
+    }
+
+    private Set<String> columnsMentionedInUpdate(String sql) {
+        Set<String> columns = new HashSet<>();
+        Matcher matcher = Pattern.compile("\\b([a-z_][a-z0-9_]*)\\s*=").matcher(sql.toLowerCase(Locale.ROOT));
+        while (matcher.find()) {
+            columns.add(matcher.group(1));
+        }
+        return columns;
+    }
+
+    private boolean tableHasColumns(String qualifiedTable, Set<String> columns) {
+        if (columns.isEmpty()) {
+            return false;
+        }
+        String[] parts = qualifiedTable.split("\\.", 2);
+        String schema = parts.length == 2 ? parts[0] : null;
+        String table = parts.length == 2 ? parts[1] : qualifiedTable;
+        Set<String> existingColumns = jdbcTemplate.execute((ConnectionCallback<Set<String>>) connection -> {
+            Set<String> found = new HashSet<>();
+            readColumns(connection.getMetaData().getColumns(null, schema, table, null), found);
+            if (found.isEmpty()) {
+                readColumns(connection.getMetaData().getColumns(null, upper(schema), upper(table), null), found);
+            }
+            if (found.isEmpty()) {
+                readColumns(connection.getMetaData().getColumns(null, null, table, null), found);
+            }
+            if (found.isEmpty()) {
+                readColumns(connection.getMetaData().getColumns(null, null, upper(table), null), found);
+            }
+            return found;
+        });
+        return existingColumns != null && existingColumns.containsAll(columns);
+    }
+
+    private void readColumns(ResultSet resultSet, Set<String> target) throws java.sql.SQLException {
+        try (ResultSet rs = resultSet) {
+            while (rs.next()) {
+                target.add(rs.getString("COLUMN_NAME").toLowerCase(Locale.ROOT));
+            }
+        }
+    }
+
+    private String upper(String value) {
+        return value == null ? null : value.toUpperCase(Locale.ROOT);
     }
 
     private long countMetricRollups(String code) {

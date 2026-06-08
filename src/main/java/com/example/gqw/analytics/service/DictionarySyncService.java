@@ -57,7 +57,7 @@ public class DictionarySyncService {
         this.eventAttributeTypeRepository = eventAttributeTypeRepository;
     }
 
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public void syncAll() {
         syncModuleTypes();
         syncEventTypes();
@@ -66,7 +66,7 @@ public class DictionarySyncService {
         syncEventAttributeTypes();
     }
 
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public void syncModuleTypes() {
         for (ModuleTypeSource source : moduleTypeSources) {
             for (ModuleType type : source.moduleTypes()) {
@@ -79,7 +79,7 @@ public class DictionarySyncService {
         }
     }
 
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public void syncEventTypes() {
         for (EventTypeSource source : eventTypeSources) {
             for (EventType type : source.eventTypes()) {
@@ -95,7 +95,7 @@ public class DictionarySyncService {
         }
     }
 
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public void syncStageTypes() {
         for (StageTypeSource source : stageTypeSources) {
             for (StageType type : source.stageTypes()) {
@@ -108,7 +108,7 @@ public class DictionarySyncService {
         }
     }
 
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public void syncMetricTypes() {
         for (StageMetricTypeSource source : stageMetricTypeSources) {
             for (StageMetricType type : source.stageMetricTypes()) {
@@ -121,7 +121,7 @@ public class DictionarySyncService {
         }
     }
 
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public void syncEventAttributeTypes() {
         for (EventAttributeTypeSource source : eventAttributeTypeSources) {
             for (EventAttributeType type : source.eventAttributeTypes()) {

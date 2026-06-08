@@ -38,7 +38,7 @@ public class AggregationService {
         this.eventRepository = eventRepository;
     }
 
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public void runAggregation(AggregationGranularity granularity, Instant periodStart, Instant periodEnd) {
         AggregationRun run = new AggregationRun();
         run.setRunType(AggregationRunType.SCHEDULED);

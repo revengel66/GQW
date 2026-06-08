@@ -1,5 +1,7 @@
 package com.example.gqw.analytics.service;
 
+import org.springframework.beans.factory.annotation.Qualifier;
+
 import com.example.gqw.analytics.aop.TrackAnalyticsEvent;
 import com.example.gqw.analytics.aop.TrackAnalyticsAttribute;
 import com.example.gqw.analytics.aop.TrackAnalyticsMetric;
@@ -193,7 +195,7 @@ public class AnalyticsEventTypeMaintenanceService {
 
     public AnalyticsEventTypeMaintenanceService(
         EventTypeRepository eventTypeRepository,
-        JdbcTemplate jdbcTemplate,
+        @Qualifier("analyticsJdbcTemplate") JdbcTemplate jdbcTemplate,
         ApplicationContext applicationContext,
         AnalyticsSystemEventClassifier systemEventClassifier
     ) {
@@ -203,7 +205,7 @@ public class AnalyticsEventTypeMaintenanceService {
         this.systemEventClassifier = systemEventClassifier;
     }
 
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public void maintainEventTypes() {
         migrateLegacyActionCodes();
         migratePrefixedCodes();
@@ -214,7 +216,7 @@ public class AnalyticsEventTypeMaintenanceService {
         classifySystemEventTypes();
     }
 
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public void seedMissingEventTypesOnly() {
         mergeEventTypeCode("PRODUCTS_ACTION", "PRODUCT_DUPLICATE");
         Map<String, GeneratedPresentation> autoPresentations = new LinkedHashMap<>();
@@ -241,7 +243,7 @@ public class AnalyticsEventTypeMaintenanceService {
         }
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public Set<String> collectTrackedEventCodes() {
         Set<String> result = new LinkedHashSet<>();
         for (BeanMethod beanMethod : collectApplicationMethods().values()) {
@@ -262,7 +264,7 @@ public class AnalyticsEventTypeMaintenanceService {
         return result;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public List<String> findTrackedEventUsages(String eventCodeRaw) {
         String normalizedCode = stripModulePrefix(normalizeCode(eventCodeRaw));
         if (normalizedCode == null || normalizedCode.isBlank()) {
@@ -287,7 +289,7 @@ public class AnalyticsEventTypeMaintenanceService {
         return usages;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public List<String> findTrackedAttributeUsages(String attributeCodeRaw) {
         String normalizedCode = normalizeCode(attributeCodeRaw);
         if (normalizedCode == null || normalizedCode.isBlank()) {
@@ -324,7 +326,7 @@ public class AnalyticsEventTypeMaintenanceService {
         return usages;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public List<String> findTrackedMetricUsages(String metricCodeRaw) {
         String normalizedCode = normalizeCode(metricCodeRaw);
         if (normalizedCode == null || normalizedCode.isBlank()) {
@@ -729,7 +731,9 @@ public class AnalyticsEventTypeMaintenanceService {
 
     private boolean isApplicationClass(Class<?> type) {
         Package typePackage = type.getPackage();
+
         String packageName = typePackage == null ? "" : typePackage.getName();
+
         return packageName.startsWith("com.example.gqw");
     }
 

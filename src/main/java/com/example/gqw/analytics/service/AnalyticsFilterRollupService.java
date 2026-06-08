@@ -1,5 +1,7 @@
 package com.example.gqw.analytics.service;
 
+import org.springframework.beans.factory.annotation.Qualifier;
+
 import java.sql.Date;
 import java.sql.Types;
 import java.time.Clock;
@@ -30,7 +32,7 @@ public class AnalyticsFilterRollupService {
     private volatile Instant lastScheduledRefreshAt;
 
     public AnalyticsFilterRollupService(
-        NamedParameterJdbcTemplate jdbcTemplate,
+        @Qualifier("analyticsNamedParameterJdbcTemplate") NamedParameterJdbcTemplate jdbcTemplate,
         AnalyticsRuntimeSettingsService runtimeSettingsService,
         @Value("${app.analytics.filter-rollup.enabled:true}") boolean enabled,
         @Value("${app.analytics.filter-rollup.long-range-days:30}") int longRangeDays,
@@ -46,7 +48,7 @@ public class AnalyticsFilterRollupService {
         this.defaultRefreshIntervalMinutes = Math.max(1, refreshIntervalMinutes);
     }
 
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public void initializeIfNeeded() {
         if (!isEnabled() || !rollupTablesExist()) {
             return;
@@ -64,7 +66,7 @@ public class AnalyticsFilterRollupService {
         refreshRecentWindow(refreshRecentDays);
     }
 
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public void refreshRecentNow() {
         if (!isEnabled() || !rollupTablesExist()) {
             return;
@@ -81,7 +83,7 @@ public class AnalyticsFilterRollupService {
         }
     }
 
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public void rebuildAllNow() {
         if (!isEnabled() || !rollupTablesExist()) {
             return;
@@ -93,7 +95,7 @@ public class AnalyticsFilterRollupService {
     }
 
     @Scheduled(cron = "0 * * * * *")
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public void scheduledRefresh() {
         int intervalMinutes = runtimeSettingsService.getInt(
             AnalyticsRuntimeSettingsService.KEY_FILTER_ROLLUP_REFRESH_INTERVAL_MINUTES,
@@ -121,7 +123,7 @@ public class AnalyticsFilterRollupService {
         }
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public boolean shouldUseRollup(Instant from, Instant to, String requestPath) {
         if (!isEnabled() || !rollupTablesExist() || !hasRollupData()) {
             return false;
@@ -146,7 +148,7 @@ public class AnalyticsFilterRollupService {
         );
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public List<String> findEventTypeCodes(
         Instant from,
         Instant to,
@@ -167,7 +169,7 @@ public class AnalyticsFilterRollupService {
         );
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public List<String> findModuleCodes(
         Instant from,
         Instant to,
@@ -192,7 +194,7 @@ public class AnalyticsFilterRollupService {
         );
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public List<String> findAttributeTypeCodes(
         Instant from,
         Instant to,
@@ -216,7 +218,7 @@ public class AnalyticsFilterRollupService {
         );
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public List<String> findAttributeValues(
         Instant from,
         Instant to,

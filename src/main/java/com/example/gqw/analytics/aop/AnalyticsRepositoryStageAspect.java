@@ -2,6 +2,8 @@ package com.example.gqw.analytics.aop;
 
 import com.example.gqw.analytics.service.AnalyticsTrackingApi;
 import com.example.gqw.analytics.service.ErrorClassClassifier;
+import com.example.gqw.analytics.service.AnalyticsInstrumentationPolicy;
+import com.example.gqw.analytics.service.AnalyticsLoggingPolicy;
 import com.example.gqw.config.TraceIdFilter;
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -27,13 +29,24 @@ public class AnalyticsRepositoryStageAspect {
     private static final Logger DB_STAGE_LOG = LoggerFactory.getLogger("analytics.db.stage");
 
     private final AnalyticsTrackingApi analyticsTrackingApi;
+    private final AnalyticsInstrumentationPolicy instrumentationPolicy;
+    private final AnalyticsLoggingPolicy loggingPolicy;
 
-    public AnalyticsRepositoryStageAspect(AnalyticsTrackingApi analyticsTrackingApi) {
+    public AnalyticsRepositoryStageAspect(
+        AnalyticsTrackingApi analyticsTrackingApi,
+        AnalyticsInstrumentationPolicy instrumentationPolicy,
+        AnalyticsLoggingPolicy loggingPolicy
+    ) {
         this.analyticsTrackingApi = analyticsTrackingApi;
+        this.instrumentationPolicy = instrumentationPolicy;
+        this.loggingPolicy = loggingPolicy;
     }
 
     @Around("execution(public * org.springframework.data.repository.CrudRepository+.*(..))")
     public Object aroundRepositoryStage(ProceedingJoinPoint joinPoint) throws Throwable {
+        if (!instrumentationPolicy.isEnabled()) {
+            return joinPoint.proceed();
+        }
         AnalyticsEventContext context = AnalyticsEventContextHolder.get();
         if (context == null) {
             return joinPoint.proceed();
@@ -53,20 +66,33 @@ public class AnalyticsRepositoryStageAspect {
         try {
             stageId = analyticsTrackingApi.startStage(context.eventUid(), "DATABASE", context.nextStageOrder());
             analyticsTrackingApi.recordMetricNum(stageId, "DB_QUERY_COUNT", BigDecimal.ONE, "count");
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException exception) {
+            if (loggingPolicy.isStrictWarningsEnabled()) {
+                DB_STAGE_LOG.warn(
+                    "Analytics stage skipped: stageType=DATABASE class={} method={} traceId={} eventUid={} reason={}",
+                    className,
+                    methodName,
+                    traceId,
+                    eventUid,
+                    exception.getMessage(),
+                    exception
+                );
+            }
             return joinPoint.proceed();
         }
         context.pushStageId(stageId);
         Instant stageLogStartedAt = Instant.now();
-        DB_STAGE_LOG.info(
-            "DB_STAGE_START stageId={} method={}.{} traceId='{}' eventUid='{}'",
-            stageId,
-            className,
-            methodName,
-            traceId,
-            eventUid
-        );
-        if (log.isTraceEnabled()) {
+        if (loggingPolicy.isDatabaseEnabled() && loggingPolicy.isInfoEnabled()) {
+            DB_STAGE_LOG.info(
+                "DB_STAGE_START stageId={} method={}.{} traceId='{}' eventUid='{}'",
+                stageId,
+                className,
+                methodName,
+                traceId,
+                eventUid
+            );
+        }
+        if (loggingPolicy.isDatabaseEnabled() && loggingPolicy.isInfoEnabled() && log.isTraceEnabled()) {
             log.trace(
                 "Database call started {}.{}: layer=DATABASE, stageId={}, traceId='{}', eventUid='{}'.",
                 className,
@@ -100,24 +126,26 @@ public class AnalyticsRepositoryStageAspect {
                 // Analytics must never break business flow.
             }
             long durationMs = Duration.between(stageLogStartedAt, Instant.now()).toMillis();
-            log.info(
-                "Database call completed successfully {}.{}: layer=DATABASE, stageId={}, durationMs={}, traceId='{}', eventUid='{}'.",
-                className,
-                methodName,
-                stageId,
-                durationMs,
-                traceId,
-                eventUid
-            );
-            DB_STAGE_LOG.info(
-                "DB_STAGE_END stageId={} method={}.{} durationMs={} traceId='{}' eventUid='{}'",
-                stageId,
-                className,
-                methodName,
-                durationMs,
-                traceId,
-                eventUid
-            );
+            if (loggingPolicy.isDatabaseEnabled() && loggingPolicy.isInfoEnabled()) {
+                log.info(
+                    "Database call completed successfully {}.{}: layer=DATABASE, stageId={}, durationMs={}, traceId='{}', eventUid='{}'.",
+                    className,
+                    methodName,
+                    stageId,
+                    durationMs,
+                    traceId,
+                    eventUid
+                );
+                DB_STAGE_LOG.info(
+                    "DB_STAGE_END stageId={} method={}.{} durationMs={} traceId='{}' eventUid='{}'",
+                    stageId,
+                    className,
+                    methodName,
+                    durationMs,
+                    traceId,
+                    eventUid
+                );
+            }
             return result;
         } catch (Throwable throwable) {
             String metricErrorCode = signature.getDeclaringType().getSimpleName() + "." + signature.getName() + "_FAIL";
@@ -138,26 +166,28 @@ public class AnalyticsRepositoryStageAspect {
                 // Analytics must never break business flow.
             }
             long durationMs = Duration.between(stageLogStartedAt, Instant.now()).toMillis();
-            log.error(
-                "Database call failed {}.{}: layer=DATABASE, stageId={}, durationMs={}, traceId='{}', eventUid='{}'.",
-                className,
-                methodName,
-                stageId,
-                durationMs,
-                traceId,
-                eventUid,
-                throwable
-            );
-            DB_STAGE_LOG.error(
-                "DB_STAGE_ERROR stageId={} method={}.{} durationMs={} traceId='{}' eventUid='{}'",
-                stageId,
-                className,
-                methodName,
-                durationMs,
-                traceId,
-                eventUid,
-                throwable
-            );
+            if (loggingPolicy.isDatabaseEnabled() && loggingPolicy.isErrorEnabled()) {
+                log.error(
+                    "Database call failed {}.{}: layer=DATABASE, stageId={}, durationMs={}, traceId='{}', eventUid='{}'.",
+                    className,
+                    methodName,
+                    stageId,
+                    durationMs,
+                    traceId,
+                    eventUid,
+                    throwable
+                );
+                DB_STAGE_LOG.error(
+                    "DB_STAGE_ERROR stageId={} method={}.{} durationMs={} traceId='{}' eventUid='{}'",
+                    stageId,
+                    className,
+                    methodName,
+                    durationMs,
+                    traceId,
+                    eventUid,
+                    throwable
+                );
+            }
             throw throwable;
         } finally {
             Instant stageLogEndedAt = Instant.now();

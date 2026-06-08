@@ -1,5 +1,7 @@
 package com.example.gqw.config;
 
+import org.springframework.beans.factory.annotation.Qualifier;
+
 import java.util.List;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -73,7 +75,7 @@ public class AnalyticsSystemFlagsSchemaPatchConfig {
 
     @Bean
     @Order(90)
-    CommandLineRunner patchAnalyticsSystemFlagsSchema(JdbcTemplate jdbcTemplate) {
+    CommandLineRunner patchAnalyticsSystemFlagsSchema(@Qualifier("analyticsJdbcTemplate") JdbcTemplate jdbcTemplate) {
         return args -> {
             if (!schemaExists(jdbcTemplate, "analytics")) {
                 return;

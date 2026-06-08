@@ -2,6 +2,8 @@ package com.example.gqw.analytics.aop;
 
 import com.example.gqw.analytics.service.AnalyticsTrackingApi;
 import com.example.gqw.analytics.service.AnalyticsHttpErrorTrackingService;
+import com.example.gqw.analytics.service.AnalyticsInstrumentationPolicy;
+import com.example.gqw.analytics.service.AnalyticsLoggingPolicy;
 import com.example.gqw.analytics.service.ErrorClassClassifier;
 import com.example.gqw.analytics.entity.EventType;
 import com.example.gqw.analytics.entity.MetricValueKind;
@@ -58,23 +60,32 @@ public class AnalyticsEventAspect {
     private final AnalyticsTrackingApi analyticsTrackingApi;
     private final CurrentUserService currentUserService;
     private final StageMetricTypeRepository stageMetricTypeRepository;
+    private final AnalyticsInstrumentationPolicy instrumentationPolicy;
+    private final AnalyticsLoggingPolicy loggingPolicy;
     private final ExpressionParser expressionParser = new SpelExpressionParser();
     private final ParameterNameDiscoverer parameterNameDiscoverer = new DefaultParameterNameDiscoverer();
 
     public AnalyticsEventAspect(
         AnalyticsTrackingApi analyticsTrackingApi,
         CurrentUserService currentUserService,
-        StageMetricTypeRepository stageMetricTypeRepository
+        StageMetricTypeRepository stageMetricTypeRepository,
+        AnalyticsInstrumentationPolicy instrumentationPolicy,
+        AnalyticsLoggingPolicy loggingPolicy
     ) {
         this.analyticsTrackingApi = analyticsTrackingApi;
         this.currentUserService = currentUserService;
         this.stageMetricTypeRepository = stageMetricTypeRepository;
+        this.instrumentationPolicy = instrumentationPolicy;
+        this.loggingPolicy = loggingPolicy;
     }
 
     @Around("@annotation(TrackAnalyticsEvent)")
     public Object aroundTrackedMethod(ProceedingJoinPoint joinPoint) throws Throwable {
+        if (!instrumentationPolicy.isEnabled()) {
+            return joinPoint.proceed();
+        }
         Method method = resolveMethod(joinPoint);
-        TrackAnalyticsEvent trackAnalyticsEvent = AnnotationUtils.findAnnotation(method, TrackAnalyticsEvent.class);
+        TrackAnalyticsEvent trackAnalyticsEvent = resolveTrackAnalyticsEvent(joinPoint, method);
         if (trackAnalyticsEvent == null) {
             return joinPoint.proceed();
         }
@@ -119,13 +130,18 @@ public class AnalyticsEventAspect {
             controllerStageId = analyticsTrackingApi.startStage(eventUid, "CONTROLLER", context.nextStageOrder());
             context.pushStageId(controllerStageId);
         } catch (RuntimeException exception) {
-            log.warn(
-                "Analytics event tracking skipped for code={} path={} reason={}",
-                eventCode,
-                request.getRequestURI(),
-                exception.getMessage(),
-                exception
-            );
+            if (loggingPolicy.isStrictWarningsEnabled()) {
+                log.warn(
+                    "Analytics tracking skipped: type=event code={} class={} method={} path={} traceId={} reason={}",
+                    eventCode,
+                    method.getDeclaringClass().getSimpleName(),
+                    method.getName(),
+                    request.getRequestURI(),
+                    resolveTraceId(request),
+                    exception.getMessage(),
+                    exception
+                );
+            }
             AnalyticsEventContextHolder.clear();
             MDC.remove(ANALYTICS_EVENT_UID_MDC_KEY);
             restoreMdc(APP_MODULE_MDC_KEY, previousAppModule);
@@ -327,13 +343,7 @@ public class AnalyticsEventAspect {
                 analyticsTrackingApi.addAttribute(AnalyticsEventContextHolder.get().eventUid(), attribute.code(), value);
                 resolvedAttributes.add(attribute.code());
             } catch (RuntimeException exception) {
-                log.warn(
-                    "Analytics attribute tracking skipped for code={} eventUid={} reason={}",
-                    attribute.code(),
-                    AnalyticsEventContextHolder.get().eventUid(),
-                    exception.getMessage(),
-                    exception
-                );
+                logAttributeWarning(attribute, method, request, exception.getMessage(), exception);
             }
         }
     }
@@ -399,13 +409,15 @@ public class AnalyticsEventAspect {
             analyticsTrackingApi.addAttribute(AnalyticsEventContextHolder.get().eventUid(), code, value);
             resolvedAttributes.add(code);
         } catch (RuntimeException exception) {
-            log.warn(
-                "Analytics attribute tracking skipped for code={} eventUid={} reason={}",
-                code,
-                AnalyticsEventContextHolder.get().eventUid(),
-                exception.getMessage(),
-                exception
-            );
+            if (loggingPolicy.isStrictWarningsEnabled()) {
+                log.warn(
+                    "Analytics attribute skipped: code={} eventUid={} reason={}",
+                    code,
+                    AnalyticsEventContextHolder.get().eventUid(),
+                    exception.getMessage(),
+                    exception
+                );
+            }
         }
     }
 
@@ -450,13 +462,15 @@ public class AnalyticsEventAspect {
         try {
             analyticsTrackingApi.recordMetricNum(stageId, metricTypeCode, value, unit);
         } catch (RuntimeException exception) {
-            log.warn(
-                "Analytics numeric metric tracking skipped for code={} stageId={} reason={}",
-                metricTypeCode,
-                stageId,
-                exception.getMessage(),
-                exception
-            );
+            if (loggingPolicy.isStrictWarningsEnabled()) {
+                log.warn(
+                    "Analytics metric skipped: code={} stageId={} reason={}",
+                    metricTypeCode,
+                    stageId,
+                    exception.getMessage(),
+                    exception
+                );
+            }
         }
     }
 
@@ -464,13 +478,15 @@ public class AnalyticsEventAspect {
         try {
             analyticsTrackingApi.recordMetricText(stageId, metricTypeCode, value, unit);
         } catch (RuntimeException exception) {
-            log.warn(
-                "Analytics text metric tracking skipped for code={} stageId={} reason={}",
-                metricTypeCode,
-                stageId,
-                exception.getMessage(),
-                exception
-            );
+            if (loggingPolicy.isStrictWarningsEnabled()) {
+                log.warn(
+                    "Analytics metric skipped: code={} stageId={} reason={}",
+                    metricTypeCode,
+                    stageId,
+                    exception.getMessage(),
+                    exception
+                );
+            }
         }
     }
 
@@ -602,13 +618,16 @@ public class AnalyticsEventAspect {
         String reason,
         RuntimeException exception
     ) {
+        if (!loggingPolicy.isStrictWarningsEnabled()) {
+            return;
+        }
         String traceId = request == null ? "" : resolveTraceId(request);
         String path = request == null ? "" : request.getRequestURI();
         AnalyticsEventContext context = AnalyticsEventContextHolder.get();
         String eventUid = context == null ? "" : String.valueOf(context.eventUid());
         if (exception == null) {
             log.warn(
-                "Analytics metric tracking skipped: code={}, expression={}, class={}, method={}, path={}, traceId={}, eventUid={}, stageId={}, required={}, reason={}",
+                "Analytics metric skipped: code={}, expression={}, class={}, method={}, path={}, traceId={}, eventUid={}, stageId={}, required={}, reason={}",
                 metric.code(),
                 metric.value(),
                 method.getDeclaringClass().getSimpleName(),
@@ -623,7 +642,7 @@ public class AnalyticsEventAspect {
             return;
         }
         log.warn(
-            "Analytics metric tracking skipped: code={}, expression={}, class={}, method={}, path={}, traceId={}, eventUid={}, stageId={}, required={}, reason={}",
+            "Analytics metric skipped: code={}, expression={}, class={}, method={}, path={}, traceId={}, eventUid={}, stageId={}, required={}, reason={}",
             metric.code(),
             metric.value(),
             method.getDeclaringClass().getSimpleName(),
@@ -633,6 +652,48 @@ public class AnalyticsEventAspect {
             eventUid,
             stageId,
             metric.required(),
+            reason,
+            exception
+        );
+    }
+
+    private void logAttributeWarning(
+        TrackAnalyticsAttribute attribute,
+        Method method,
+        HttpServletRequest request,
+        String reason,
+        RuntimeException exception
+    ) {
+        if (!loggingPolicy.isStrictWarningsEnabled()) {
+            return;
+        }
+        String traceId = request == null ? "" : resolveTraceId(request);
+        String path = request == null ? "" : request.getRequestURI();
+        AnalyticsEventContext context = AnalyticsEventContextHolder.get();
+        String eventUid = context == null ? "" : String.valueOf(context.eventUid());
+        if (exception == null) {
+            log.warn(
+                "Analytics attribute skipped: code={}, expression={}, class={}, method={}, path={}, traceId={}, eventUid={}, reason={}",
+                attribute.code(),
+                attribute.value(),
+                method.getDeclaringClass().getSimpleName(),
+                method.getName(),
+                path,
+                traceId,
+                eventUid,
+                reason
+            );
+            return;
+        }
+        log.warn(
+            "Analytics attribute skipped: code={}, expression={}, class={}, method={}, path={}, traceId={}, eventUid={}, reason={}",
+            attribute.code(),
+            attribute.value(),
+            method.getDeclaringClass().getSimpleName(),
+            method.getName(),
+            path,
+            traceId,
+            eventUid,
             reason,
             exception
         );
@@ -688,6 +749,55 @@ public class AnalyticsEventAspect {
             return method;
         }
         return AopUtils.getMostSpecificMethod(method, joinPoint.getTarget().getClass());
+    }
+
+    private TrackAnalyticsEvent resolveTrackAnalyticsEvent(ProceedingJoinPoint joinPoint, Method resolvedMethod) {
+        MethodSignature signature = (MethodSignature) joinPoint.getSignature();
+        TrackAnalyticsEvent selected = AnnotationUtils.findAnnotation(resolvedMethod, TrackAnalyticsEvent.class);
+        selected = selectRicherAnnotation(selected, AnnotationUtils.findAnnotation(signature.getMethod(), TrackAnalyticsEvent.class));
+        Object target = joinPoint.getTarget();
+        if (target == null) {
+            return selected;
+        }
+        Class<?> targetClass = target.getClass();
+        Method signatureMethod = signature.getMethod();
+        try {
+            Method publicMethod = targetClass.getMethod(signatureMethod.getName(), signatureMethod.getParameterTypes());
+            selected = selectRicherAnnotation(selected, AnnotationUtils.findAnnotation(publicMethod, TrackAnalyticsEvent.class));
+        } catch (NoSuchMethodException ignored) {
+            // Fall through to declared method lookup.
+        }
+        try {
+            Method declaredMethod = targetClass.getDeclaredMethod(signatureMethod.getName(), signatureMethod.getParameterTypes());
+            selected = selectRicherAnnotation(selected, AnnotationUtils.findAnnotation(declaredMethod, TrackAnalyticsEvent.class));
+        } catch (NoSuchMethodException ignored) {
+            // The already resolved method is still a valid candidate.
+        }
+        return selected;
+    }
+
+    private TrackAnalyticsEvent selectRicherAnnotation(TrackAnalyticsEvent current, TrackAnalyticsEvent candidate) {
+        if (candidate == null) {
+            return current;
+        }
+        if (current == null) {
+            return candidate;
+        }
+        return annotationScore(candidate) > annotationScore(current) ? candidate : current;
+    }
+
+    private int annotationScore(TrackAnalyticsEvent annotation) {
+        int score = annotation.attributes().length * 10 + annotation.metrics().length * 10;
+        if (annotation.entityType() != null && !annotation.entityType().isBlank()) {
+            score++;
+        }
+        if (annotation.entityId() != null && !annotation.entityId().isBlank()) {
+            score++;
+        }
+        if (annotation.codeExpression() != null && !annotation.codeExpression().isBlank()) {
+            score++;
+        }
+        return score;
     }
 
     private static String resolveTraceId(HttpServletRequest request) {

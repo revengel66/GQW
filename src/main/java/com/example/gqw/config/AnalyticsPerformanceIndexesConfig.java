@@ -1,5 +1,7 @@
 package com.example.gqw.config;
 
+import org.springframework.beans.factory.annotation.Qualifier;
+
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -14,7 +16,7 @@ public class AnalyticsPerformanceIndexesConfig {
 
     @Bean
     @Order(210)
-    CommandLineRunner ensureAnalyticsPerformanceIndexes(JdbcTemplate jdbcTemplate) {
+    CommandLineRunner ensureAnalyticsPerformanceIndexes(@Qualifier("analyticsJdbcTemplate") JdbcTemplate jdbcTemplate) {
         return args -> {
             if (!tableExists(jdbcTemplate, "analytics.event") || !tableExists(jdbcTemplate, "analytics.event_attribute")) {
                 return;

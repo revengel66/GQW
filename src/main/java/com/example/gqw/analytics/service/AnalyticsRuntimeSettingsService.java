@@ -1,5 +1,7 @@
 package com.example.gqw.analytics.service;
 
+import org.springframework.beans.factory.annotation.Qualifier;
+
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -92,6 +94,15 @@ public class AnalyticsRuntimeSettingsService {
     public static final String KEY_LOG_RETENTION_ARCHIVE_INDEXED_ONLY = "analytics.log-retention.archive-indexed-only";
     public static final String KEY_LOG_RETENTION_SAFE_MODE_ENABLED = "analytics.log-retention.safe-mode-enabled";
 
+    public static final String KEY_ANALYTICS_LOGGING_ENABLED = "analytics.logging.enabled";
+    public static final String KEY_ANALYTICS_LOGGING_LEVEL = "analytics.logging.level";
+    public static final String KEY_ANALYTICS_LOGGING_CONTROLLER_ENABLED = "analytics.logging.controller.enabled";
+    public static final String KEY_ANALYTICS_LOGGING_SERVICE_ENABLED = "analytics.logging.service.enabled";
+    public static final String KEY_ANALYTICS_LOGGING_DATABASE_ENABLED = "analytics.logging.database.enabled";
+    public static final String KEY_ANALYTICS_LOGGING_CUSTOM_LAYER_ENABLED = "analytics.logging.custom-layer.enabled";
+    public static final String KEY_ANALYTICS_LOGGING_USER_LOG_CAPTURE_ENABLED = "analytics.logging.user-log-capture.enabled";
+    public static final String KEY_ANALYTICS_LOGGING_STRICT_WARNINGS_ENABLED = "analytics.logging.strict-warnings.enabled";
+
     private static final Duration CACHE_TTL = Duration.ofSeconds(15);
     private static final String DB_TABLE = "analytics.runtime_setting";
     private static final String DB_TABLE_SCHEMA = "analytics";
@@ -102,11 +113,11 @@ public class AnalyticsRuntimeSettingsService {
     private final NamedParameterJdbcTemplate jdbcTemplate;
     private volatile CacheSnapshot cacheSnapshot;
 
-    public AnalyticsRuntimeSettingsService(NamedParameterJdbcTemplate jdbcTemplate) {
+    public AnalyticsRuntimeSettingsService(@Qualifier("analyticsNamedParameterJdbcTemplate") NamedParameterJdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public SettingsView view() {
         Map<String, String> raw = loadCachedValues();
         Instant updatedAt = readLastUpdatedAt();
@@ -125,7 +136,7 @@ public class AnalyticsRuntimeSettingsService {
         return new SettingsView(updatedAt, groups);
     }
 
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public SettingsView update(Map<String, String> values, String updatedBy) {
         if (!tableExists()) {
             return view();
@@ -146,7 +157,7 @@ public class AnalyticsRuntimeSettingsService {
         return view();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public boolean getBoolean(String key, boolean fallback) {
         String value = resolveRawValue(key);
         if (value == null || value.isBlank()) {
@@ -162,7 +173,7 @@ public class AnalyticsRuntimeSettingsService {
         return fallback;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public int getInt(String key, int fallback, int min, int max) {
         String value = resolveRawValue(key);
         int parsed = fallback;
@@ -176,7 +187,7 @@ public class AnalyticsRuntimeSettingsService {
         return clamp(parsed, min, max);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public String getText(String key, String fallback) {
         String value = resolveRawValue(key);
         if (value == null) {
@@ -842,6 +853,71 @@ public class AnalyticsRuntimeSettingsService {
                     "5000",
                     100,
                     200000
+                )
+            )
+        );
+
+        groups.add(
+            group(
+                "LOGGING",
+                "\u041b\u043e\u0433\u0438\u0440\u043e\u0432\u0430\u043d\u0438\u0435",
+                "\u0423\u043f\u0440\u0430\u0432\u043b\u044f\u0435\u0442 \u0432\u0441\u0442\u0440\u043e\u0435\u043d\u043d\u044b\u043c\u0438 \u043b\u043e\u0433\u0430\u043c\u0438 Analytics \u0438 \u043b\u043e\u0433\u0430\u043c\u0438 \u0432 \u0442\u0440\u0430\u0441\u0441\u0438\u0440\u043e\u0432\u043a\u0435.",
+                def(
+                    KEY_ANALYTICS_LOGGING_ENABLED,
+                    "\u0412\u0441\u0442\u0440\u043e\u0435\u043d\u043d\u044b\u0435 \u043b\u043e\u0433\u0438 Analytics",
+                    "\u041e\u0442\u043a\u043b\u044e\u0447\u0430\u0435\u0442 \u0442\u043e\u043b\u044c\u043a\u043e log-line \u0441\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u044f Analytics. \u0421\u043e\u0431\u044b\u0442\u0438\u044f, \u044d\u0442\u0430\u043f\u044b, \u0430\u0442\u0440\u0438\u0431\u0443\u0442\u044b, \u043c\u0435\u0442\u0440\u0438\u043a\u0438 \u0438 MDC \u0440\u0430\u0431\u043e\u0442\u0430\u044e\u0442.",
+                    SettingKind.BOOLEAN,
+                    "true"
+                ),
+                def(
+                    KEY_ANALYTICS_LOGGING_LEVEL,
+                    "\u0423\u0440\u043e\u0432\u0435\u043d\u044c \u0432\u0441\u0442\u0440\u043e\u0435\u043d\u043d\u044b\u0445 \u043b\u043e\u0433\u043e\u0432",
+                    "\u041c\u0438\u043d\u0438\u043c\u0430\u043b\u044c\u043d\u044b\u0439 \u0443\u0440\u043e\u0432\u0435\u043d\u044c \u0432\u0441\u0442\u0440\u043e\u0435\u043d\u043d\u044b\u0445 Analytics-\u0441\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u0439.",
+                    SettingKind.ENUM,
+                    "INFO",
+                    options("INFO", "INFO", "WARN", "WARN", "ERROR", "ERROR", "OFF", "OFF")
+                ),
+                def(
+                    KEY_ANALYTICS_LOGGING_CONTROLLER_ENABLED,
+                    "\u041a\u043e\u043d\u0442\u0440\u043e\u043b\u043b\u0435\u0440\u044b",
+                    "\u041f\u0438\u0448\u0435\u0442 START/OK/ERROR \u0441\u0442\u0440\u043e\u043a\u0438 \u0434\u043b\u044f \u043a\u043e\u043d\u0442\u0440\u043e\u043b\u043b\u0435\u0440\u043e\u0432.",
+                    SettingKind.BOOLEAN,
+                    "true"
+                ),
+                def(
+                    KEY_ANALYTICS_LOGGING_SERVICE_ENABLED,
+                    "\u0421\u0435\u0440\u0432\u0438\u0441\u044b",
+                    "\u041f\u0438\u0448\u0435\u0442 START/OK/ERROR \u0441\u0442\u0440\u043e\u043a\u0438 \u0434\u043b\u044f \u0441\u0435\u0440\u0432\u0438\u0441\u043e\u0432.",
+                    SettingKind.BOOLEAN,
+                    "true"
+                ),
+                def(
+                    KEY_ANALYTICS_LOGGING_DATABASE_ENABLED,
+                    "\u0411\u0430\u0437\u0430 \u0434\u0430\u043d\u043d\u044b\u0445",
+                    "\u041f\u0438\u0448\u0435\u0442 DB_STAGE \u0438 database call \u0441\u0442\u0440\u043e\u043a\u0438. DATABASE stage \u0432 \u0411\u0414 \u0441\u043e\u0437\u0434\u0430\u0435\u0442\u0441\u044f \u043e\u0442\u0434\u0435\u043b\u044c\u043d\u043e.",
+                    SettingKind.BOOLEAN,
+                    "true"
+                ),
+                def(
+                    KEY_ANALYTICS_LOGGING_CUSTOM_LAYER_ENABLED,
+                    "\u041f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u044c\u0441\u043a\u0438\u0435 \u0441\u043b\u043e\u0438",
+                    "\u041f\u0438\u0448\u0435\u0442 LAYER_STAGE \u0441\u0442\u0440\u043e\u043a\u0438 \u0434\u043b\u044f FACADE, PERSISTENCE \u0438 \u0434\u0440\u0443\u0433\u0438\u0445 @TrackAnalyticsLayer.",
+                    SettingKind.BOOLEAN,
+                    "true"
+                ),
+                def(
+                    KEY_ANALYTICS_LOGGING_USER_LOG_CAPTURE_ENABLED,
+                    "\u041f\u043e\u043a\u0430\u0437\u044b\u0432\u0430\u0442\u044c \u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u044c\u0441\u043a\u0438\u0435 \u043b\u043e\u0433\u0438 \u0432 \u0442\u0440\u0430\u0441\u0441\u0438\u0440\u043e\u0432\u043a\u0435",
+                    "\u0415\u0441\u043b\u0438 \u0432\u043a\u043b\u044e\u0447\u0435\u043d\u043e, SLF4J-\u043b\u043e\u0433\u0438 \u0432\u043d\u0443\u0442\u0440\u0438 \u0441\u043e\u0431\u044b\u0442\u0438\u044f \u043e\u0442\u043e\u0431\u0440\u0430\u0436\u0430\u044e\u0442\u0441\u044f \u0432 \u043b\u043e\u0433\u0430\u0445 \u0442\u0440\u0430\u0441\u0441\u0438\u0440\u043e\u0432\u043a\u0438.",
+                    SettingKind.BOOLEAN,
+                    "true"
+                ),
+                def(
+                    KEY_ANALYTICS_LOGGING_STRICT_WARNINGS_ENABLED,
+                    "\u0421\u0442\u0440\u043e\u0433\u0438\u0435 \u043f\u0440\u0435\u0434\u0443\u043f\u0440\u0435\u0436\u0434\u0435\u043d\u0438\u044f",
+                    "\u041f\u0438\u0448\u0435\u0442 WARN \u043f\u043e unknown/inactive \u043a\u043e\u0434\u0430\u043c. \u041e\u0442\u043a\u043b\u044e\u0447\u0430\u0442\u044c \u043d\u0435 \u0440\u0435\u043a\u043e\u043c\u0435\u043d\u0434\u0443\u0435\u0442\u0441\u044f.",
+                    SettingKind.BOOLEAN,
+                    "true"
                 )
             )
         );

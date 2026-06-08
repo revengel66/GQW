@@ -13,6 +13,52 @@
     let loadedPayload = null;
     let diagnosticsTimer = null;
     let operationInFlight = false;
+    let runtimeTooltipEl = null;
+
+    const RUNTIME_DIAG_HELP = {
+        rawRowsEstimate: "Количество исходных событий, сохранённых в аналитике. Если значение быстро растёт, проверьте сроки хранения.",
+        rollupRowsEstimate: "Подготовленные записи для быстрых графиков и RCA. Чем их больше, тем быстрее открываются длинные периоды.",
+        maxLagMinutes: "Самое большое отставание между текущим временем и последним обновлением агрегатов. Большое значение означает устаревшие графики.",
+        minLagMinutes: "Самое маленькое отставание среди агрегатов. Помогает понять, есть ли хотя бы один актуальный набор данных.",
+        staleWatermarkCount: "Сколько отметок обновления требуют пересчёта. Ненулевое значение значит, что часть графиков может отставать.",
+        currentFiles: "Файлы логов в активной папке. Они используются для поиска логов трассировки по свежим событиям.",
+        archiveFiles: "Архивные файлы логов. Они нужны для поиска трассировок старых событий.",
+        indexedFiles: "Файлы, уже обработанные индексатором. Чем ближе к общему числу файлов, тем полнее поиск по логам.",
+        traceLinks: "Количество трассировок, доступных для быстрого поиска в индексе логов.",
+        pendingFiles: "Очередь файлов, которые ещё не обработаны индексатором. Если число растёт, запустите индексацию логов.",
+        cleanupCandidates: "Файлы и записи индекса, которые могут быть удалены обслуживанием по правилам хранения."
+    };
+
+    const RUNTIME_TABLE_HELP = {
+        logIndex: "Показывает состояние индекса логов: когда он обновлялся, есть ли очередь и ошибки обработки.",
+        watermarks: "Показывает актуальность агрегатов по интервалам. Если отставание выше интервала обновления, графики могут показывать старые данные.",
+        eta: "Показывает, какие агрегаты ещё ждут планового обновления и когда они догонят последние события.",
+        tableSizes: "Помогает контролировать рост аналитических таблиц и оценивать влияние аналитики на базу данных."
+    };
+
+    const RUNTIME_COLUMN_HELP = {
+        logStatus: "Общее состояние индекса логов.",
+        logLastIndexedAt: "Когда индексатор последний раз успешно проверял файлы логов.",
+        logPendingFiles: "Сколько файлов ещё ждут обработки.",
+        logMissingFiles: "Сколько архивов указаны в индексе, но не найдены на диске.",
+        logTooLargeFiles: "Файлы, пропущенные из-за ограничения размера.",
+        logIndexErrorFiles: "Файлы, при обработке которых возникла ошибка.",
+        logExcerptRows: "Короткие важные фрагменты логов, сохранённые для быстрого просмотра.",
+        logLastError: "Последняя ошибка индексатора логов.",
+        scope: "Какой аналитический набор обновляется: события, этапы, метрики или фильтры.",
+        interval: "Период агрегации данных.",
+        watermark: "Последнее время, до которого данные уже подготовлены.",
+        lag: "Разница между текущим временем и последним обновлением.",
+        enabled: "Участвует ли этот агрегат в построении аналитики.",
+        status: "Текущее состояние обновления.",
+        eta: "Оценка времени до актуального состояния.",
+        comment: "Пояснение, почему данные актуальны, ждут обновления или отключены.",
+        tableName: "Физическая таблица базы данных с аналитическими данными.",
+        rows: "Приблизительное количество записей.",
+        size: "Объём, который таблица занимает на диске.",
+        minTime: "Начало истории данных в таблице.",
+        maxTime: "Самые свежие данные в таблице."
+    };
 
     document.addEventListener("DOMContentLoaded", () => {
         initRefs();
@@ -84,6 +130,11 @@
             void runOperation("cleanup_logs_now", "Очистка старых логов выполнена.");
         });
         refs.modalEl?.addEventListener("click", handleRuntimeHelpClick, true);
+        refs.modalEl?.addEventListener("mouseover", handleRuntimeTooltipEnter, true);
+        refs.modalEl?.addEventListener("focusin", handleRuntimeTooltipEnter, true);
+        refs.modalEl?.addEventListener("mouseout", handleRuntimeTooltipLeave, true);
+        refs.modalEl?.addEventListener("focusout", handleRuntimeTooltipLeave, true);
+        refs.modalEl?.addEventListener("scroll", hideRuntimeTooltip, true);
         refs.modalEl?.addEventListener("keydown", (event) => {
             if (event.key !== "Enter" && event.key !== " ") {
                 return;
@@ -232,6 +283,7 @@
         const groups = Array.isArray(payload?.groups) ? payload.groups : [];
         refs.formRoot.innerHTML = groups.map((group) => renderGroup(group)).join("");
         initTooltips();
+        attachRuntimeSettingTooltips();
     }
 
     function renderDiagnostics(payload) {
@@ -351,13 +403,15 @@
         `;
 
         renderDiagnosticsContent(html);
+        attachRuntimeDiagnosticsTooltips();
     }
 
     function renderGroup(group) {
         const groupCode = String(group?.code || "");
         const title = escapeHtml(formatRuntimeGroupTitle(groupCode, group?.title));
         const description = escapeHtml(formatRuntimeGroupDescription(groupCode, group?.description));
-        const settings = Array.isArray(group?.settings) ? group.settings : [];
+        const settings = (Array.isArray(group?.settings) ? group.settings : [])
+            .filter((setting) => !isReservedRuntimeSetting(setting?.key));
         const rows = settings.map((setting) => renderSetting(setting)).join("");
         return `
             <section class="analytics-runtime-group mb-3">
@@ -385,6 +439,7 @@
         const max = setting?.maxValue;
         const custom = Boolean(setting?.custom);
         const input = renderInput(kind, key, value, min, max, setting?.options);
+        const defaultLabel = `\u041f\u043e \u0443\u043c\u043e\u043b\u0447\u0430\u043d\u0438\u044e ${escapeHtml(defaultValue || "\u2014")}`;
 
         return `
             <div class="analytics-runtime-item">
@@ -395,16 +450,15 @@
                             data-runtime-help="setting"
                             data-runtime-help-title="${label}"
                             data-runtime-help-body="${help}"
-                            data-runtime-help-default="${escapeHtml(defaultValue || "—")}"
+                            data-runtime-help-default="${defaultLabel}"
                             aria-label="Открыть пояснение параметра">?</button>
                 </div>
                 <div class="analytics-runtime-item-input">
                     ${input}
                 </div>
                 <div class="analytics-runtime-item-meta">
-                    <span class="${custom ? "text-success" : "text-muted"}">${custom ? "Пользовательское значение" : "Значение по умолчанию"}</span>
+                    <span class="text-muted">${defaultLabel}</span>
                     ${isReservedRuntimeSetting(rawKey) ? "<span class=\"text-warning\">Пока не используется в текущей версии</span>" : ""}
-                    <span class="text-muted">Если поле оставить пустым, будет использовано значение: ${escapeHtml(defaultValue || "—")}</span>
                 </div>
             </div>
         `;
@@ -593,7 +647,7 @@
 
     function cleanRuntimeText(value, fallback) {
         const text = String(value || "").trim();
-        const mojibakePattern = /[\u0420\u0421].|\u0432\u0402|\uFFFD/;
+        const mojibakePattern = /\u0420[\u00A0-\u00BF\u0400-\u040F\u0450-\u045F]|\u0421[\u0400-\u040F\u0450-\u045F\u201A-\u201E]|\u00D0|\u00D1|\uFFFD/;
         if (!text || mojibakePattern.test(text)) {
             return String(fallback || "");
         }
@@ -612,6 +666,9 @@
         event.preventDefault();
         event.stopPropagation();
         event.stopImmediatePropagation?.();
+        // Runtime help uses compact hover tooltips inside the settings window.
+        // A click should not open an additional modal over this modal.
+        return;
         if (button.hasAttribute("data-runtime-overview-help")) {
             openRuntimeHelpModal(runtimeOverviewHelpPayload());
             return;
@@ -623,7 +680,7 @@
         openRuntimeHelpModal({
             title: button.getAttribute("data-runtime-help-title") || "Параметр аналитики",
             body: button.getAttribute("data-runtime-help-body") || "Описание отсутствует.",
-            safeValue: button.getAttribute("data-runtime-help-default") || "Значение по умолчанию",
+            safeValue: button.getAttribute("data-runtime-help-default") || "\u041f\u043e \u0443\u043c\u043e\u043b\u0447\u0430\u043d\u0438\u044e \u2014",
             when: "Меняйте этот параметр, если диагностика показывает отставание, нехватку срока хранения или слишком тяжёлую фоновую обработку.",
             impact: "Изменение влияет только на обслуживание аналитических данных и не переименовывает внутренние ключи или значения в базе.",
             risk: "Слишком маленькие интервалы могут чаще нагружать диск или базу. Слишком короткие сроки хранения могут удалить старую историю раньше, чем вы ожидаете."
@@ -758,6 +815,126 @@
             return "Диагностика обновлена.";
         }
         return `Диагностика обновлена: ${generatedAt.toLocaleString()}`;
+    }
+
+    function attachRuntimeSettingTooltips() {
+        refs.formRoot?.querySelectorAll(".analytics-runtime-help-badge[data-runtime-help='setting']").forEach((button) => {
+            const body = button.getAttribute("data-runtime-help-body") || "Поясняет назначение параметра и влияние изменения.";
+            setRuntimeTooltip(button, body);
+        });
+        const overview = refs.modalEl?.querySelector("[data-runtime-overview-help]");
+        if (overview) {
+            setRuntimeTooltip(overview, "Здесь настраиваются сроки хранения, пересчёт агрегатов, обслуживание логов и фоновые задачи аналитики.");
+        }
+        refs.modalEl?.querySelectorAll("[data-runtime-action-help]").forEach((button) => {
+            const help = actionHelpPayload(button.getAttribute("data-runtime-action-help") || "");
+            setRuntimeTooltip(button, help.body || "Запускает служебную операцию аналитики.");
+        });
+    }
+
+    function attachRuntimeDiagnosticsTooltips() {
+        const cardKeys = [
+            "rawRowsEstimate",
+            "rollupRowsEstimate",
+            "maxLagMinutes",
+            "minLagMinutes",
+            "staleWatermarkCount",
+            "currentFiles",
+            "archiveFiles",
+            "indexedFiles",
+            "traceLinks",
+            "pendingFiles",
+            "cleanupCandidates"
+        ];
+        refs.diagnosticsContent?.querySelectorAll(".analytics-runtime-diag-card-label").forEach((label, index) => {
+            appendRuntimeTooltip(label, RUNTIME_DIAG_HELP[cardKeys[index]]);
+        });
+
+        const blockKeys = ["logIndex", "watermarks", "eta", "tableSizes"];
+        refs.diagnosticsContent?.querySelectorAll(".analytics-runtime-diag-block-title").forEach((title, index) => {
+            appendRuntimeTooltip(title, RUNTIME_TABLE_HELP[blockKeys[index]]);
+        });
+
+    }
+
+    function appendRuntimeTooltip(host, text) {
+        if (!host || !text || host.querySelector?.(".analytics-runtime-help-badge")) {
+            return;
+        }
+        host.classList.add("analytics-runtime-help-host");
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "analytics-runtime-help-badge analytics-runtime-tooltip-badge";
+        button.textContent = "?";
+        setRuntimeTooltip(button, text);
+        host.append(" ", button);
+    }
+
+    function setRuntimeTooltip(button, text) {
+        if (!button || !text) {
+            return;
+        }
+        const normalized = String(text).replace(/\s+/g, " ").trim();
+        button.setAttribute("data-runtime-tooltip", normalized);
+        button.removeAttribute("title");
+        button.setAttribute("aria-label", normalized);
+    }
+
+    function handleRuntimeTooltipEnter(event) {
+        const button = event.target?.closest?.("[data-runtime-tooltip]");
+        if (!button || !refs.modalEl?.contains(button)) {
+            return;
+        }
+        showRuntimeTooltip(button);
+    }
+
+    function handleRuntimeTooltipLeave(event) {
+        const button = event.target?.closest?.("[data-runtime-tooltip]");
+        if (!button || !refs.modalEl?.contains(button)) {
+            return;
+        }
+        const next = event.relatedTarget;
+        if (next && button.contains(next)) {
+            return;
+        }
+        hideRuntimeTooltip();
+    }
+
+    function showRuntimeTooltip(button) {
+        const text = button.getAttribute("data-runtime-tooltip") || "";
+        if (!text) {
+            return;
+        }
+        if (!runtimeTooltipEl) {
+            runtimeTooltipEl = document.createElement("div");
+            runtimeTooltipEl.className = "analytics-runtime-floating-tooltip";
+            document.body.appendChild(runtimeTooltipEl);
+        }
+        runtimeTooltipEl.textContent = text;
+        runtimeTooltipEl.classList.add("is-visible");
+        positionRuntimeTooltip(button);
+    }
+
+    function positionRuntimeTooltip(button) {
+        if (!runtimeTooltipEl || !button) {
+            return;
+        }
+        const rect = button.getBoundingClientRect();
+        const tooltipRect = runtimeTooltipEl.getBoundingClientRect();
+        const gap = 8;
+        const viewportPadding = 10;
+        let left = rect.left + rect.width / 2 - tooltipRect.width / 2;
+        left = Math.max(viewportPadding, Math.min(left, window.innerWidth - tooltipRect.width - viewportPadding));
+        let top = rect.top - tooltipRect.height - gap;
+        if (top < viewportPadding) {
+            top = rect.bottom + gap;
+        }
+        runtimeTooltipEl.style.left = `${left}px`;
+        runtimeTooltipEl.style.top = `${top}px`;
+    }
+
+    function hideRuntimeTooltip() {
+        runtimeTooltipEl?.classList.remove("is-visible");
     }
 
     function renderDiagCard(label, value) {

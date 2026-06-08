@@ -1,7 +1,7 @@
 package com.example.gqw.analytics.repository;
 
 import com.example.gqw.analytics.entity.ModuleType;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -12,7 +12,7 @@ public interface ModuleTypeRepository extends JpaRepository<ModuleType, String> 
     java.util.List<ModuleType> findByIsActiveTrueOrderByNameAsc();
 
     @Modifying
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     @Query(value = """
         INSERT INTO analytics.module_type(code, name, description, is_active)
         VALUES (:code, :name, :description, :isActive)

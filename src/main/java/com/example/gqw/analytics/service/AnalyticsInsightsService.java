@@ -66,7 +66,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@Transactional(readOnly = true)
+@Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
 public class AnalyticsInsightsService {
     private static final Logger log = LoggerFactory.getLogger(AnalyticsInsightsService.class);
     private static final int DEFAULT_EVENT_PAGE_SIZE = 20;

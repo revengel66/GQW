@@ -1,7 +1,7 @@
 package com.example.gqw.analytics.repository;
 
 import com.example.gqw.analytics.entity.StageMetricType;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -14,7 +14,7 @@ public interface StageMetricTypeRepository extends JpaRepository<StageMetricType
     java.util.List<StageMetricType> findByIsSystemTrueOrderByCodeAsc();
 
     @Modifying
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     @Query(value = """
         INSERT INTO analytics.stage_metric_type(code, name, description, reading_guide, value_kind, unit_default, is_system, is_active)
         VALUES (:code, :name, :description, :readingGuide, :valueKind, :unitDefault, :isSystem, :isActive)
@@ -39,7 +39,7 @@ public interface StageMetricTypeRepository extends JpaRepository<StageMetricType
     );
 
     @Modifying
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     @Query("update StageMetricType t set t.readingGuide = :readingGuide where t.code = :code")
     int updateReadingGuideByCode(
         @Param("code") String code,

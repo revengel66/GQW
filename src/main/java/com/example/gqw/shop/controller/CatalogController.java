@@ -5,6 +5,7 @@ import com.example.gqw.analytics.aop.TrackAnalyticsEvent;
 import com.example.gqw.analytics.aop.TrackAnalyticsMetric;
 import com.example.gqw.shop.entity.Product;
 import com.example.gqw.shop.entity.Review;
+import com.example.gqw.shop.facade.CatalogFacade;
 import com.example.gqw.shop.service.CatalogService;
 import com.example.gqw.shop.service.ReviewService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -26,13 +27,16 @@ public class CatalogController {
     }
 
     private final CatalogService catalogService;
+    private final CatalogFacade catalogFacade;
     private final ReviewService reviewService;
 
     public CatalogController(
         CatalogService catalogService,
+        CatalogFacade catalogFacade,
         ReviewService reviewService
     ) {
         this.catalogService = catalogService;
+        this.catalogFacade = catalogFacade;
         this.reviewService = reviewService;
     }
 
@@ -41,10 +45,10 @@ public class CatalogController {
         code = "HOME_VIEW"
     )
     public String home(Model model) {
-        model.addAttribute("featuredCategories", catalogService.featuredTopCategories(4));
-        List<Product> products = catalogService.latestProducts();
-        model.addAttribute("products", products);
-        model.addAttribute("productCardFeatures", catalogService.cardCharacteristics(products, 3));
+        var pageData = catalogFacade.homePage();
+        model.addAttribute("featuredCategories", pageData.featuredCategories());
+        model.addAttribute("products", pageData.products());
+        model.addAttribute("productCardFeatures", pageData.productCardFeatures());
         return "shop/index";
     }
 
@@ -88,16 +92,17 @@ public class CatalogController {
     ) {
         int resolvedSize = Math.min(32, Math.max(1, size));
         boolean onlyInStock = inStockOnly != null && inStockOnly;
-        var category = catalogService.categoryBySlug(slug);
-        var categoryData = catalogService.categoryCatalogData(slug, page, resolvedSize, sort, q, minPrice, maxPrice, optionIds, onlyInStock);
-        var priceBounds = catalogService.categoryPriceBounds(slug, q, optionIds, onlyInStock);
+        var categoryPage = catalogFacade.categoryPage(slug, page, resolvedSize, sort, q, minPrice, maxPrice, optionIds, onlyInStock);
+        var category = categoryPage.category();
+        var categoryData = categoryPage.categoryData();
+        var priceBounds = categoryPage.priceBounds();
         var pageData = categoryData.pageData();
 
         model.addAttribute("category", category);
         model.addAttribute("pageData", pageData);
         model.addAttribute("filterFacets", categoryData.facets());
-        model.addAttribute("productCardFeatures", catalogService.cardCharacteristics(pageData.getContent(), 3));
-        model.addAttribute("categoryTree", catalogService.categoryTree());
+        model.addAttribute("productCardFeatures", categoryPage.productCardFeatures());
+        model.addAttribute("categoryTree", categoryPage.categoryTree());
         model.addAttribute("sort", sort);
         model.addAttribute("q", q);
         model.addAttribute("minPrice", minPrice);
@@ -188,7 +193,7 @@ public class CatalogController {
     @GetMapping("/about")
     @TrackAnalyticsEvent(code = "ABOUT_VIEW")
     public String about() {
-        return "shop/about";
+        return catalogFacade.staticShopPage("about");
     }
 
     @GetMapping("/reviews")

@@ -1,5 +1,7 @@
 package com.example.gqw.analytics.service;
 
+import org.springframework.beans.factory.annotation.Qualifier;
+
 import java.sql.Date;
 import java.sql.Timestamp;
 import java.time.Clock;
@@ -29,7 +31,7 @@ public class AnalyticsDataLifecycleService {
     private volatile Instant lastRunAt;
 
     public AnalyticsDataLifecycleService(
-        NamedParameterJdbcTemplate jdbcTemplate,
+        @Qualifier("analyticsNamedParameterJdbcTemplate") NamedParameterJdbcTemplate jdbcTemplate,
         AnalyticsRuntimeSettingsService runtimeSettingsService,
         @Value("${app.analytics.lifecycle.enabled:true}") boolean lifecycleEnabled
     ) {
@@ -40,7 +42,7 @@ public class AnalyticsDataLifecycleService {
     }
 
     @Scheduled(cron = "0 * * * * *")
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public void scheduledMaintenance() {
         if (!runtimeSettingsService.getBoolean(
             AnalyticsRuntimeSettingsService.KEY_LIFECYCLE_ENABLED,
@@ -66,7 +68,7 @@ public class AnalyticsDataLifecycleService {
         }
     }
 
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public void runMaintenanceNow() {
         Instant now = Instant.now(clock);
         synchronized (runLock) {

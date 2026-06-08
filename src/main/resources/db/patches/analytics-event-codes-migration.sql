@@ -154,7 +154,12 @@ insert into tmp_event_type_target(code, name, description, module_code) values
 ('SUPPORT_PROCESSED_UPDATE','Отметка обращения обработанным','Администратор отметил обращение как обработанное.','ADMIN'),
 ('USER_LIST_VIEW','Список пользователей','Администратор открыл страницу списка пользователей.','ADMIN'),
 ('USER_VIEW','Карточка пользователя','Администратор открыл карточку пользователя.','ADMIN'),
-('USER_UPDATE','Обновление пользователя','Администратор обновил данные/статус пользователя.','ADMIN');
+('USER_UPDATE','Обновление пользователя','Администратор обновил данные/статус пользователя.','ADMIN'),
+('FRONTEND_API_CALL','API вызов (frontend)','Клиентский HTTP-вызов из браузера: фиксирует URL, статус, длительность и traceId.','DEFAULT'),
+('FRONTEND_JS_ERROR','JavaScript ошибка','Необработанная JavaScript-ошибка или отклонённый promise на клиенте.','DEFAULT'),
+('FRONTEND_PAGE_LOAD','Загрузка страницы','Метрики загрузки страницы на клиенте: TTFB, DOM, load и тип навигации.','DEFAULT'),
+('FRONTEND_WEB_VITALS','Web Vitals','Ключевые UX-метрики браузера: LCP, INP, CLS.','DEFAULT'),
+('HTTP_REQUEST_ERROR','Ошибка HTTP-запроса','Служебное событие для неуспешного HTTP-запроса: фиксирует статус ответа, внутренний маршрут, traceId и контекст ошибки.','DEFAULT');
 
 insert into analytics.event_type(code, name, description, module_code, is_active)
 select code, name, description, module_code, true

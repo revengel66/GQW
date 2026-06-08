@@ -94,6 +94,42 @@ class AnalyticsRuntimeSettingsServiceTest {
         assertTrue(ex.getMessage() != null && !ex.getMessage().isBlank());
     }
 
+    @Test
+    void loggingSettingsAreExposedAndPolicyUsesRuntimeValues() {
+        AnalyticsRuntimeSettingsService.SettingView enabled = findSetting(
+            service.view(),
+            AnalyticsRuntimeSettingsService.KEY_ANALYTICS_LOGGING_ENABLED
+        );
+        AnalyticsRuntimeSettingsService.SettingView level = findSetting(
+            service.view(),
+            AnalyticsRuntimeSettingsService.KEY_ANALYTICS_LOGGING_LEVEL
+        );
+        AnalyticsLoggingPolicy policy = new AnalyticsLoggingPolicy(service);
+
+        assertEquals("BOOLEAN", enabled.kind());
+        assertEquals("true", enabled.defaultValue());
+        assertTrue(enabled.label().contains("Analytics"));
+        assertEquals("ENUM", level.kind());
+        assertTrue(policy.isInfoEnabled());
+        assertTrue(policy.isControllerEnabled());
+
+        service.update(Map.of(AnalyticsRuntimeSettingsService.KEY_ANALYTICS_LOGGING_LEVEL, "WARN"), "test");
+        assertFalse(policy.isInfoEnabled());
+        assertTrue(policy.isWarnEnabled());
+        assertTrue(policy.isErrorEnabled());
+
+        service.update(Map.of(AnalyticsRuntimeSettingsService.KEY_ANALYTICS_LOGGING_ENABLED, "false"), "test");
+        assertFalse(policy.isControllerEnabled());
+        assertFalse(policy.isDatabaseEnabled());
+        assertTrue(policy.isStrictWarningsEnabled());
+
+        service.update(Map.of(AnalyticsRuntimeSettingsService.KEY_ANALYTICS_LOGGING_LEVEL, "ERROR"), "test");
+        assertFalse(policy.isStrictWarningsEnabled());
+
+        service.update(Map.of(AnalyticsRuntimeSettingsService.KEY_ANALYTICS_LOGGING_STRICT_WARNINGS_ENABLED, "false"), "test");
+        assertFalse(policy.isStrictWarningsEnabled());
+    }
+
     private static AnalyticsRuntimeSettingsService.SettingView findSetting(
         AnalyticsRuntimeSettingsService.SettingsView view,
         String key

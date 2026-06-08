@@ -6,6 +6,7 @@ import com.example.gqw.analytics.aop.AnalyticsEventAspect;
 import com.example.gqw.analytics.repository.AnalyticsEventRepository;
 import com.example.gqw.analytics.repository.EventTypeRepository;
 import com.example.gqw.analytics.repository.ModuleTypeRepository;
+import com.example.gqw.analytics.entity.ModuleType;
 import java.time.Duration;
 import java.time.Instant;
 import org.slf4j.MDC;
@@ -26,22 +27,25 @@ public class AnalyticsEventService {
     private final ModuleTypeRepository moduleTypeRepository;
     private final AnalyticsCodeResolverService codeResolverService;
     private final AnalyticsSystemEventClassifier systemEventClassifier;
+    private final AnalyticsLoggingPolicy loggingPolicy;
 
     public AnalyticsEventService(
         AnalyticsEventRepository eventRepository,
         EventTypeRepository eventTypeRepository,
         ModuleTypeRepository moduleTypeRepository,
         AnalyticsCodeResolverService codeResolverService,
-        AnalyticsSystemEventClassifier systemEventClassifier
+        AnalyticsSystemEventClassifier systemEventClassifier,
+        AnalyticsLoggingPolicy loggingPolicy
     ) {
         this.eventRepository = eventRepository;
         this.eventTypeRepository = eventTypeRepository;
         this.moduleTypeRepository = moduleTypeRepository;
         this.codeResolverService = codeResolverService;
         this.systemEventClassifier = systemEventClassifier;
+        this.loggingPolicy = loggingPolicy;
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(transactionManager = "analyticsTransactionManager", propagation = Propagation.REQUIRES_NEW)
     public AnalyticsEvent createEvent(
         String eventTypeCode,
         Long userId,
@@ -63,22 +67,7 @@ public class AnalyticsEventService {
         event.setEventUid(UUID.randomUUID());
         event.setEventTypeCode(resolvedCode);
         String moduleCode = normalizeModuleCode(type.getModuleCode());
-        if (!moduleExists(moduleCode)) {
-            log.warn(
-                "Analytics event type {} references unknown module {}; falling back to preferred/default module",
-                resolvedCode,
-                moduleCode
-            );
-            moduleCode = resolvePreferredModuleCode(resolvedCode);
-        }
-        if (moduleCode == null || moduleCode.isBlank() || !moduleExists(moduleCode)) {
-            log.warn(
-                "Analytics event type {} has no valid module after fallback; using default module {}",
-                resolvedCode,
-                EventType.DEFAULT_MODULE_CODE
-            );
-            moduleCode = EventType.DEFAULT_MODULE_CODE;
-        }
+        validateModuleType(resolvedCode, moduleCode);
         event.setModuleCode(moduleCode);
         event.setUserId(userId);
         event.setSessionId(sessionId);
@@ -90,24 +79,32 @@ public class AnalyticsEventService {
         return eventRepository.save(event);
     }
 
-    private EventType autoCreateEventType(String code) {
-        String moduleCode = resolvePreferredModuleCode(code);
-        if (!moduleExists(moduleCode)) {
-            moduleCode = EventType.DEFAULT_MODULE_CODE;
+    private void validateModuleType(String eventTypeCode, String moduleCode) {
+        if (moduleCode == null || moduleCode.isBlank()) {
+            logDictionaryMismatch(moduleCode, eventTypeCode, "Blank module type");
+            throw new IllegalArgumentException("Blank module type");
         }
-        EventType type = new EventType();
-        type.setCode(code);
-        type.setName(humanizeCode(code));
-        type.setDescription(null);
-        type.setModuleCode(moduleCode);
-        type.setIsSystem(systemEventClassifier.isSystemEvent(code, type.getName(), null, null));
-        type.setIsActive(true);
-        try {
-            return eventTypeRepository.save(type);
-        } catch (RuntimeException ex) {
-            type.setModuleCode(EventType.DEFAULT_MODULE_CODE);
-            return eventTypeRepository.save(type);
+        ModuleType moduleType = moduleTypeRepository.findById(moduleCode).orElse(null);
+        if (moduleType == null) {
+            logDictionaryMismatch(moduleCode, eventTypeCode, "Unknown module type");
+            throw new IllegalArgumentException("Unknown module type: " + moduleCode);
         }
+        if (!Boolean.TRUE.equals(moduleType.getIsActive())) {
+            logDictionaryMismatch(moduleCode, eventTypeCode, "Inactive module type");
+            throw new IllegalArgumentException("Inactive module type: " + moduleCode);
+        }
+    }
+
+    private void logDictionaryMismatch(String moduleCode, String eventTypeCode, String reason) {
+        if (!loggingPolicy.isStrictWarningsEnabled()) {
+            return;
+        }
+        log.warn(
+            "Analytics dictionary mismatch: module={} eventType={} reason={}",
+            moduleCode,
+            eventTypeCode,
+            reason
+        );
     }
 
     private void markSystemEventTypeIfNeeded(EventType type, String requestPath, Integer statusCode) {
@@ -183,7 +180,10 @@ public class AnalyticsEventService {
         if (code == null || code.isBlank()) {
             return false;
         }
-        return moduleTypeRepository.findById(code).isPresent();
+        return moduleTypeRepository.findById(code)
+            .map(ModuleType::getIsActive)
+            .filter(Boolean.TRUE::equals)
+            .isPresent();
     }
 
     private String normalizeModuleCode(String value) {
@@ -193,13 +193,13 @@ public class AnalyticsEventService {
         return value.trim().toUpperCase();
     }
 
-    @Transactional(readOnly = true, propagation = Propagation.REQUIRES_NEW)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true, propagation = Propagation.REQUIRES_NEW)
     public AnalyticsEvent findByEventUid(UUID eventUid) {
         return eventRepository.findByEventUid(eventUid)
             .orElseThrow(() -> new IllegalArgumentException("Event not found: " + eventUid));
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(transactionManager = "analyticsTransactionManager", propagation = Propagation.REQUIRES_NEW)
     public void setStartedAtIfEarlier(UUID eventUid, Instant startedAt) {
         if (startedAt == null) {
             return;
@@ -215,7 +215,7 @@ public class AnalyticsEventService {
         }
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(transactionManager = "analyticsTransactionManager", propagation = Propagation.REQUIRES_NEW)
     public void extendEventDurationIfLater(UUID eventUid, Instant endedAtCandidate) {
         if (endedAtCandidate == null) {
             return;
@@ -233,7 +233,7 @@ public class AnalyticsEventService {
         eventRepository.save(event);
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(transactionManager = "analyticsTransactionManager", propagation = Propagation.REQUIRES_NEW)
     public void finishEventSuccess(UUID eventUid, Integer statusCode) {
         AnalyticsEvent event = findByEventUid(eventUid);
         Instant endedAt = Instant.now();
@@ -245,7 +245,7 @@ public class AnalyticsEventService {
         eventRepository.save(event);
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(transactionManager = "analyticsTransactionManager", propagation = Propagation.REQUIRES_NEW)
     public void finishEventError(UUID eventUid, Integer statusCode, String errorMessage) {
         AnalyticsEvent event = findByEventUid(eventUid);
         Instant endedAt = Instant.now();

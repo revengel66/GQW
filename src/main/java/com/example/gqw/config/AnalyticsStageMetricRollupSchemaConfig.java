@@ -1,5 +1,7 @@
 package com.example.gqw.config;
 
+import org.springframework.beans.factory.annotation.Qualifier;
+
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -13,7 +15,7 @@ public class AnalyticsStageMetricRollupSchemaConfig {
 
     @Bean
     @Order(206)
-    CommandLineRunner ensureAnalyticsStageMetricRollupSchema(JdbcTemplate jdbcTemplate) {
+    CommandLineRunner ensureAnalyticsStageMetricRollupSchema(@Qualifier("analyticsJdbcTemplate") JdbcTemplate jdbcTemplate) {
         return args -> {
             if (!tableExists(jdbcTemplate, "analytics.event")
                 || !tableExists(jdbcTemplate, "analytics.stage")
@@ -59,6 +61,19 @@ public class AnalyticsStageMetricRollupSchemaConfig {
                         stage_type_code,
                         metric_type_code,
                         bucket_start
+                    )
+                """
+            );
+            jdbcTemplate.execute(
+                """
+                    create unique index if not exists stage_metric_rollup_bucket_pkey
+                    on analytics.stage_metric_rollup_bucket (
+                        bucket_start,
+                        granularity_minutes,
+                        module_code,
+                        event_type_code,
+                        stage_type_code,
+                        metric_type_code
                     )
                 """
             );

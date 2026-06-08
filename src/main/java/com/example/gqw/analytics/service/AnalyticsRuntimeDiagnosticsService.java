@@ -1,5 +1,7 @@
 package com.example.gqw.analytics.service;
 
+import org.springframework.beans.factory.annotation.Qualifier;
+
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
@@ -27,7 +29,7 @@ public class AnalyticsRuntimeDiagnosticsService {
     private final Clock clock;
 
     public AnalyticsRuntimeDiagnosticsService(
-        NamedParameterJdbcTemplate jdbcTemplate,
+        @Qualifier("analyticsNamedParameterJdbcTemplate") NamedParameterJdbcTemplate jdbcTemplate,
         AnalyticsRuntimeSettingsService runtimeSettingsService,
         AnalyticsLogArchiveIndexService logArchiveIndexService
     ) {
@@ -37,7 +39,7 @@ public class AnalyticsRuntimeDiagnosticsService {
         this.clock = Clock.systemUTC();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public DiagnosticsView view() {
         Instant now = Instant.now(clock);
 

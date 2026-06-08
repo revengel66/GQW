@@ -264,12 +264,14 @@ public class AnalyticsAdminController {
             payload.put("code", resolvedCode);
             payload.put("deletable", usages.isEmpty());
             payload.put("usages", usages);
+            payload.put("eventCount", dictionaryAdminService.eventTypeEventCount(resolvedCode));
             payload.put("reason", usages.isEmpty() ? "" : "Событие используется в коде и не может быть удалено.");
         } catch (RuntimeException ex) {
             payload.put("ok", false);
             payload.put("deletable", false);
             payload.put("reason", ex.getMessage());
             payload.put("usages", List.of());
+            payload.put("eventCount", 0);
         }
         return payload;
     }
@@ -487,12 +489,14 @@ public class AnalyticsAdminController {
             payload.put("code", resolvedCode);
             payload.put("deletable", usages.isEmpty());
             payload.put("usages", usages);
+            payload.put("attributeValueCount", dictionaryAdminService.eventAttributeValueCount(resolvedCode));
             payload.put("reason", usages.isEmpty() ? "" : "Атрибут используется в коде и не может быть удалён.");
         } catch (RuntimeException ex) {
             payload.put("ok", false);
             payload.put("deletable", false);
             payload.put("reason", ex.getMessage());
             payload.put("usages", List.of());
+            payload.put("attributeValueCount", 0);
         }
         return payload;
     }
@@ -766,14 +770,11 @@ public class AnalyticsAdminController {
         model.addAttribute("modules", dictionaryAdminService.allModules());
         var eventTypes = dictionaryAdminService.allEventTypes(eventModuleCode);
         model.addAttribute("eventTypes", eventTypes);
-        model.addAttribute("eventTypeEventCounts", dictionaryAdminService.eventTypeEventCounts(eventTypes));
         var attributeTypes = dictionaryAdminService.allEventAttributeTypes();
         model.addAttribute("attributeTypes", attributeTypes);
-        model.addAttribute("attributeTypeValueCounts", dictionaryAdminService.eventAttributeValueCounts(attributeTypes));
         model.addAttribute("stageTypes", dictionaryAdminService.allStageTypes());
         var metricTypes = dictionaryAdminService.allStageMetricTypes();
         model.addAttribute("metricTypes", metricTypes);
-        model.addAttribute("stageMetricValueCounts", dictionaryAdminService.stageMetricValueCounts(metricTypes));
         model.addAttribute("builtInEventAttributeCodes", dictionaryAdminService.builtInEventAttributeCodes());
         model.addAttribute("builtInStageCodes", dictionaryAdminService.builtInStageCodes());
         model.addAttribute("builtInStageMetricCodes", dictionaryAdminService.builtInStageMetricCodes());

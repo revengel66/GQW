@@ -8,11 +8,7 @@ import com.example.gqw.shop.entity.Product;
 import com.example.gqw.shop.entity.ProductCharacteristic;
 import com.example.gqw.shop.entity.ProductFilterOption;
 import com.example.gqw.shop.entity.Review;
-import com.example.gqw.shop.repository.CategoryFilterRepository;
-import com.example.gqw.shop.repository.CategoryRepository;
-import com.example.gqw.shop.repository.ProductCharacteristicRepository;
-import com.example.gqw.shop.repository.ProductFilterOptionRepository;
-import com.example.gqw.shop.repository.ProductRepository;
+import com.example.gqw.shop.persistence.CatalogPersistence;
 import com.example.gqw.shop.repository.ReviewRepository;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -51,37 +47,25 @@ public class CatalogService {
     public record PriceBounds(BigDecimal min, BigDecimal max) {
     }
 
-    private final CategoryRepository categoryRepository;
-    private final CategoryFilterRepository categoryFilterRepository;
-    private final ProductRepository productRepository;
-    private final ProductCharacteristicRepository characteristicRepository;
-    private final ProductFilterOptionRepository productFilterOptionRepository;
+    private final CatalogPersistence catalogPersistence;
     private final ReviewRepository reviewRepository;
 
     public CatalogService(
-        CategoryRepository categoryRepository,
-        CategoryFilterRepository categoryFilterRepository,
-        ProductRepository productRepository,
-        ProductCharacteristicRepository characteristicRepository,
-        ProductFilterOptionRepository productFilterOptionRepository,
+        CatalogPersistence catalogPersistence,
         ReviewRepository reviewRepository
     ) {
-        this.categoryRepository = categoryRepository;
-        this.categoryFilterRepository = categoryFilterRepository;
-        this.productRepository = productRepository;
-        this.characteristicRepository = characteristicRepository;
-        this.productFilterOptionRepository = productFilterOptionRepository;
+        this.catalogPersistence = catalogPersistence;
         this.reviewRepository = reviewRepository;
     }
 
     @Transactional(readOnly = true)
     public List<Category> categories() {
-        return categoryRepository.findAll(Sort.by("name"));
+        return catalogPersistence.categories(Sort.by("name"));
     }
 
     @Transactional(readOnly = true)
     public List<Category> topCategories() {
-        return categoryRepository.findByParentIsNullAndIsPublishedTrueOrderByIdAsc();
+        return catalogPersistence.topCategories();
     }
 
     @Transactional(readOnly = true)
@@ -95,7 +79,7 @@ public class CatalogService {
 
     @Transactional(readOnly = true)
     public List<Category> subcategories(Category parent) {
-        return categoryRepository.findByParentAndIsPublishedTrueOrderByIdAsc(parent);
+        return catalogPersistence.subcategories(parent);
     }
 
     @Transactional(readOnly = true)
@@ -120,7 +104,7 @@ public class CatalogService {
   
     @Transactional(readOnly = true)
     public List<Product> latestProducts() {
-        return productRepository.findTop20ByIsPublishedTrueOrderByCreatedAtDesc();
+        return catalogPersistence.latestProducts();
     }
 
     @Transactional(readOnly = true)
@@ -133,7 +117,7 @@ public class CatalogService {
         for (Product product : products) {
             result.put(product.getId(), new ArrayList<>());
         }
-        List<ProductCharacteristic> rows = characteristicRepository.findForProductsOrdered(products);
+        List<ProductCharacteristic> rows = catalogPersistence.cardCharacteristics(products);
         for (ProductCharacteristic row : rows) {
             List<ProductCharacteristic> list = result.get(row.getProduct().getId());
             if (list != null && list.size() < resolvedLimit) {
@@ -153,7 +137,7 @@ public class CatalogService {
         BigDecimal maxPrice,
         Long categoryId
     ) {
-        return productRepository.findAll(
+        return catalogPersistence.products(
             buildFilterSpecification(query, minPrice, maxPrice, categoryId, false),
             PageRequest.of(Math.max(0, page), normalizePageSize(size), resolveSort(sortBy))
         );
@@ -161,7 +145,7 @@ public class CatalogService {
 
     @Transactional(readOnly = true)
     public Category categoryBySlug(String slug) {
-        return categoryRepository.findBySlugAndIsPublishedTrue(slug)
+        return catalogPersistence.categoryBySlug(slug)
             .orElseThrow(() -> new IllegalArgumentException("Категория не найдена"));
     }
 
@@ -192,7 +176,7 @@ public class CatalogService {
         boolean inStockOnly
     ) {
         Category category = categoryBySlug(categorySlug);
-        List<Product> baseProducts = productRepository.findAll(
+        List<Product> baseProducts = catalogPersistence.products(
             buildFilterSpecification(query, minPrice, maxPrice, category.getId(), inStockOnly),
             resolveSort(sortBy)
         );
@@ -202,14 +186,14 @@ public class CatalogService {
                 .filter(id -> id != null && id > 0)
                 .collect(java.util.stream.Collectors.toCollection(HashSet::new));
 
-        Set<Long> allowedFilterIds = categoryFilterRepository.findByCategory(category).stream()
+        Set<Long> allowedFilterIds = catalogPersistence.categoryFilters(category).stream()
             .map(cf -> cf.getFilter() != null ? cf.getFilter().getId() : null)
             .filter(id -> id != null && id > 0)
             .collect(java.util.stream.Collectors.toCollection(HashSet::new));
 
         List<ProductFilterOption> relations = baseProducts.isEmpty()
             ? List.of()
-            : productFilterOptionRepository.findByProductIn(baseProducts).stream()
+            : catalogPersistence.productFilterOptions(baseProducts).stream()
                 .filter(relation -> {
                     if (allowedFilterIds.isEmpty()) {
                         return true;
@@ -243,7 +227,7 @@ public class CatalogService {
     @Transactional(readOnly = true)
     public PriceBounds categoryPriceBounds(String categorySlug, String query, List<Long> selectedOptionIds, boolean inStockOnly) {
         Category category = categoryBySlug(categorySlug);
-        List<Product> baseProducts = productRepository.findAll(
+        List<Product> baseProducts = catalogPersistence.products(
             buildFilterSpecification(query, null, null, category.getId(), inStockOnly),
             Sort.by(Sort.Direction.ASC, "price")
         );
@@ -259,12 +243,12 @@ public class CatalogService {
                 .collect(java.util.stream.Collectors.toCollection(HashSet::new));
 
         if (!selectedIds.isEmpty()) {
-            Set<Long> allowedFilterIds = categoryFilterRepository.findByCategory(category).stream()
+            Set<Long> allowedFilterIds = catalogPersistence.categoryFilters(category).stream()
                 .map(cf -> cf.getFilter() != null ? cf.getFilter().getId() : null)
                 .filter(id -> id != null && id > 0)
                 .collect(java.util.stream.Collectors.toCollection(HashSet::new));
 
-            List<ProductFilterOption> relations = productFilterOptionRepository.findByProductIn(baseProducts).stream()
+            List<ProductFilterOption> relations = catalogPersistence.productFilterOptions(baseProducts).stream()
                 .filter(relation -> {
                     if (allowedFilterIds.isEmpty()) {
                         return true;
@@ -319,31 +303,31 @@ public class CatalogService {
 
     @Transactional(readOnly = true)
     public Product productBySlug(String slug) {
-        return productRepository.findBySlugAndIsPublishedTrue(slug)
+        return catalogPersistence.productBySlug(slug)
             .orElseThrow(() -> new IllegalArgumentException("Товар не найден"));
     }
 
     @Transactional(readOnly = true)
     public Product productById(Long id) {
-        return productRepository.findById(id)
+        return catalogPersistence.productById(id)
             .orElseThrow(() -> new IllegalArgumentException("Товар не найден"));
     }
 
     @Transactional(readOnly = true)
     public List<ProductCharacteristic> characteristics(Product product) {
-        return characteristicRepository.findByProductOrderBySortOrderAsc(product);
+        return catalogPersistence.characteristics(product);
     }
 
     @Transactional(readOnly = true)
     public List<FilterOption> filterOptions(Product product) {
-        return productFilterOptionRepository.findByProduct(product).stream()
+        return catalogPersistence.productFilterOptions(product).stream()
             .map(ProductFilterOption::getFilterOption)
             .toList();
     }
 
     @Transactional(readOnly = true)
     public List<Review> approvedReviews(Product product) {
-        return reviewRepository.findByProductAndApprovedTrueAndParentIsNullOrderByCreatedAtDesc(product);
+        return catalogPersistence.approvedReviews(product);
     }
 
     @Transactional(readOnly = true)
@@ -364,7 +348,10 @@ public class CatalogService {
             ? List.of()
             : product.getCategories().stream().toList();
         if (!currentCategories.isEmpty()) {
-            productRepository.findDistinctByCategoriesInAndIsPublishedTrue(currentCategories, PageRequest.of(0, resolvedLimit * 3, Sort.by(Sort.Direction.DESC, "createdAt")))
+            catalogPersistence.relatedProducts(
+                    currentCategories,
+                    PageRequest.of(0, resolvedLimit * 3, Sort.by(Sort.Direction.DESC, "createdAt"))
+                )
                 .stream()
                 .filter(candidate -> !candidate.getId().equals(product.getId()))
                 .forEach(result::add);
@@ -378,7 +365,10 @@ public class CatalogService {
                 }
             }
             if (!parentCategories.isEmpty()) {
-                productRepository.findDistinctByCategoriesInAndIsPublishedTrue(parentCategories, PageRequest.of(0, resolvedLimit * 3, Sort.by(Sort.Direction.DESC, "createdAt")))
+                catalogPersistence.relatedProducts(
+                        parentCategories,
+                        PageRequest.of(0, resolvedLimit * 3, Sort.by(Sort.Direction.DESC, "createdAt"))
+                    )
                     .stream()
                     .filter(candidate -> !candidate.getId().equals(product.getId()))
                     .forEach(result::add);
@@ -386,6 +376,14 @@ public class CatalogService {
         }
 
         return result.stream().limit(resolvedLimit).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public String staticShopPage(String pageName) {
+        if (pageName == null || pageName.isBlank()) {
+            return "shop/index";
+        }
+        return "shop/" + pageName.trim();
     }
 
     private Specification<Product> buildFilterSpecification(

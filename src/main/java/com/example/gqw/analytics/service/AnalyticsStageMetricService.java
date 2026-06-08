@@ -28,7 +28,7 @@ public class AnalyticsStageMetricService {
         this.codeResolverService = codeResolverService;
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(transactionManager = "analyticsTransactionManager", propagation = Propagation.REQUIRES_NEW)
     public void recordMetricNum(Long stageId, String metricTypeCode, BigDecimal value, String unit) {
         String resolvedCode = codeResolverService.resolveMetricTypeCode(metricTypeCode);
         StageMetricType type = stageMetricTypeRepository.findById(resolvedCode)
@@ -51,7 +51,7 @@ public class AnalyticsStageMetricService {
         stageMetricRepository.save(metric);
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(transactionManager = "analyticsTransactionManager", propagation = Propagation.REQUIRES_NEW)
     public void recordMetricText(Long stageId, String metricTypeCode, String value, String unit) {
         String resolvedCode = codeResolverService.resolveMetricTypeCode(metricTypeCode);
         StageMetricType type = stageMetricTypeRepository.findById(resolvedCode)

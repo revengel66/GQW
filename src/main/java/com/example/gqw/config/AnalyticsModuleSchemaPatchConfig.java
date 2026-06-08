@@ -1,5 +1,7 @@
 package com.example.gqw.config;
 
+import org.springframework.beans.factory.annotation.Qualifier;
+
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -15,7 +17,7 @@ public class AnalyticsModuleSchemaPatchConfig {
 
     @Bean
     @Order(110)
-    CommandLineRunner patchAnalyticsModuleSchema(JdbcTemplate jdbcTemplate) {
+    CommandLineRunner patchAnalyticsModuleSchema(@Qualifier("analyticsJdbcTemplate") JdbcTemplate jdbcTemplate) {
         return args -> {
             if (!schemaExists(jdbcTemplate, "analytics")) {
                 return;

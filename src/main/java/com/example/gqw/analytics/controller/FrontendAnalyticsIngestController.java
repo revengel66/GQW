@@ -1,5 +1,6 @@
 package com.example.gqw.analytics.controller;
 
+import com.example.gqw.analytics.service.AnalyticsInstrumentationPolicy;
 import com.example.gqw.analytics.service.FrontendAnalyticsIngestService;
 import com.example.gqw.analytics.web.dto.FrontendAnalyticsIngestRequest;
 import jakarta.servlet.http.HttpServletRequest;
@@ -17,9 +18,14 @@ public class FrontendAnalyticsIngestController {
 
     private static final Logger log = LoggerFactory.getLogger(FrontendAnalyticsIngestController.class);
 
+    private final AnalyticsInstrumentationPolicy instrumentationPolicy;
     private final FrontendAnalyticsIngestService frontendAnalyticsIngestService;
 
-    public FrontendAnalyticsIngestController(FrontendAnalyticsIngestService frontendAnalyticsIngestService) {
+    public FrontendAnalyticsIngestController(
+        AnalyticsInstrumentationPolicy instrumentationPolicy,
+        FrontendAnalyticsIngestService frontendAnalyticsIngestService
+    ) {
+        this.instrumentationPolicy = instrumentationPolicy;
         this.frontendAnalyticsIngestService = frontendAnalyticsIngestService;
     }
 
@@ -28,6 +34,9 @@ public class FrontendAnalyticsIngestController {
         @RequestBody(required = false) FrontendAnalyticsIngestRequest request,
         HttpServletRequest httpRequest
     ) {
+        if (!instrumentationPolicy.isEnabled()) {
+            return ResponseEntity.noContent().build();
+        }
         try {
             frontendAnalyticsIngestService.ingest(request, httpRequest);
         } catch (RuntimeException ex) {

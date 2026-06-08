@@ -37,7 +37,7 @@ public class AnalyticsRuntimeOperationsService {
         this.clock = Clock.systemUTC();
     }
 
-    @Transactional
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public OperationResult runOperation(String rawAction, String requestedBy) {
         String action = normalizeAction(rawAction);
         Instant startedAt = Instant.now(clock);
