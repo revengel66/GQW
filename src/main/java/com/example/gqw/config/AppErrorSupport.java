@@ -33,7 +33,7 @@ final class AppErrorSupport {
 
     static String resolveViewName(String requestPath) {
         if (requestPath != null) {
-            if (requestPath.startsWith("/admin") || requestPath.startsWith("/analytics-admin")) {
+            if (requestPath.startsWith("/admin")) {
                 return "admin/error";
             }
         }

@@ -1,6 +1,5 @@
 package com.example.gqw.admin.controller;
 
-import com.example.gqw.analytics.aop.TrackAnalyticsEvent;
 import com.example.gqw.shop.entity.OrderItem;
 import com.example.gqw.shop.entity.OrderStatus;
 import com.example.gqw.shop.entity.Product;
@@ -55,7 +54,6 @@ public class AdminUsersController {
     }
 
     @GetMapping("/admin/users")
-    @TrackAnalyticsEvent(code = "USER_LIST_VIEW")
     public String users(
         @RequestParam(required = false, defaultValue = "") String q,
         @RequestParam(required = false, defaultValue = "ALL") String userEnabled,
@@ -176,7 +174,6 @@ public class AdminUsersController {
     }
 
     @GetMapping("/admin/users/{id}")
-    @TrackAnalyticsEvent(code = "USER_VIEW")
     public String userDetails(
         @PathVariable Long id,
         @RequestParam(required = false, defaultValue = "orders") String tab,
@@ -338,7 +335,6 @@ public class AdminUsersController {
     }
 
     @PostMapping("/admin/users/{id}/status")
-    @TrackAnalyticsEvent(code = "USER_UPDATE")
     public String updateUserStatus(
         @PathVariable Long id,
         @RequestParam boolean enabled,

@@ -1,6 +1,5 @@
 package com.example.gqw.shop.controller;
 
-import com.example.gqw.analytics.aop.TrackAnalyticsEvent;
 import com.example.gqw.shop.entity.OrderItem;
 import com.example.gqw.shop.entity.OrderStatus;
 import com.example.gqw.shop.entity.OrderStatusHistory;
@@ -60,7 +59,6 @@ public class AccountController {
     }
 
     @GetMapping("/account")
-    @TrackAnalyticsEvent(code = "ACCOUNT_VIEW")
     public String account(
         @RequestParam(required = false) Boolean checkoutSuccess,
         @RequestParam(required = false) Boolean profileUpdated,
@@ -157,7 +155,6 @@ public class AccountController {
     }
 
     @PostMapping("/account/profile")
-    @TrackAnalyticsEvent(code = "ACCOUNT_PROFILE_UPDATE")
     public String updateProfile(
         @RequestParam String fullName,
         @RequestParam String phone,
@@ -180,7 +177,6 @@ public class AccountController {
     }
 
     @PostMapping("/account/address")
-    @TrackAnalyticsEvent(code = "ACCOUNT_ADDRESS_UPDATE")
     public String updateAddress(
         @RequestParam(required = false) String addressStreet,
         @RequestParam(required = false) String addressHouse,
@@ -214,7 +210,6 @@ public class AccountController {
     }
 
     @PostMapping("/account/delete")
-    @TrackAnalyticsEvent(code = "ACCOUNT_DELETE")
     public String deleteAccount(
         HttpServletRequest request,
         HttpServletResponse response,
@@ -237,7 +232,6 @@ public class AccountController {
     }
 
     @PostMapping("/account/orders/{orderId}/cancel")
-    @TrackAnalyticsEvent(code = "ACCOUNT_ORDER_CANCEL")
     public String cancelOrderFromAccount(@PathVariable Long orderId, RedirectAttributes redirectAttributes) {
         try {
             orderService.cancelForCurrentUser(orderId);
@@ -250,7 +244,6 @@ public class AccountController {
     }
 
     @PostMapping("/account/orders/{orderId}/update")
-    @TrackAnalyticsEvent(code = "ACCOUNT_ORDER_UPDATE")
     public String updateOrderFromAccount(
         @PathVariable Long orderId,
         @RequestParam String customerName,
@@ -298,7 +291,6 @@ public class AccountController {
     }
 
     @PostMapping("/account/support/create")
-    @TrackAnalyticsEvent(code = "ACCOUNT_SUPPORT_CREATE")
     public String createSupportTicketFromAccount(
         @RequestParam(required = false) Long orderId,
         @RequestParam String message,

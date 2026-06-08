@@ -1,6 +1,5 @@
 package com.example.gqw.shop.facade;
 
-import com.example.gqw.analytics.aop.TrackAnalyticsLayer;
 import com.example.gqw.shop.entity.Category;
 import com.example.gqw.shop.entity.Product;
 import com.example.gqw.shop.service.CatalogService;
@@ -10,7 +9,6 @@ import java.util.Map;
 import org.springframework.stereotype.Service;
 
 @Service
-@TrackAnalyticsLayer(code = "FACADE")
 public class CatalogFacade {
 
     public record HomePageData(

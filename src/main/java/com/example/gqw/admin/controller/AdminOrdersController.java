@@ -1,6 +1,5 @@
 package com.example.gqw.admin.controller;
 
-import com.example.gqw.analytics.aop.TrackAnalyticsEvent;
 import com.example.gqw.shop.entity.OrderItem;
 import com.example.gqw.shop.entity.OrderStatus;
 import com.example.gqw.shop.entity.ShopOrder;
@@ -48,7 +47,6 @@ public class AdminOrdersController {
     }
 
     @GetMapping("/admin/orders")
-    @TrackAnalyticsEvent(code = "ORDER_LIST_VIEW")
     public String orders(
         @RequestParam(required = false, defaultValue = "ALL") String status,
         @RequestParam(required = false, defaultValue = "ALL") String type,
@@ -191,7 +189,6 @@ public class AdminOrdersController {
     }
 
     @GetMapping("/admin/orders/{id}")
-    @TrackAnalyticsEvent(code = "ORDER_VIEW")
     public String orderDetails(
         @PathVariable Long id,
         @RequestParam(required = false, defaultValue = "ALL") String status,
@@ -244,7 +241,6 @@ public class AdminOrdersController {
     }
 
     @PostMapping("/admin/orders/{id}/status")
-    @TrackAnalyticsEvent(code = "ORDER_UPDATE")
     public String updateOrderStatus(
         @PathVariable Long id,
         @RequestParam OrderStatus status,
@@ -339,7 +335,6 @@ public class AdminOrdersController {
     }
 
     @PostMapping("/admin/orders/{id}/delete")
-    @TrackAnalyticsEvent(code = "ORDER_DELETE")
     public String deleteOrder(
         @PathVariable Long id,
         @RequestParam(required = false, defaultValue = "orders") String returnTo,

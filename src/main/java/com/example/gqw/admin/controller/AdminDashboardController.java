@@ -1,6 +1,5 @@
 package com.example.gqw.admin.controller;
 
-import com.example.gqw.analytics.aop.TrackAnalyticsEvent;
 import com.example.gqw.shop.entity.OrderStatus;
 import com.example.gqw.shop.entity.ShopOrder;
 import com.example.gqw.shop.entity.ShopUser;
@@ -51,7 +50,6 @@ public class AdminDashboardController {
     }
 
     @GetMapping("/admin")
-    @TrackAnalyticsEvent(code = "DASHBOARD_VIEW")
     public String adminHome(
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
@@ -207,7 +205,6 @@ public class AdminDashboardController {
     }
 
     @PostMapping("/admin/credentials")
-    @TrackAnalyticsEvent(code = "CREDENTIALS_UPDATE")
     public String updateCredentials(
         @RequestParam String username,
         @RequestParam String password,

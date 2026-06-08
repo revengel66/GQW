@@ -1,10 +1,7 @@
 package com.example.gqw.shop.controller;
 
-import com.example.gqw.analytics.aop.TrackAnalyticsAttribute;
-import com.example.gqw.analytics.aop.TrackAnalyticsEvent;
 import com.example.gqw.shop.dto.CheckoutRequest;
 import com.example.gqw.shop.entity.CartItem;
-import com.example.gqw.shop.entity.ShopOrder;
 import com.example.gqw.shop.entity.ShopUser;
 import com.example.gqw.shop.service.CartService;
 import com.example.gqw.shop.service.CurrentUserService;
@@ -40,7 +37,6 @@ public class CheckoutController {
     }
 
     @GetMapping("/checkout")
-    @TrackAnalyticsEvent(code = "CHECKOUT_VIEW")
     public String checkout(Model model, HttpServletRequest request) {
         List<CartItem> items = cartService.items(request.getSession().getId());
         if (items.isEmpty()) {
@@ -68,13 +64,6 @@ public class CheckoutController {
         return "shop/checkout";
     }
 
-    @TrackAnalyticsEvent(
-        code = "CHECKOUT_SUBMIT",
-        attributes = {
-            @TrackAnalyticsAttribute(code = "DELIVERY_TYPE", value = "#checkoutRequest.deliveryType()"),
-            @TrackAnalyticsAttribute(code = "DEMO_FAULT", value = "#request.getHeader('X-Demo-Fault') != null && ('CHECKOUT_RESERVATION_FAIL'.equalsIgnoreCase(#request.getHeader('X-Demo-Fault')) || 'CHECKOUT_BUSINESS_FAIL'.equalsIgnoreCase(#request.getHeader('X-Demo-Fault'))) ? 'CHECKOUT_RESERVATION_FAIL' : null")
-        }
-    )
     @PostMapping("/checkout")
     public String checkoutSubmit(
         @Valid @ModelAttribute("checkoutRequest") CheckoutRequest checkoutRequest,
@@ -94,10 +83,7 @@ public class CheckoutController {
             "CHECKOUT_RESERVATION_FAIL".equalsIgnoreCase(demoFaultHeader)
                 || "CHECKOUT_BUSINESS_FAIL".equalsIgnoreCase(demoFaultHeader);
         try {
-            ShopOrder order = orderService.checkout(checkoutRequest, request.getSession().getId(), demoReservationFailure);
-            if (order != null && order.getId() != null) {
-                request.setAttribute("analytics.orderId", order.getId());
-            }
+            orderService.checkout(checkoutRequest, request.getSession().getId(), demoReservationFailure);
             return "redirect:/account?checkoutSuccess=true";
         } catch (IllegalStateException | IllegalArgumentException ex) {
             redirectAttributes.addFlashAttribute("cartError", ex.getMessage());

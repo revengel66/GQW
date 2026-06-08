@@ -25,17 +25,6 @@
             </div>
         </article>
         <article class="glass-card admin-dash-card p-3 p-xl-4">
-            <div class="admin-dash-icon admin-dash-icon-analytics">
-                <i class="bi bi-graph-up-arrow"></i>
-            </div>
-            <div class="admin-dash-title">Аналитика</div>
-            <div class="admin-dash-value">Live</div>
-            <div class="admin-dash-links">
-                <a th:href="@{/analytics}">Открыть модуль</a>
-                <a th:href="@{/analytics}">Графики и расследования</a>
-            </div>
-        </article>
-        <article class="glass-card admin-dash-card p-3 p-xl-4">
             <span class="admin-dash-badge"
                   th:classappend="${newOrdersCount == 0} ? ' is-empty'"
                   th:text="${newOrdersCount}">0</span>

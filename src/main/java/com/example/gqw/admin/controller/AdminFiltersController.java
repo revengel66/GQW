@@ -1,6 +1,5 @@
 package com.example.gqw.admin.controller;
 
-import com.example.gqw.analytics.aop.TrackAnalyticsEvent;
 import com.example.gqw.admin.service.AdminService;
 import com.example.gqw.shop.service.CatalogService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -32,14 +31,12 @@ public class AdminFiltersController {
     }
 
     @GetMapping("/admin/filters")
-    @TrackAnalyticsEvent(code = "FILTER_LIST_VIEW")
     public String filters(Model model) {
         model.addAttribute("filters", adminService.filters());
         return "admin/filters";
     }
 
     @GetMapping("/admin/filters/new")
-    @TrackAnalyticsEvent(code = "FILTER_CREATE_VIEW")
     public String newFilter(Model model) {
         model.addAttribute("editingFilter", null);
         model.addAttribute("categoryRows", adminService.categoryTreeRows());
@@ -52,7 +49,6 @@ public class AdminFiltersController {
     }
 
     @GetMapping("/admin/filters/{id}/edit")
-    @TrackAnalyticsEvent(code = "FILTER_EDIT_VIEW")
     public String editFilter(@PathVariable Long id, Model model, RedirectAttributes redirectAttributes) {
         try {
             var filter = adminService.filterById(id);
@@ -70,10 +66,6 @@ public class AdminFiltersController {
     }
 
     @PostMapping("/admin/filters/save")
-    @TrackAnalyticsEvent(
-        code = "FILTER_UPDATE",
-        codeExpression = "#filterId == null ? 'FILTER_CREATE' : 'FILTER_UPDATE'"
-    )
     public String saveFilter(
         @RequestParam(required = false) Long filterId,
         @RequestParam(required = false) String code,
@@ -98,7 +90,6 @@ public class AdminFiltersController {
     }
 
     @PostMapping("/admin/filters/{id}/delete")
-    @TrackAnalyticsEvent(code = "FILTER_DELETE")
     public String deleteFilter(
         @PathVariable Long id,
         RedirectAttributes redirectAttributes,

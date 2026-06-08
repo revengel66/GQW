@@ -62992,3 +62992,40 @@ where c.table_schema = 'analytics'
 2026-06-08 13:54:31.121  INFO [trace:c7ae3d190f48457680ba7a2e72d804f6] [event:] [module:DEFAULT] --- [nio-8080-exec-1] c.e.gqw.shop.service.CurrentUserService  : Method finished successfully CurrentUserService.findCurrentUser: operation='read data', layer=SERVICE, durationMs=0, traceId='c7ae3d190f48457680ba7a2e72d804f6', eventUid=''.
 2026-06-08 13:54:31.122  INFO [trace:c7ae3d190f48457680ba7a2e72d804f6] [event:] [module:DEFAULT] --- [nio-8080-exec-1] c.example.gqw.shop.service.CartService   : Method finished successfully CartService.items: operation='read data', layer=SERVICE, durationMs=1, traceId='c7ae3d190f48457680ba7a2e72d804f6', eventUid=''.
 2026-06-08 13:54:31.122  INFO [trace:c7ae3d190f48457680ba7a2e72d804f6] [event:] [module:DEFAULT] --- [nio-8080-exec-1] c.e.gqw.shop.controller.CartController   : Method finished successfully CartController.cartCountApi: operation='handle incoming request', layer=CONTROLLER, durationMs=1, traceId='c7ae3d190f48457680ba7a2e72d804f6', eventUid=''.
+2026-06-08T16:04:25.992+04:00  INFO 19864 --- [gqw] [restartedMain] com.example.gqw.GqwApplication           : Starting GqwApplication using Java 21.0.8 with PID 19864 (C:\Users\Natalia\.gqw-build\gqw\classes\java\main started by Natalia in C:\Users\Natalia\Desktop\ДИПЛОМ\GQW)
+2026-06-08T16:04:25.996+04:00  INFO 19864 --- [gqw] [restartedMain] com.example.gqw.GqwApplication           : No active profile set, falling back to 1 default profile: "default"
+2026-06-08T16:04:26.033+04:00  INFO 19864 --- [gqw] [restartedMain] .e.DevToolsPropertyDefaultsPostProcessor : Devtools property defaults active! Set 'spring.devtools.add-properties' to 'false' to disable
+2026-06-08T16:04:26.034+04:00  INFO 19864 --- [gqw] [restartedMain] .e.DevToolsPropertyDefaultsPostProcessor : For additional web related logging consider setting the 'logging.level.web' property to 'DEBUG'
+2026-06-08T16:04:26.493+04:00  INFO 19864 --- [gqw] [restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-06-08T16:04:26.550+04:00  INFO 19864 --- [gqw] [restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 50 ms. Found 17 JPA repository interfaces.
+2026-06-08T16:04:26.952+04:00  INFO 19864 --- [gqw] [restartedMain] o.s.boot.tomcat.TomcatWebServer          : Tomcat initialized with port 8080 (http)
+2026-06-08T16:04:26.965+04:00  INFO 19864 --- [gqw] [restartedMain] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-06-08T16:04:26.965+04:00  INFO 19864 --- [gqw] [restartedMain] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/11.0.18]
+2026-06-08T16:04:26.999+04:00  INFO 19864 --- [gqw] [restartedMain] b.w.c.s.WebApplicationContextInitializer : Root WebApplicationContext: initialization completed in 964 ms
+2026-06-08T16:04:27.218+04:00  INFO 19864 --- [gqw] [restartedMain] org.hibernate.orm.jpa                    : HHH008540: Processing PersistenceUnitInfo [name: default]
+2026-06-08T16:04:27.256+04:00  INFO 19864 --- [gqw] [restartedMain] org.hibernate.orm.core                   : HHH000001: Hibernate ORM core version 7.2.7.Final
+2026-06-08T16:04:27.551+04:00  INFO 19864 --- [gqw] [restartedMain] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-06-08T16:04:27.573+04:00  INFO 19864 --- [gqw] [restartedMain] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-06-08T16:04:27.606+04:00  INFO 19864 --- [gqw] [restartedMain] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@619c0b12
+2026-06-08T16:04:27.607+04:00  INFO 19864 --- [gqw] [restartedMain] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-06-08T16:04:27.663+04:00  INFO 19864 --- [gqw] [restartedMain] org.hibernate.orm.connections.pooling    : HHH10001005: Database info:
+	Database JDBC URL [jdbc:postgresql://localhost:5432/gqw]
+	Database driver: PostgreSQL JDBC Driver
+	Database dialect: PostgreSQLDialect
+	Database version: 18.0
+	Default catalog/schema: gqw/public
+	Autocommit mode: undefined/unknown
+	Isolation level: READ_COMMITTED [default READ_COMMITTED]
+	JDBC fetch size: none
+	Pool: DataSourceConnectionProvider
+	Minimum pool size: undefined/unknown
+	Maximum pool size: undefined/unknown
+2026-06-08T16:04:28.519+04:00  INFO 19864 --- [gqw] [restartedMain] org.hibernate.orm.core                   : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-06-08T16:04:28.594+04:00  INFO 19864 --- [gqw] [restartedMain] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-06-08T16:04:28.661+04:00  INFO 19864 --- [gqw] [restartedMain] o.s.d.j.r.query.QueryEnhancerFactories   : Hibernate is in classpath; If applicable, HQL parser will be used.
+2026-06-08T16:04:29.401+04:00  INFO 19864 --- [gqw] [restartedMain] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with UserDetailsService bean with name customUserDetailsService
+2026-06-08T16:04:29.760+04:00  INFO 19864 --- [gqw] [restartedMain] o.s.boot.tomcat.TomcatWebServer          : Tomcat started on port 8080 (http) with context path '/'
+2026-06-08T16:04:29.763+04:00  INFO 19864 --- [gqw] [restartedMain] com.example.gqw.GqwApplication           : Started GqwApplication in 4.078 seconds (process running for 4.407)
+2026-06-08T16:04:36.038+04:00  INFO 19864 --- [gqw] [http-nio-8080-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-06-08T16:04:36.039+04:00  INFO 19864 --- [gqw] [http-nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2026-06-08T16:04:36.040+04:00  INFO 19864 --- [gqw] [http-nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 1 ms

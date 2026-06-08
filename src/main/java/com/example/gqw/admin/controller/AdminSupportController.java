@@ -1,6 +1,5 @@
 package com.example.gqw.admin.controller;
 
-import com.example.gqw.analytics.aop.TrackAnalyticsEvent;
 import com.example.gqw.shop.entity.OrderItem;
 import com.example.gqw.shop.entity.ShopOrder;
 import com.example.gqw.shop.entity.SupportRequest;
@@ -41,7 +40,6 @@ public class AdminSupportController {
     }
 
     @GetMapping("/admin/support")
-    @TrackAnalyticsEvent(code = "SUPPORT_LIST_VIEW")
     public String support(
         @RequestParam(required = false, defaultValue = "CONTACT") String tab,
         @RequestParam(required = false, defaultValue = "ALL") String status,
@@ -171,7 +169,6 @@ public class AdminSupportController {
     }
 
     @GetMapping("/admin/support/{id}")
-    @TrackAnalyticsEvent(code = "SUPPORT_DETAIL_VIEW")
     public String supportDetails(
         @PathVariable Long id,
         @RequestParam(required = false, defaultValue = "CONTACT") String tab,
@@ -220,7 +217,6 @@ public class AdminSupportController {
     }
 
     @PostMapping("/admin/support/{id}/status")
-    @TrackAnalyticsEvent(code = "SUPPORT_STATUS_UPDATE")
     public String updateSupportStatus(
         @PathVariable Long id,
         @RequestParam String status,
@@ -268,7 +264,6 @@ public class AdminSupportController {
     }
 
     @PostMapping("/admin/support/{id}/reply")
-    @TrackAnalyticsEvent(code = "SUPPORT_REPLY_CREATE")
     public String replySupportRequest(
         @PathVariable Long id,
         @RequestParam String adminReply,
@@ -303,7 +298,6 @@ public class AdminSupportController {
     }
 
     @PostMapping("/admin/support/{id}/processed")
-    @TrackAnalyticsEvent(code = "SUPPORT_PROCESSED_UPDATE")
     public String markSupportProcessed(
         @PathVariable Long id,
         HttpServletRequest request,

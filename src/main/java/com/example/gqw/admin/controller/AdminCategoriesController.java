@@ -1,6 +1,5 @@
 package com.example.gqw.admin.controller;
 
-import com.example.gqw.analytics.aop.TrackAnalyticsEvent;
 import com.example.gqw.shop.entity.Category;
 import com.example.gqw.admin.service.AdminService;
 import com.example.gqw.shop.service.CatalogService;
@@ -34,7 +33,6 @@ public class AdminCategoriesController {
     }
 
     @GetMapping("/admin/categories")
-    @TrackAnalyticsEvent(code = "CATEGORY_LIST_VIEW")
     public String categories(
         @RequestParam(required = false, defaultValue = "date_desc") String sort,
         Model model
@@ -49,7 +47,6 @@ public class AdminCategoriesController {
     }
 
     @GetMapping("/admin/categories/new")
-    @TrackAnalyticsEvent(code = "CATEGORY_CREATE_VIEW")
     public String newCategory(Model model) {
         AdminControllerSupport.LibraryViewData libraryViewData = controllerSupport.prepareLibraryViewData();
         model.addAttribute("categoryRows", adminService.categoryTreeRows());
@@ -63,7 +60,6 @@ public class AdminCategoriesController {
     }
 
     @GetMapping("/admin/categories/{id}/edit")
-    @TrackAnalyticsEvent(code = "CATEGORY_EDIT_VIEW")
     public String editCategory(@PathVariable Long id, Model model, RedirectAttributes redirectAttributes) {
         try {
             Category category = adminService.categoryById(id);
@@ -84,7 +80,6 @@ public class AdminCategoriesController {
     }
 
     @PostMapping("/admin/categories")
-    @TrackAnalyticsEvent(code = "CATEGORY_CREATE")
     public String createCategory(
         @RequestParam String name,
         @RequestParam(required = false) String slug,
@@ -110,7 +105,6 @@ public class AdminCategoriesController {
     }
 
     @PostMapping("/admin/categories/{id}")
-    @TrackAnalyticsEvent(code = "CATEGORY_UPDATE")
     public String updateCategory(
         @PathVariable Long id,
         @RequestParam String name,
@@ -137,7 +131,6 @@ public class AdminCategoriesController {
     }
 
     @PostMapping("/admin/categories/{id}/delete")
-    @TrackAnalyticsEvent(code = "CATEGORY_DELETE")
     public String deleteCategory(
         @PathVariable Long id,
         RedirectAttributes redirectAttributes,

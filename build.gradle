@@ -4,8 +4,6 @@ plugins {
     id 'io.spring.dependency-management' version '1.1.7'
 }
 
-def springBootVersion = '4.0.4'
-
 group = 'com.example'
 version = '0.0.1-SNAPSHOT'
 description = 'gqw'
@@ -31,7 +29,6 @@ repositories {
 }
 
 dependencies {
-    implementation 'org.springframework.boot:spring-boot-starter-aspectj'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
@@ -48,13 +45,6 @@ dependencies {
     testImplementation 'org.junit.platform:junit-platform-suite-api'
     testRuntimeOnly 'org.junit.platform:junit-platform-suite-engine'
     testRuntimeOnly 'com.h2database:h2'
-}
-
-configurations.configureEach {
-    resolutionStrategy.dependencySubstitution {
-        // Backward compatibility with old dependency name used before Boot 4.
-        substitute module('org.springframework.boot:spring-boot-starter-aop') using module("org.springframework.boot:spring-boot-starter-aspectj:${springBootVersion}")
-    }
 }
 
 tasks.named('test') {

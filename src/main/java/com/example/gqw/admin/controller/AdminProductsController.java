@@ -1,6 +1,5 @@
 package com.example.gqw.admin.controller;
 
-import com.example.gqw.analytics.aop.TrackAnalyticsEvent;
 import com.example.gqw.shop.entity.Product;
 import com.example.gqw.shop.entity.Review;
 import com.example.gqw.admin.service.AdminService;
@@ -49,7 +48,6 @@ public class AdminProductsController {
     }
 
     @GetMapping("/admin/products")
-    @TrackAnalyticsEvent(code = "PRODUCT_LIST_VIEW")
     public String products(
         @RequestParam(required = false) Long categoryId,
         @RequestParam(required = false, defaultValue = "") String q,
@@ -195,7 +193,6 @@ public class AdminProductsController {
     }
 
     @GetMapping("/admin/products/new")
-    @TrackAnalyticsEvent(code = "PRODUCT_CREATE_VIEW")
     public String newProduct(
         @RequestParam(required = false) Long categoryId,
         @RequestParam(required = false) Long copySourceProductId,
@@ -247,7 +244,6 @@ public class AdminProductsController {
     }
 
     @GetMapping("/admin/products/{id}/edit")
-    @TrackAnalyticsEvent(code = "PRODUCT_EDIT_VIEW")
     public String editProduct(@PathVariable Long id, Model model, RedirectAttributes redirectAttributes) {
         try {
             AdminControllerSupport.LibraryViewData libraryViewData = controllerSupport.prepareLibraryViewData();
@@ -288,7 +284,6 @@ public class AdminProductsController {
     }
 
     @PostMapping("/admin/products/save")
-    @TrackAnalyticsEvent(code = "PRODUCT_CREATE")
     public Object saveProduct(
         @RequestParam("productName") String name,
         @RequestParam("productSlug") String slug,
@@ -339,7 +334,6 @@ public class AdminProductsController {
     }
 
     @PostMapping("/admin/products")
-    @TrackAnalyticsEvent(code = "PRODUCT_CREATE")
     public Object createProduct(
         @RequestParam("productName") String name,
         @RequestParam("productSlug") String slug,
@@ -390,7 +384,6 @@ public class AdminProductsController {
     }
 
     @PostMapping("/admin/products/{id}")
-    @TrackAnalyticsEvent(code = "PRODUCT_UPDATE")
     public Object updateProduct(
         @PathVariable Long id,
         @RequestParam("productName") String name,
@@ -441,7 +434,6 @@ public class AdminProductsController {
     }
 
     @PostMapping("/admin/products/characteristics/save")
-    @TrackAnalyticsEvent(code = "PRODUCT_CHARACTERISTIC_CREATE")
     public String saveProductCharacteristic(
         @RequestParam Long productId,
         @RequestParam String name,
@@ -460,7 +452,6 @@ public class AdminProductsController {
     }
 
     @PostMapping("/admin/products/characteristics/{id}")
-    @TrackAnalyticsEvent(code = "PRODUCT_CHARACTERISTIC_UPDATE")
     public String updateProductCharacteristic(
         @PathVariable Long id,
         @RequestParam String name,
@@ -480,7 +471,6 @@ public class AdminProductsController {
     }
 
     @PostMapping("/admin/products/characteristics/{id}/delete")
-    @TrackAnalyticsEvent(code = "PRODUCT_CHARACTERISTIC_DELETE")
     public String deleteProductCharacteristic(
         @PathVariable Long id,
         @RequestParam(required = false) Long productId,
@@ -499,7 +489,6 @@ public class AdminProductsController {
     }
 
     @PostMapping("/admin/products/filter-options/save")
-    @TrackAnalyticsEvent(code = "PRODUCT_FILTER_OPTION_CREATE")
     public String saveProductFilterOption(
         @RequestParam Long productId,
         @RequestParam Long filterId,
@@ -518,7 +507,6 @@ public class AdminProductsController {
     }
 
     @PostMapping("/admin/products/filter-options/{id}")
-    @TrackAnalyticsEvent(code = "PRODUCT_FILTER_OPTION_UPDATE")
     public String updateProductFilterOption(
         @PathVariable Long id,
         @RequestParam Long productId,
@@ -537,7 +525,6 @@ public class AdminProductsController {
     }
 
     @PostMapping("/admin/products/filter-options/{id}/delete")
-    @TrackAnalyticsEvent(code = "PRODUCT_FILTER_OPTION_DELETE")
     public String deleteProductFilterOption(
         @PathVariable Long id,
         @RequestParam(required = false) Long productId,
@@ -556,7 +543,6 @@ public class AdminProductsController {
     }
 
     @PostMapping("/admin/products/{id}/delete")
-    @TrackAnalyticsEvent(code = "PRODUCT_DELETE")
     public String deleteProduct(
         @PathVariable Long id,
         RedirectAttributes redirectAttributes,
@@ -575,7 +561,6 @@ public class AdminProductsController {
     }
 
     @PostMapping("/admin/products/{id}/duplicate")
-    @TrackAnalyticsEvent(code = "PRODUCT_DUPLICATE")
     public String duplicateProduct(
         @PathVariable Long id,
         RedirectAttributes redirectAttributes,
@@ -592,7 +577,6 @@ public class AdminProductsController {
     }
 
     @PostMapping("/admin/products/{id}/images/{imageId}/delete")
-    @TrackAnalyticsEvent(code = "PRODUCT_IMAGE_DELETE")
     public String deleteProductImage(
         @PathVariable Long id,
         @PathVariable Long imageId,
@@ -610,7 +594,6 @@ public class AdminProductsController {
     }
 
     @PostMapping("/admin/products/{productId}/reviews/{reviewId}/moderate")
-    @TrackAnalyticsEvent(code = "PRODUCT_REVIEW_MODERATE")
     public String moderateProductReview(
         @PathVariable Long productId,
         @PathVariable Long reviewId,
@@ -629,7 +612,6 @@ public class AdminProductsController {
     }
 
     @PostMapping("/admin/products/{productId}/reviews/{reviewId}/delete")
-    @TrackAnalyticsEvent(code = "PRODUCT_REVIEW_DELETE")
     public String deleteProductReview(
         @PathVariable Long productId,
         @PathVariable Long reviewId,
@@ -647,7 +629,6 @@ public class AdminProductsController {
     }
 
     @PostMapping("/admin/products/{productId}/reviews/{reviewId}/reply")
-    @TrackAnalyticsEvent(code = "PRODUCT_REVIEW_REPLY_CREATE")
     public String replyProductReview(
         @PathVariable Long productId,
         @PathVariable Long reviewId,
@@ -667,7 +648,6 @@ public class AdminProductsController {
     }
 
     @PostMapping("/admin/products/{productId}/reviews/{reviewId}/reply/{replyId}")
-    @TrackAnalyticsEvent(code = "PRODUCT_REVIEW_REPLY_UPDATE")
     public String updateProductReviewReply(
         @PathVariable Long productId,
         @PathVariable Long reviewId,

@@ -1,6 +1,5 @@
 package com.example.gqw.config;
 
-import com.example.gqw.analytics.service.AnalyticsHttpErrorTrackingService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.OffsetDateTime;
 import org.springframework.core.Ordered;
@@ -25,12 +24,6 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 @ControllerAdvice(annotations = Controller.class)
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class AppGlobalExceptionHandler {
-
-    private final AnalyticsHttpErrorTrackingService analyticsHttpErrorTrackingService;
-
-    public AppGlobalExceptionHandler(AnalyticsHttpErrorTrackingService analyticsHttpErrorTrackingService) {
-        this.analyticsHttpErrorTrackingService = analyticsHttpErrorTrackingService;
-    }
 
     @ExceptionHandler({
         MissingServletRequestParameterException.class,
@@ -66,11 +59,6 @@ public class AppGlobalExceptionHandler {
     }
 
     private Object buildErrorResponse(HttpStatus status, Throwable ex, HttpServletRequest request) {
-        if (request != null && ex != null) {
-            request.setAttribute(AnalyticsHttpErrorTrackingService.ERROR_THROWABLE_REQUEST_ATTRIBUTE, ex);
-            analyticsHttpErrorTrackingService.trackIfMissing(request, status.value(), ex);
-        }
-
         String requestPath = request != null ? request.getRequestURI() : "";
         String title = AppErrorSupport.titleForStatus(status.value());
         String message = AppErrorSupport.userMessage(status.value(), ex, ex != null ? ex.getMessage() : null);

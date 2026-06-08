@@ -1,7 +1,5 @@
 package com.example.gqw.shop.controller;
 
-import com.example.gqw.analytics.aop.TrackAnalyticsAttribute;
-import com.example.gqw.analytics.aop.TrackAnalyticsEvent;
 import com.example.gqw.shop.entity.Product;
 import com.example.gqw.shop.entity.Review;
 import com.example.gqw.shop.service.CatalogService;
@@ -36,13 +34,6 @@ public class ReviewController {
         this.shopWebSupport = shopWebSupport;
     }
 
-    @TrackAnalyticsEvent(
-        code = "REVIEW_ADD",
-        attributes = {
-            @TrackAnalyticsAttribute(code = "RATING", value = "#rating"),
-            @TrackAnalyticsAttribute(code = "REVIEW_IMAGES_COUNT", value = "#images == null ? 0 : #images.size()")
-        }
-    )
     @PostMapping("/review/add")
     public String addReview(
         @RequestParam Long productId,
@@ -72,12 +63,6 @@ public class ReviewController {
     }
 
     @PostMapping("/review/reply")
-    @TrackAnalyticsEvent(
-        code = "REVIEW_REPLY",
-        attributes = {
-            @TrackAnalyticsAttribute(code = "REVIEW_ID", value = "#reviewId")
-        }
-    )
     public String replyReview(
         @RequestParam Long reviewId,
         @RequestParam String text,

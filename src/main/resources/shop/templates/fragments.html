@@ -5,12 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta th:if="${_csrf != null}" name="_csrf" th:content="${_csrf.token}">
     <meta th:if="${_csrf != null}" name="_csrf_header" th:content="${_csrf.headerName}">
-    <meta th:if="${#httpServletRequest != null and #httpServletRequest.getAttribute('analyticsEventUid') != null}"
-          name="analytics_event_uid"
-          th:content="${#httpServletRequest.getAttribute('analyticsEventUid')}">
-    <meta th:if="${#httpServletRequest != null and #httpServletRequest.getAttribute('traceId') != null}"
-          name="analytics_trace_id"
-          th:content="${#httpServletRequest.getAttribute('traceId')}">
     <title th:text="${title}">NEXORA</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
@@ -170,8 +164,7 @@
                 <a class="nav-link" th:href="@{/admin/users}">Пользователи</a>
                 <a class="nav-link" th:href="@{/admin/reviews}">Отзывы</a>
                 <a class="nav-link" th:href="@{/admin/support}">Заявки</a>
-                <a class="nav-link" th:href="@{/analytics-admin/dashboard}">Аналитика</a>
-                <a class="nav-link" th:href="@{/}">На сайт</a>
+                    <a class="nav-link" th:href="@{/}">На сайт</a>
             </div>
             <div class="d-flex align-items-center gap-2 ms-3">
                 <form method="post" th:action="@{/logout}" class="m-0">
@@ -188,23 +181,6 @@
 <div th:fragment="scripts">
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
-    <script th:src="@{/analytics/js/analytics-web.js(v='20260516-4')}"></script>
-    <script>
-        (function () {
-            if (!window.AnalyticsWeb || typeof window.AnalyticsWeb.init !== "function") {
-                return;
-            }
-            window.AnalyticsWeb.init({
-                endpoint: "/api/analytics/frontend/ingest",
-                moduleResolver: function (pathname) {
-                    const path = (pathname || window.location.pathname || "").toLowerCase();
-                    if (path.startsWith("/admin")) return "ADMIN";
-                    return "SHOP";
-                },
-                ignorePathPrefixes: ["/analytics", "/analytics-admin"]
-            });
-        })();
-    </script>
     <script th:src="${(#httpServletRequest != null and #httpServletRequest.requestURI != null and #httpServletRequest.requestURI.startsWith('/admin') ? '/admin/js/store.js' : '/shop/js/store.js') + '?v=20260516-5'}"></script>
 </div>
 </body>

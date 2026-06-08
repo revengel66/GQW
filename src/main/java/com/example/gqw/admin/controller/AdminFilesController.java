@@ -1,6 +1,5 @@
 package com.example.gqw.admin.controller;
 
-import com.example.gqw.analytics.aop.TrackAnalyticsEvent;
 import com.example.gqw.shop.service.LibraryStorageService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
@@ -30,7 +29,6 @@ public class AdminFilesController {
     }
 
     @GetMapping("/admin/files")
-    @TrackAnalyticsEvent(code = "FILE_LIST_VIEW")
     public String files(
         @RequestParam(required = false) String folder,
         Model model
@@ -43,7 +41,6 @@ public class AdminFilesController {
     }
 
     @PostMapping("/admin/files/upload")
-    @TrackAnalyticsEvent(code = "FILE_CREATE")
     public String uploadFiles(
         @RequestParam(required = false) List<MultipartFile> files,
         @RequestParam(required = false, defaultValue = "library") String folder,
@@ -82,7 +79,6 @@ public class AdminFilesController {
     }
 
     @PostMapping("/admin/files/upload-json")
-    @TrackAnalyticsEvent(code = "FILE_CREATE")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> uploadFilesJson(
         @RequestParam(required = false) List<MultipartFile> files,
@@ -108,7 +104,6 @@ public class AdminFilesController {
     }
 
     @PostMapping("/admin/files/delete-json")
-    @TrackAnalyticsEvent(code = "FILE_DELETE")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> deleteFileJson(
         @RequestParam String url,

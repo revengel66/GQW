@@ -1,6 +1,5 @@
 package com.example.gqw.config;
 
-import com.example.gqw.analytics.service.AnalyticsHttpErrorTrackingService;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.OffsetDateTime;
@@ -15,12 +14,6 @@ import org.springframework.web.servlet.ModelAndView;
 @Controller
 public class AppErrorController implements ErrorController {
 
-    private final AnalyticsHttpErrorTrackingService analyticsHttpErrorTrackingService;
-
-    public AppErrorController(AnalyticsHttpErrorTrackingService analyticsHttpErrorTrackingService) {
-        this.analyticsHttpErrorTrackingService = analyticsHttpErrorTrackingService;
-    }
-
     @RequestMapping("/error")
     public Object handleError(HttpServletRequest request) {
         int statusCode = resolveStatusCode(request);
@@ -31,12 +24,6 @@ public class AppErrorController implements ErrorController {
         }
 
         Throwable error = resolveThrowable(request);
-        if (request != null && error != null) {
-            request.setAttribute(AnalyticsHttpErrorTrackingService.ERROR_THROWABLE_REQUEST_ATTRIBUTE, error);
-        }
-        if (request != null && statusCode >= 400) {
-            analyticsHttpErrorTrackingService.trackIfMissing(request, statusCode, error);
-        }
         String fallbackMessage = resolveErrorMessage(request);
         String requestPath = resolveRequestPath(request);
         String title = AppErrorSupport.titleForStatus(statusCode);

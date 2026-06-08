@@ -36,7 +36,6 @@ class AppErrorSupportTest {
 
     @Test
     void resolveViewNameReturnsAdminTemplateForAdminPath() {
-        assertEquals("admin/error", AppErrorSupport.resolveViewName("/analytics-admin/dashboard"));
         assertEquals("admin/error", AppErrorSupport.resolveViewName("/admin/products"));
     }
 

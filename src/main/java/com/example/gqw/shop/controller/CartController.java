@@ -1,7 +1,5 @@
 package com.example.gqw.shop.controller;
 
-import com.example.gqw.analytics.aop.TrackAnalyticsAttribute;
-import com.example.gqw.analytics.aop.TrackAnalyticsEvent;
 import com.example.gqw.shop.entity.CartItem;
 import com.example.gqw.shop.service.CartService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -31,7 +29,6 @@ public class CartController {
     }
 
     @GetMapping("/cart")
-    @TrackAnalyticsEvent(code = "CART_VIEW")
     public String cart(Model model, HttpServletRequest request) {
         List<CartItem> items = cartService.items(request.getSession().getId());
         model.addAttribute("items", items);
@@ -39,12 +36,6 @@ public class CartController {
         return "shop/cart";
     }
 
-    @TrackAnalyticsEvent(
-        code = "ADD_TO_CART",
-        attributes = {
-            @TrackAnalyticsAttribute(code = "QUANTITY", value = "#quantity")
-        }
-    )
     @PostMapping("/cart/add")
     public String addToCart(
         @RequestParam Long productId,
@@ -60,12 +51,6 @@ public class CartController {
         return "redirect:/cart";
     }
 
-    @TrackAnalyticsEvent(
-        code = "ADD_TO_CART",
-        attributes = {
-            @TrackAnalyticsAttribute(code = "QUANTITY", value = "#quantity")
-        }
-    )
     @PostMapping("/api/cart/add")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> addToCartApi(
@@ -81,12 +66,6 @@ public class CartController {
         }
     }
 
-    @TrackAnalyticsEvent(
-        code = "ADD_TO_CART",
-        attributes = {
-            @TrackAnalyticsAttribute(code = "QUANTITY", value = "'1'")
-        }
-    )
     @PostMapping("/api/cart/increment")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> incrementCartItemApi(
@@ -101,12 +80,6 @@ public class CartController {
         }
     }
 
-    @TrackAnalyticsEvent(
-        code = "ADD_TO_CART",
-        attributes = {
-            @TrackAnalyticsAttribute(code = "QUANTITY", value = "'-1'")
-        }
-    )
     @PostMapping("/api/cart/decrement")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> decrementCartItemApi(
@@ -121,13 +94,6 @@ public class CartController {
         }
     }
 
-    @TrackAnalyticsEvent(
-        code = "ADD_TO_CART",
-        codeExpression = "#expectedQuantity != null && #expectedQuantity > 0 ? 'REMOVE_TO_CART' : 'ADD_TO_CART'",
-        attributes = {
-            @TrackAnalyticsAttribute(code = "QUANTITY", value = "#expectedQuantity != null && #expectedQuantity > 0 ? '-1' : '1'")
-        }
-    )
     @PostMapping("/api/cart/toggle-one")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> toggleCartItemApi(
@@ -150,12 +116,9 @@ public class CartController {
         return Map.of("count", shopWebSupport.countCartItems(request.getSession().getId()));
     }
 
-    @TrackAnalyticsEvent(code = "REMOVE_TO_CART")
     @PostMapping("/cart/remove")
     public String removeFromCart(@RequestParam Long itemId, HttpServletRequest request, RedirectAttributes redirectAttributes) {
         String sessionId = request.getSession().getId();
-        cartService.findProductIdByItemId(itemId, sessionId)
-            .ifPresent(productId -> request.setAttribute("analytics.productId", productId));
         try {
             cartService.removeItem(itemId, sessionId);
         } catch (IllegalArgumentException ex) {
@@ -165,13 +128,6 @@ public class CartController {
     }
 
     @PostMapping("/cart/update")
-    @TrackAnalyticsEvent(
-        code = "CART_UPDATE",
-        attributes = {
-            @TrackAnalyticsAttribute(code = "CART_ITEM_ID", value = "#itemId"),
-            @TrackAnalyticsAttribute(code = "QUANTITY", value = "#quantity")
-        }
-    )
     public String updateCart(
         @RequestParam Long itemId,
         @RequestParam int quantity,

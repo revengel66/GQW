@@ -1,7 +1,5 @@
 package com.example.gqw.shop.service;
 
-import com.example.gqw.analytics.aop.TrackAnalyticsMetric;
-import com.example.gqw.analytics.aop.TrackAnalyticsStageMetric;
 import com.example.gqw.shop.entity.Category;
 import com.example.gqw.shop.entity.FilterOption;
 import com.example.gqw.shop.entity.Product;

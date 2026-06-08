@@ -1,6 +1,5 @@
 package com.example.gqw.admin.controller;
 
-import com.example.gqw.analytics.aop.TrackAnalyticsEvent;
 import com.example.gqw.shop.entity.Review;
 import com.example.gqw.shop.service.ReviewService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -31,7 +30,6 @@ public class AdminReviewsController {
     }
 
     @GetMapping("/admin/reviews")
-    @TrackAnalyticsEvent(code = "REVIEW_LIST_VIEW")
     public String reviews(
         @RequestParam(defaultValue = "PENDING") String status,
         @RequestParam(required = false) Integer rating,
@@ -88,7 +86,6 @@ public class AdminReviewsController {
     }
 
     @PostMapping("/admin/reviews/{id}/moderate")
-    @TrackAnalyticsEvent(code = "REVIEW_MODERATE")
     public String moderateReview(
         @PathVariable Long id,
         @RequestParam boolean approved,
@@ -112,7 +109,6 @@ public class AdminReviewsController {
     }
 
     @PostMapping("/admin/reviews/{id}/delete")
-    @TrackAnalyticsEvent(code = "REVIEW_DELETE")
     public String deleteReview(
         @PathVariable Long id,
         @RequestParam(required = false) String status,
