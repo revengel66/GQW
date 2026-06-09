@@ -1,0 +1,4 @@
+[submodule "gqw-analytics-module"]
+	path = gqw-analytics-module
+	url = https://github.com/revengel66/GQW.git
+	branch = module
