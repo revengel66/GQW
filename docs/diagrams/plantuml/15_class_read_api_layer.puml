@@ -6,52 +6,165 @@ skinparam shadowing false
 skinparam classAttributeIconSize 0
 
 package "com.example.gqw.analytics.controller" {
-  class AnalyticsOverviewController
-  class AnalyticsEventController
-  class AnalyticsStageController
-  class AnalyticsFilterOptionsController
-  class AnalyticsCompareController
-  class AnalyticsDictionaryController
-  class AnalyticsRuntimeSettingsController
-  class AnalyticsAdminController
-  class AnalyticsUniversalController
+  class AnalyticsOverviewController {
+    -analyticsInsightsService : AnalyticsInsightsService
+    +overview(...) : OverviewResponse
+    +overviewCompare(...) : OverviewCompareResponse
+  }
+
+  class AnalyticsEventController {
+    -analyticsInsightsService : AnalyticsInsightsService
+    +events(...) : EventListResponse
+    +eventDetails(eventUid) : EventDetailsResponse
+    +eventDetailsById(eventId) : EventDetailsResponse
+  }
+
+  class AnalyticsStageController {
+    -analyticsInsightsService : AnalyticsInsightsService
+    +stages(...) : StageBreakdownResponse
+    +stagesCompare(...) : StageBreakdownCompareResponse
+    +stageMetrics(...) : StageMetricResponse
+    +stageMetricsCompare(...) : StageMetricCompareResponse
+  }
+
+  class AnalyticsFilterOptionsController {
+    -analyticsInsightsService : AnalyticsInsightsService
+    +filterOptions(...) : FilterOptionsResponse
+  }
+
+  class AnalyticsCompareController {
+    -analyticsInsightsService : AnalyticsInsightsService
+    +compare(...) : CompareResponse
+  }
+
+  class AnalyticsDictionaryController {
+    -analyticsInsightsService : AnalyticsInsightsService
+    +dictionaries(...) : DictionariesResponse
+  }
+
+  class AnalyticsRuntimeSettingsController {
+    -settingsService : AnalyticsRuntimeSettingsService
+    -diagnosticsService : AnalyticsRuntimeDiagnosticsService
+    -operationsService : AnalyticsRuntimeOperationsService
+    +view() : SettingsView
+    +diagnostics() : DiagnosticsView
+    +runOperation(request) : OperationResult
+    +update(request, principal) : SettingsView
+  }
+
+  class AnalyticsAdminController {
+    -authService : AnalyticsAdminAuthService
+    -settingsService : AnalyticsRuntimeSettingsService
+    -dictionaryAdminService : AnalyticsDictionaryAdminService
+    +dashboard(...) : String
+    +settings(...) : String
+    +dictionaries(...) : String
+    +saveEventType(...) : String
+    +saveStageMetricType(...) : String
+    +saveAlias(...) : String
+  }
+
+  class AnalyticsUniversalController {
+    -analyticsInsightsService : AnalyticsInsightsService
+    +universal(...) : UniversalResponse
+    +universalCompare(...) : UniversalCompareResponse
+    +rootCause(...) : UniversalRootCauseResponse
+    +errorBreakdown(...) : UniversalErrorBreakdownResponse
+    +moduleBreakdown(...) : UniversalModuleBreakdownResponse
+  }
 }
 
 package "com.example.gqw.analytics.service" {
   class AnalyticsInsightsService {
-    +dashboard(...)
-    +events(...)
-    +eventDetails(...)
+    -eventRepository : AnalyticsEventRepository
+    -stageRepository : AnalyticsStageRepository
+    -metricRepository : AnalyticsStageMetricRepository
+    -attributeRepository : AnalyticsEventAttributeRepository
+    -traceLogLookupService : AnalyticsTraceLogLookupService
+    +dictionaries(...) : DictionariesResponse
+    +filterOptions(...) : FilterOptionsResponse
+    +overview(...) : OverviewResponse
+    +stageBreakdown(...) : StageBreakdownResponse
+    +stageMetrics(...) : StageMetricResponse
+    +events(...) : EventListResponse
+    +eventDetails(eventUid) : EventDetailsResponse
+    +compare(...) : CompareResponse
   }
-  class AnalyticsQueryService
-  class AnalyticsRuntimeSettingsService
-  class AnalyticsDictionaryAdminService
-  class AnalyticsTraceLogLookupService
+
+  class AnalyticsQueryService {
+    -eventRepository : AnalyticsEventRepository
+    -stageRepository : AnalyticsStageRepository
+    -metricRepository : AnalyticsStageMetricRepository
+    +getDashboardData(...) : DashboardResponseDto
+    +getEventList(...) : EventListResponseDto
+    +getEventDetails(eventUid) : EventDetailsResponseDto
+    +getEventAttributes(eventUid) : List<AnalyticsEventAttribute>
+  }
+
+  class AnalyticsRuntimeSettingsService {
+    -jdbcTemplate : NamedParameterJdbcTemplate
+    +view() : SettingsView
+    +update(values, updatedBy) : SettingsView
+    +getBoolean(key, fallback) : boolean
+    +getInt(key, fallback, min, max) : int
+    +getText(key, fallback) : String
+  }
+
+  class AnalyticsDictionaryAdminService {
+    -eventTypeRepository : EventTypeRepository
+    -moduleTypeRepository : ModuleTypeRepository
+    -stageTypeRepository : StageTypeRepository
+    -metricTypeRepository : StageMetricTypeRepository
+    -aliasRepository : AnalyticsCodeAliasRepository
+    +allModules() : List<ModuleType>
+    +allEventTypes(moduleCode) : List<EventType>
+    +createOrUpdateEventType(...) : void
+    +toggleEventType(code) : boolean
+    +deleteStageMetricType(code) : void
+    +upsertAlias(...) : void
+  }
+
+  class AnalyticsTraceLogLookupService {
+    -analyticsLogViewService : AnalyticsLogViewService
+    +loadTraceLogsSafely(event) : TraceLogLookupResult
+  }
 }
 
 package "com.example.gqw.analytics.service.dto" {
-  class DashboardResponseDto
-  class EventListResponseDto
-  class EventDetailsResponseDto
+  class DashboardResponseDto {
+    +from : Instant
+    +to : Instant
+    +points : List<ChartPointDto>
+  }
+  class EventListResponseDto {
+    +items : List<EventListItemDto>
+    +totalElements : long
+  }
+  class EventDetailsResponseDto {
+    +eventUid : UUID
+    +attributes : List<?>
+    +stages : List<?>
+  }
   class EventDashboardResponseDto
-  class ChartPointDto
+  class ChartPointDto {
+    +timestamp : Instant
+    +count : long
+    +avgMs : BigDecimal
+  }
 }
 
 AnalyticsOverviewController --> AnalyticsInsightsService
 AnalyticsEventController --> AnalyticsInsightsService
-AnalyticsStageController --> AnalyticsQueryService
-AnalyticsFilterOptionsController --> AnalyticsQueryService
+AnalyticsStageController --> AnalyticsInsightsService
+AnalyticsFilterOptionsController --> AnalyticsInsightsService
 AnalyticsCompareController --> AnalyticsInsightsService
-AnalyticsDictionaryController --> AnalyticsDictionaryAdminService
+AnalyticsDictionaryController --> AnalyticsInsightsService
 AnalyticsRuntimeSettingsController --> AnalyticsRuntimeSettingsService
-AnalyticsAdminController --> AnalyticsRuntimeSettingsService
-AnalyticsUniversalController --> AnalyticsQueryService
-
+AnalyticsAdminController --> AnalyticsDictionaryAdminService
+AnalyticsUniversalController --> AnalyticsInsightsService
+AnalyticsInsightsService --> AnalyticsTraceLogLookupService : trace logs fallback
 AnalyticsInsightsService --> DashboardResponseDto
 AnalyticsInsightsService --> EventListResponseDto
 AnalyticsInsightsService --> EventDetailsResponseDto
-AnalyticsInsightsService --> EventDashboardResponseDto
-AnalyticsInsightsService --> ChartPointDto
-AnalyticsInsightsService --> AnalyticsTraceLogLookupService : trace logs fallback
 AnalyticsQueryService --> ChartPointDto
 @enduml

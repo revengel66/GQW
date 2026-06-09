@@ -6,42 +6,169 @@ skinparam shadowing false
 skinparam classAttributeIconSize 0
 
 package "com.example.gqw.analytics.source" {
-  interface EventTypeSource
-  interface ModuleTypeSource
-  interface StageTypeSource
-  interface StageMetricTypeSource
-  interface EventAttributeTypeSource
-  class DemoEventTypeSource
-  class DemoModuleTypeSource
-  class DemoStageTypeSource
-  class DemoStageMetricTypeSource
-  class DemoEventAttributeTypeSource
+  interface EventTypeSource {
+    +eventTypes() : List<EventType>
+  }
+  interface ModuleTypeSource {
+    +moduleTypes() : List<ModuleType>
+  }
+  interface StageTypeSource {
+    +stageTypes() : List<StageType>
+  }
+  interface StageMetricTypeSource {
+    +stageMetricTypes() : List<StageMetricType>
+  }
+  interface EventAttributeTypeSource {
+    +eventAttributeTypes() : List<EventAttributeType>
+  }
+
+  class DemoEventTypeSource {
+    +eventTypes() : List<EventType>
+  }
+  class DemoModuleTypeSource {
+    +moduleTypes() : List<ModuleType>
+  }
+  class DemoStageTypeSource {
+    +stageTypes() : List<StageType>
+  }
+  class DemoStageMetricTypeSource {
+    +stageMetricTypes() : List<StageMetricType>
+  }
+  class DemoEventAttributeTypeSource {
+    +eventAttributeTypes() : List<EventAttributeType>
+  }
 }
 
 package "com.example.gqw.analytics.service" {
-  class AnalyticsEventTypeMaintenanceService
-  class AnalyticsDictionaryAdminService
-  class AnalyticsStrictWarningEventService
-  class DictionarySyncService
-  class AnalyticsCodeResolverService
+  class DictionarySyncService {
+    -eventTypeSources : List<EventTypeSource>
+    -moduleTypeSources : List<ModuleTypeSource>
+    -stageTypeSources : List<StageTypeSource>
+    -metricTypeSources : List<StageMetricTypeSource>
+    -attributeTypeSources : List<EventAttributeTypeSource>
+    +syncAll() : void
+    +syncModuleTypes() : void
+    +syncEventTypes() : void
+    +syncStageTypes() : void
+    +syncMetricTypes() : void
+  }
+
+  class AnalyticsEventTypeMaintenanceService {
+    -eventTypeRepository : EventTypeRepository
+    -analyticsScanProperties : AnalyticsScanProperties
+    +maintainEventTypes() : void
+    -mergeEventTypeCode(...) : void
+    -generatePresentation(...) : GeneratedPresentation
+  }
+
+  class AnalyticsDictionaryAdminService {
+    -moduleTypeRepository : ModuleTypeRepository
+    -eventTypeRepository : EventTypeRepository
+    -attributeTypeRepository : EventAttributeTypeRepository
+    -stageTypeRepository : StageTypeRepository
+    -metricTypeRepository : StageMetricTypeRepository
+    -aliasRepository : AnalyticsCodeAliasRepository
+    +createOrUpdateModuleType(...) : void
+    +createOrUpdateEventType(...) : void
+    +createOrUpdateStageType(...) : void
+    +toggleAlias(aliasId) : boolean
+    +deleteEventType(code) : void
+  }
+
+  class AnalyticsStrictWarningEventService {
+    -eventService : AnalyticsEventService
+    -attributeService : AnalyticsEventAttributeService
+    -loggingPolicy : AnalyticsLoggingPolicy
+    +record(...) : void
+  }
+
+  class AnalyticsCodeResolverService {
+    -aliasRepository : AnalyticsCodeAliasRepository
+    +resolveEventTypeCode(code) : String
+    +resolveMetricTypeCode(code) : String
+    +resolveAttributeTypeCode(code) : String
+  }
 }
 
 package "com.example.gqw.analytics.entity" {
-  class EventType
-  class ModuleType
-  class StageType
-  class StageMetricType
-  class EventAttributeType
-  class AnalyticsCodeAlias
+  class EventType {
+    -code : String
+    -name : String
+    -description : String
+    -moduleCode : String
+    -isSystem : Boolean
+    -isActive : Boolean
+  }
+  class ModuleType {
+    -code : String
+    -name : String
+    -description : String
+    -isActive : Boolean
+  }
+  class StageType {
+    -code : String
+    -name : String
+    -description : String
+    -isSystem : Boolean
+    -isActive : Boolean
+  }
+  class StageMetricType {
+    -code : String
+    -name : String
+    -description : String
+    -readingGuide : String
+    -valueKind : MetricValueKind
+    -unitDefault : String
+    -isSystem : Boolean
+    -isActive : Boolean
+  }
+  class EventAttributeType {
+    -code : String
+    -name : String
+    -description : String
+    -valueKind : MetricValueKind
+    -unitDefault : String
+    -isSystem : Boolean
+    -isActive : Boolean
+  }
+  class AnalyticsCodeAlias {
+    -id : Long
+    -aliasType : AnalyticsCodeAliasType
+    -sourceCode : String
+    -targetCode : String
+    -isActive : Boolean
+    +onCreate() : void
+    +onUpdate() : void
+  }
 }
 
 package "com.example.gqw.analytics.repository" {
-  interface EventTypeRepository
-  interface ModuleTypeRepository
-  interface StageTypeRepository
-  interface StageMetricTypeRepository
-  interface EventAttributeTypeRepository
-  interface AnalyticsCodeAliasRepository
+  interface EventTypeRepository {
+    +findByIsActiveTrueOrderByNameAsc() : List<EventType>
+    +findByModuleCodeOrderByCodeAsc(code) : List<EventType>
+    +countByModuleCode(code) : long
+    +upsert(...) : void
+  }
+  interface ModuleTypeRepository {
+    +findByIsActiveTrueOrderByNameAsc() : List<ModuleType>
+    +upsert(...) : void
+  }
+  interface StageTypeRepository {
+    +findByIsActiveTrueOrderByNameAsc() : List<StageType>
+    +upsert(...) : void
+  }
+  interface StageMetricTypeRepository {
+    +findByIsActiveTrueOrderByNameAsc() : List<StageMetricType>
+    +upsert(...) : void
+  }
+  interface EventAttributeTypeRepository {
+    +findByIsActiveTrueOrderByNameAsc() : List<EventAttributeType>
+    +upsert(...) : void
+  }
+  interface AnalyticsCodeAliasRepository {
+    +findByAliasTypeAndSourceCode(...) : Optional<AnalyticsCodeAlias>
+    +findAllByAliasTypeOrderBySourceCodeAsc(...) : List<AnalyticsCodeAlias>
+  }
 }
 
 DemoEventTypeSource ..|> EventTypeSource
@@ -49,7 +176,6 @@ DemoModuleTypeSource ..|> ModuleTypeSource
 DemoStageTypeSource ..|> StageTypeSource
 DemoStageMetricTypeSource ..|> StageMetricTypeSource
 DemoEventAttributeTypeSource ..|> EventAttributeTypeSource
-
 DictionarySyncService --> EventTypeSource
 DictionarySyncService --> ModuleTypeSource
 DictionarySyncService --> StageTypeSource
@@ -61,18 +187,7 @@ DictionarySyncService --> StageTypeRepository
 DictionarySyncService --> StageMetricTypeRepository
 DictionarySyncService --> EventAttributeTypeRepository
 AnalyticsDictionaryAdminService --> AnalyticsCodeAliasRepository
-AnalyticsDictionaryAdminService --> EventTypeRepository
-AnalyticsDictionaryAdminService --> ModuleTypeRepository
-AnalyticsDictionaryAdminService --> StageTypeRepository
-AnalyticsDictionaryAdminService --> StageMetricTypeRepository
-AnalyticsDictionaryAdminService --> EventAttributeTypeRepository
 AnalyticsCodeResolverService --> AnalyticsCodeAliasRepository
-AnalyticsStrictWarningEventService --> EventTypeRepository : SYSTEM events
+AnalyticsStrictWarningEventService --> AnalyticsEventService
 AnalyticsEventTypeMaintenanceService --> EventTypeRepository
-EventTypeRepository --> EventType
-ModuleTypeRepository --> ModuleType
-StageTypeRepository --> StageType
-StageMetricTypeRepository --> StageMetricType
-EventAttributeTypeRepository --> EventAttributeType
-AnalyticsCodeAliasRepository --> AnalyticsCodeAlias
 @enduml

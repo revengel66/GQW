@@ -7,33 +7,86 @@ skinparam classAttributeIconSize 0
 
 package "com.example.gqw.analytics.logging" {
   class AnalyticsMethodLoggingAspect {
-    +logMethod(...)
+    -analyticsTrackingApi : AnalyticsTrackingApi
+    -instrumentationPolicy : AnalyticsInstrumentationPolicy
+    -loggingPolicy : AnalyticsLoggingPolicy
+    -operationDescriptionResolvers : List<AnalyticsOperationDescriptionResolver>
+    -basePackage : String
+    -controllerEnabled : boolean
+    -serviceEnabled : boolean
+    -repositoryEnabled : boolean
+    +logMethodExecution(joinPoint) : Object
+    -markStageLogWindow(...) : void
+    -resolveOperationDescription(...) : String
+    -resolveLayer(typeName) : String
   }
-  class AppModuleMdcFilter
-  interface AnalyticsOperationDescriptionResolver
-  class DefaultAnalyticsOperationDescriptionResolver
+
+  class AppModuleMdcFilter {
+    -defaultModuleCode : String
+    #doFilterInternal(request, response, chain) : void
+    -resolveModuleCode(request) : String
+    -resolveModuleFromPath(path) : String
+  }
+
+  interface AnalyticsOperationDescriptionResolver {
+    +resolve(className, methodName, layer) : String
+  }
+
+  class DefaultAnalyticsOperationDescriptionResolver {
+    +resolve(className, methodName, layer) : String
+    -genericOperationDescription(methodName, layer) : String
+  }
 }
 
 package "com.example.gqw.analytics.support" {
   class AnalyticsTraceContext {
-    +TRACE_ID_MDC_KEY
-    +EVENT_UID_MDC_KEY
-    +APP_MODULE_MDC_KEY
+    +TRACE_ID_HEADER : String
+    +TRACE_ID_REQUEST_ATTRIBUTE : String
+    +REQUEST_STARTED_AT_ATTRIBUTE : String
+    +REQUEST_DURATION_MS_ATTRIBUTE : String
+    +TRACE_ID_MDC_KEY : String
   }
 }
 
 package "com.example.gqw.analytics.service" {
   class AnalyticsLogArchiveIndexService {
-    +indexAvailableFilesNow()
+    -jdbcTemplate : NamedParameterJdbcTemplate
+    -runtimeSettingsService : AnalyticsRuntimeSettingsService
+    -clock : Clock
+    +scheduledIndexTick() : void
+    +scheduledRetentionTick() : void
+    +indexAvailableFilesNow() : LogIndexRunResult
+    +findIndexedTrace(...) : IndexedTraceLookup
+    +loadTraceLinesFromArchive(...) : List<EventLogEntryDto>
+    +diagnostics() : LogIndexDiagnostics
+    +cleanupOldLogsNow() : LogRetentionCleanupResult
   }
+
   class AnalyticsLogViewService {
-    +loadTraceLogs(...)
+    -eventRepository : AnalyticsEventRepository
+    -logArchiveIndexService : AnalyticsLogArchiveIndexService
+    -runtimeSettingsService : AnalyticsRuntimeSettingsService
+    +loadTraceLogs(event) : TraceLogLookupResult
+    -loadFromCurrentLogs(...) : List<EventLogEntryDto>
+    -mergeLogs(...) : List<EventLogEntryDto>
   }
+
   class AnalyticsTraceLogLookupService {
-    +loadTraceLogsSafely(...)
+    -analyticsLogViewService : AnalyticsLogViewService
+    +loadTraceLogsSafely(event) : TraceLogLookupResult
   }
-  class AnalyticsLoggingPolicy
-  class AnalyticsRuntimeSettingsService
+
+  class AnalyticsLoggingPolicy {
+    -runtimeSettingsService : AnalyticsRuntimeSettingsService
+    +isBuiltInEnabled() : boolean
+    +isInfoEnabled() : boolean
+    +isWarnEnabled() : boolean
+    +isErrorEnabled() : boolean
+    +isControllerEnabled() : boolean
+    +isUserLogCaptureEnabled() : boolean
+    +isStrictWarningsEnabled() : boolean
+    +isLayerEnabled(layer) : boolean
+  }
 }
 
 database "analytics.log_file_index" as file_index
@@ -43,10 +96,9 @@ folder ".log / .log.gz" as files
 
 DefaultAnalyticsOperationDescriptionResolver ..|> AnalyticsOperationDescriptionResolver
 AnalyticsMethodLoggingAspect --> AnalyticsOperationDescriptionResolver
-AnalyticsMethodLoggingAspect --> AnalyticsTraceContext : MDC keys
-AppModuleMdcFilter --> AnalyticsTraceContext : module MDC
-AnalyticsMethodLoggingAspect --> AnalyticsLoggingPolicy : built-in logs
-AnalyticsLogArchiveIndexService --> AnalyticsRuntimeSettingsService : log settings
+AnalyticsMethodLoggingAspect --> AnalyticsTraceContext
+AppModuleMdcFilter --> AnalyticsTraceContext
+AnalyticsMethodLoggingAspect --> AnalyticsLoggingPolicy
 AnalyticsLogArchiveIndexService --> files : reads
 AnalyticsLogArchiveIndexService --> file_index : writes
 AnalyticsLogArchiveIndexService --> trace_index : writes

@@ -6,59 +6,135 @@ skinparam shadowing false
 skinparam classAttributeIconSize 0
 
 package "com.example.gqw.analytics.aop" {
-  annotation TrackAnalyticsEvent
-  annotation TrackAnalyticsLayer
-  annotation TrackAnalyticsMetric
-  annotation TrackAnalyticsAttribute
-  annotation TrackAnalyticsStageMetric
+  annotation TrackAnalyticsEvent {
+    +code() : String
+    +codeExpression() : String
+    +entityType() : String
+    +entityId() : String
+    +attributes() : TrackAnalyticsAttribute[]
+    +metrics() : TrackAnalyticsMetric[]
+  }
+
+  annotation TrackAnalyticsLayer {
+    +code() : String
+    +operation() : String
+    +enabled() : boolean
+  }
+
+  annotation TrackAnalyticsMetric {
+    +code() : String
+    +value() : String
+    +unit() : String
+    +required() : boolean
+  }
+
+  annotation TrackAnalyticsAttribute {
+    +code() : String
+    +value() : String
+  }
+
+  annotation TrackAnalyticsStageMetric {
+    +code() : String
+    +value() : String
+    +unit() : String
+    +required() : boolean
+    +metrics() : TrackAnalyticsMetric[]
+  }
 
   class AnalyticsEventAspect {
-    +trackAnalyticsEvent(...)
-    -resolveTraceId(...)
-    -recordStrictWarning(...)
+    -analyticsTrackingApi : AnalyticsTrackingApi
+    -currentUserProvider : AnalyticsCurrentUserProvider
+    -stageMetricTypeRepository : StageMetricTypeRepository
+    -instrumentationPolicy : AnalyticsInstrumentationPolicy
+    -loggingPolicy : AnalyticsLoggingPolicy
+    -strictWarningEventService : AnalyticsStrictWarningEventService
+    -expressionParser : ExpressionParser
+    +aroundTrackedMethod(joinPoint) : Object
+    -recordMetrics(...)
+    -recordAttributes(...)
+    -resolveEventCode(...) : String
+    -resolveCurrentUserId() : Long
+    -resolveTraceId(request) : String
   }
 
   class AnalyticsServiceStageAspect {
-    +trackServiceStage(...)
+    -analyticsTrackingApi : AnalyticsTrackingApi
+    -instrumentationPolicy : AnalyticsInstrumentationPolicy
+    -loggingPolicy : AnalyticsLoggingPolicy
+    -strictWarningEventService : AnalyticsStrictWarningEventService
+    +aroundServiceStage(joinPoint) : Object
   }
 
   class AnalyticsRepositoryStageAspect {
-    +trackRepositoryStage(...)
+    -analyticsTrackingApi : AnalyticsTrackingApi
+    -instrumentationPolicy : AnalyticsInstrumentationPolicy
+    -loggingPolicy : AnalyticsLoggingPolicy
+    -strictWarningEventService : AnalyticsStrictWarningEventService
+    +aroundRepositoryStage(joinPoint) : Object
+    -safeMdc(key) : String
   }
 
   class AnalyticsLayerStageAspect {
-    +trackLayerStage(...)
+    -analyticsTrackingApi : AnalyticsTrackingApi
+    -stageTypeRepository : StageTypeRepository
+    -instrumentationPolicy : AnalyticsInstrumentationPolicy
+    -loggingPolicy : AnalyticsLoggingPolicy
+    -strictWarningEventService : AnalyticsStrictWarningEventService
+    +aroundAnalyticsLayer(joinPoint) : Object
+    -resolveAnnotation(joinPoint) : TrackAnalyticsLayer
+    -resolveOperation(annotation, joinPoint) : String
   }
 
   class AnalyticsStageMetricAspect {
-    +trackStageMetric(...)
+    -analyticsTrackingApi : AnalyticsTrackingApi
+    -stageMetricTypeRepository : StageMetricTypeRepository
+    -instrumentationPolicy : AnalyticsInstrumentationPolicy
+    -strictWarningEventService : AnalyticsStrictWarningEventService
+    +aroundStageMetric(joinPoint) : Object
+    -evaluateMetricExpression(...) : Object
+    -recordMetric(...)
   }
 
   class AutoCrudAnalyticsEventAspect {
-    +trackCrudEvent(...)
+    -analyticsTrackingApi : AnalyticsTrackingApi
+    -analyticsScanProperties : AnalyticsScanProperties
+    -instrumentationPolicy : AnalyticsInstrumentationPolicy
+    +aroundCrudOperation(joinPoint) : Object
+    -resolveEventCode(...) : String
   }
 
   class AnalyticsEventContext {
-    +eventUid()
-    +traceId()
-    +addStage(...)
+    -eventUid : UUID
+    -stageOrder : AtomicInteger
+    -activeStageIds : Deque<Long>
+    +eventUid() : UUID
+    +nextStageOrder() : int
+    +pushStageId(stageId) : void
+    +popStageId(stageId) : void
+    +currentStageId() : Long
   }
 
   class AnalyticsEventContextHolder {
-    +set(context)
-    +get()
-    +clear()
+    -CONTEXT : ThreadLocal<AnalyticsEventContext>
+    +get() : AnalyticsEventContext
+    +set(context) : void
+    +currentStageId() : Long
+    +clear() : void
   }
 
   class AnalyticsValueEstimator {
-    +estimate(...)
+    +estimate(value) : BigDecimal
+    -estimateCollection(...) : BigDecimal
+    -estimateString(...) : BigDecimal
   }
 }
 
 package "Сервисы модуля" {
-  class AnalyticsTrackerFacade
+  interface AnalyticsTrackingApi
   class AnalyticsInstrumentationPolicy
   class AnalyticsStrictWarningEventService
+  class AnalyticsLoggingPolicy
+  interface AnalyticsCurrentUserProvider
 }
 
 TrackAnalyticsEvent ..> AnalyticsEventAspect : используется
@@ -68,13 +144,13 @@ TrackAnalyticsLayer ..> AnalyticsLayerStageAspect : custom layer
 TrackAnalyticsStageMetric ..> AnalyticsStageMetricAspect : stage metric
 
 AnalyticsEventAspect --> AnalyticsEventContext : создаёт
-AnalyticsEventAspect --> AnalyticsEventContextHolder : хранит текущий context
-AnalyticsServiceStageAspect --> AnalyticsEventContextHolder : получает context
-AnalyticsRepositoryStageAspect --> AnalyticsEventContextHolder : получает context
-AnalyticsLayerStageAspect --> AnalyticsEventContextHolder : получает context
-AnalyticsStageMetricAspect --> AnalyticsEventContextHolder : добавляет metrics
-AutoCrudAnalyticsEventAspect --> AnalyticsTrackerFacade : создаёт auto CRUD events
-AnalyticsEventAspect --> AnalyticsInstrumentationPolicy : проверка правил
-AnalyticsEventAspect --> AnalyticsStrictWarningEventService : strict warnings
-AnalyticsEventAspect --> AnalyticsValueEstimator : payload/size metrics
+AnalyticsEventAspect --> AnalyticsEventContextHolder : хранит context
+AnalyticsServiceStageAspect --> AnalyticsEventContextHolder : stage stack
+AnalyticsRepositoryStageAspect --> AnalyticsEventContextHolder : stage stack
+AnalyticsLayerStageAspect --> AnalyticsEventContextHolder : stage stack
+AnalyticsStageMetricAspect --> AnalyticsEventContextHolder : current stage
+AutoCrudAnalyticsEventAspect --> AnalyticsTrackingApi : auto CRUD events
+AnalyticsEventAspect --> AnalyticsInstrumentationPolicy
+AnalyticsEventAspect --> AnalyticsStrictWarningEventService
+AnalyticsEventAspect --> AnalyticsValueEstimator
 @enduml

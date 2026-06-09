@@ -7,42 +7,121 @@ skinparam classAttributeIconSize 0
 
 package "com.example.gqw.analytics.service" {
   class AnalyticsTrackerFacade {
-    +startEvent(...)
-    +finishEvent(...)
-    +recordStageMetric(...)
+    -eventService : AnalyticsEventService
+    -stageService : AnalyticsStageService
+    -metricService : AnalyticsStageMetricService
+    -attributeService : AnalyticsEventAttributeService
+    -snapshotBuffer : AnalyticsEventSnapshotBuffer
+    -asyncWriteBuffer : AnalyticsAsyncWriteBuffer
+    +isSnapshotEnabled() : boolean
+    +startEvent(...) : UUID
+    +addAttribute(...) : void
+    +startStage(...) : Long
+    +recordMetricNum(...) : void
+    +finishEventSuccess(...) : void
+    +finishEventError(...) : void
   }
 
   class AnalyticsEventService {
-    +createEvent(...)
-    +finishEvent(...)
+    -eventRepository : AnalyticsEventRepository
+    -eventTypeRepository : EventTypeRepository
+    -moduleTypeRepository : ModuleTypeRepository
+    +createEvent(...) : AnalyticsEvent
+    +findByEventUid(eventUid) : AnalyticsEvent
+    +setStartedAtIfEarlier(...) : void
+    +extendEventDurationIfLater(...) : void
+    +finishEventSuccess(...) : void
+    +finishEventError(...) : void
   }
 
   class AnalyticsStageService {
-    +startStage(...)
-    +finishStage(...)
+    -stageRepository : AnalyticsStageRepository
+    -stageTypeRepository : StageTypeRepository
+    +createStage(event, stageTypeCode, stageOrder) : AnalyticsStage
+    +finishStageSuccess(stageId) : void
+    +finishStageError(stageId, errorMessage) : void
+    +markStageLogWindow(...) : void
   }
 
   class AnalyticsStageMetricService {
-    +recordMetric(...)
+    -metricRepository : AnalyticsStageMetricRepository
+    -metricTypeRepository : StageMetricTypeRepository
+    +recordMetricNum(...) : void
+    +recordMetricText(...) : void
   }
 
   class AnalyticsEventAttributeService {
-    +recordAttribute(...)
+    -attributeRepository : AnalyticsEventAttributeRepository
+    -attributeTypeRepository : EventAttributeTypeRepository
+    +addTextAttribute(...) : void
+    +addJsonAttribute(...) : void
   }
 
-  class AnalyticsEventSnapshot
-  class AnalyticsEventSnapshotBuffer
-  class AnalyticsEventSnapshotPersistenceService
-  class AnalyticsAsyncWriteBuffer
+  class AnalyticsEventSnapshot {
+    -eventUid : UUID
+    -eventTypeCode : String
+    -moduleCode : String
+    -traceId : String
+    -attributes : List<AttributeSnapshot>
+    -stages : Map<Long, StageSnapshot>
+    +eventUid() : UUID
+    +traceId() : String
+    +addAttribute(...) : void
+    +addStage(...) : void
+    +finishStageSuccess(...) : void
+    +finishSuccess(...) : void
+  }
+
+  class AnalyticsEventSnapshotBuffer {
+    -queue : BlockingQueue<AnalyticsEventSnapshot>
+    -currentSnapshots : ConcurrentMap<UUID, AnalyticsEventSnapshot>
+    -persistenceService : AnalyticsEventSnapshotPersistenceService
+    +start() : void
+    +stop() : void
+    +isEnabled() : boolean
+    +pendingSnapshots() : int
+    +startEvent(...) : UUID
+    +finishEventSuccess(...) : void
+    +finishEventError(...) : void
+  }
+
+  class AnalyticsEventSnapshotPersistenceService {
+    -eventRepository : AnalyticsEventRepository
+    -stageRepository : AnalyticsStageRepository
+    -metricRepository : AnalyticsStageMetricRepository
+    -attributeRepository : AnalyticsEventAttributeRepository
+    +persist(snapshot) : void
+  }
+
+  class AnalyticsAsyncWriteBuffer {
+    -queue : BlockingQueue<AnalyticsWriteOperation>
+    -droppedOperations : AtomicLong
+    -eventService : AnalyticsEventService
+    +start() : void
+    +stop() : void
+    +isEnabled() : boolean
+    +pendingOperations() : int
+    +startEvent(...) : UUID
+    +recordMetricNum(...) : void
+    +finishEventError(...) : void
+  }
 
   interface AnalyticsCurrentUserProvider {
-    +currentUserId()
-    +currentUsername()
-    +currentUserRole()
+    +currentUserId() : Optional<String>
+    +currentUsername() : Optional<String>
+    +currentUserRole() : Optional<String>
   }
 
-  class NoopAnalyticsCurrentUserProvider
-  class AnalyticsInstrumentationPolicy
+  class NoopAnalyticsCurrentUserProvider {
+    +currentUserId() : Optional<String>
+    +currentUsername() : Optional<String>
+    +currentUserRole() : Optional<String>
+  }
+
+  class AnalyticsInstrumentationPolicy {
+    -enabled : boolean
+    +isEnabled() : boolean
+  }
 }
 
 package "com.example.gqw.analytics.entity" {
@@ -70,5 +149,5 @@ AnalyticsStageService --> AnalyticsStage : creates
 AnalyticsStageMetricService --> AnalyticsStageMetric : creates
 AnalyticsEventAttributeService --> AnalyticsEventAttribute : creates
 NoopAnalyticsCurrentUserProvider ..|> AnalyticsCurrentUserProvider
-AnalyticsTrackerFacade --> AnalyticsInstrumentationPolicy : policy
+AnalyticsTrackerFacade --> AnalyticsInstrumentationPolicy
 @enduml

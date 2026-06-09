@@ -9,210 +9,298 @@ skinparam entity {
   BorderColor #334155
 }
 
+legend right
+  PK = primary key
+  FK = foreign key by code/id
+  NN = NOT NULL
+  NULL = nullable
+  UQ = UNIQUE
+  CK = conflict/unique key for SQL upsert
+endlegend
+
 entity "analytics.event" as event {
-  * id : bigint
+  * id : bigint <<PK, NN>>
   --
-  event_uid : uuid
-  event_type_code : varchar(64)
-  module_code : varchar(64)
-  user_id : bigint
-  request_path : varchar(1024)
-  http_method : varchar(16)
-  trace_id : varchar(64)
-  status_code : int
-  is_error : boolean
-  started_at : timestamp
-  duration_ms : int
+  event_uid : uuid <<NN, UQ>>
+  user_id : bigint <<NULL>>
+  session_id : varchar(128) <<NULL>>
+  event_type_code : varchar(64) <<NN, FK>>
+  module_code : varchar(64) <<NULL, FK>>
+  request_path : varchar(1024) <<NULL>>
+  http_method : varchar(16) <<NULL>>
+  trace_id : varchar(64) <<NULL>>
+  status_code : int <<NULL>>
+  is_error : boolean <<NN>>
+  error_message : varchar(2048) <<NULL>>
+  started_at : timestamp <<NN>>
+  ended_at : timestamp <<NULL>>
+  duration_ms : int <<NULL>>
+  created_at : timestamp <<NN>>
 }
 
 entity "analytics.stage" as stage {
-  * id : bigint
+  * id : bigint <<PK, NN>>
   --
-  event_id : bigint
-  stage_type_code : varchar(64)
-  stage_order : int
-  started_at : timestamp
-  duration_ms : int
-  is_error : boolean
+  event_id : bigint <<NN, FK>>
+  stage_type_code : varchar(64) <<NN, FK>>
+  stage_order : int <<NN>>
+  started_at : timestamp <<NN>>
+  ended_at : timestamp <<NULL>>
+  duration_ms : int <<NULL>>
+  log_started_at : timestamp <<NULL>>
+  log_ended_at : timestamp <<NULL>>
+  is_error : boolean <<NN>>
+  error_message : varchar(2048) <<NULL>>
+  created_at : timestamp <<NN>>
+  uq(event_id, stage_order) <<UQ>>
 }
 
 entity "analytics.stage_metric" as stage_metric {
-  * id : bigint
+  * id : bigint <<PK, NN>>
   --
-  stage_id : bigint
-  metric_type_code : varchar(64)
-  metric_value_num : numeric
-  metric_value_text : varchar(1024)
-  unit : varchar(32)
+  stage_id : bigint <<NN, FK>>
+  metric_type_code : varchar(64) <<NN, FK>>
+  metric_value_num : numeric(14,3) <<NULL>>
+  metric_value_text : varchar(1024) <<NULL>>
+  unit : varchar(32) <<NULL>>
+  recorded_at : timestamp <<NN>>
+  uq(stage_id, metric_type_code) <<UQ>>
 }
 
 entity "analytics.event_attribute" as event_attribute {
-  * id : bigint
+  * id : bigint <<PK, NN>>
   --
-  event_id : bigint
-  attribute_type_code : varchar(64)
-  attr_value : varchar(2048)
-  attr_value_json : varchar(4000)
+  event_id : bigint <<NN, FK>>
+  attribute_type_code : varchar(64) <<NN, FK>>
+  attr_value : varchar(2048) <<NULL>>
+  attr_value_json : varchar(4000) <<NULL>>
+  created_at : timestamp <<NN>>
 }
 
 entity "analytics.event_type" as event_type {
-  * code : varchar(64)
+  * code : varchar(64) <<PK, NN>>
   --
-  module_code : varchar(64)
-  name : varchar
-  active : boolean
+  name : varchar(128) <<NN>>
+  description : varchar(512) <<NULL>>
+  module_code : varchar(64) <<NN, FK>>
+  is_system : boolean <<NN>>
+  is_active : boolean <<NN>>
 }
 
 entity "analytics.module_type" as module_type {
-  * code : varchar(64)
+  * code : varchar(64) <<PK, NN>>
   --
-  name : varchar
-  active : boolean
+  name : varchar(128) <<NN>>
+  description : varchar(512) <<NULL>>
+  is_active : boolean <<NN>>
 }
 
 entity "analytics.stage_type" as stage_type {
-  * code : varchar(64)
+  * code : varchar(64) <<PK, NN>>
   --
-  name : varchar
-  active : boolean
+  name : varchar(128) <<NN>>
+  description : varchar(512) <<NULL>>
+  is_system : boolean <<NN>>
+  is_active : boolean <<NN>>
 }
 
 entity "analytics.stage_metric_type" as metric_type {
-  * code : varchar(64)
+  * code : varchar(64) <<PK, NN>>
   --
-  name : varchar
-  value_kind : enum
-  unit : varchar
-  active : boolean
+  name : varchar(128) <<NN>>
+  description : varchar(512) <<NULL>>
+  reading_guide : varchar(2048) <<NULL>>
+  value_kind : varchar(32) <<NN>>
+  unit_default : varchar(32) <<NULL>>
+  is_system : boolean <<NN>>
+  is_active : boolean <<NN>>
 }
 
 entity "analytics.event_attribute_type" as attr_type {
-  * code : varchar(64)
+  * code : varchar(64) <<PK, NN>>
   --
-  name : varchar
-  active : boolean
+  name : varchar(128) <<NN>>
+  description : varchar(512) <<NULL>>
+  value_kind : varchar(32) <<NN>>
+  unit_default : varchar(32) <<NULL>>
+  is_system : boolean <<NN>>
+  is_active : boolean <<NN>>
 }
 
 entity "analytics.aggregation_run" as aggregation_run {
-  * id : bigint
+  * id : bigint <<PK, NN>>
   --
-  run_type : enum
-  granularity : enum
-  period_start : timestamp
-  period_end : timestamp
-  status : enum
-  rows_written : int
+  run_type : varchar(16) <<NN>>
+  granularity : varchar(16) <<NN>>
+  period_start : timestamp <<NN>>
+  period_end : timestamp <<NN>>
+  status : varchar(16) <<NN>>
+  started_at : timestamp <<NN>>
+  finished_at : timestamp <<NULL>>
+  rows_written : int <<NN>>
+  error_message : varchar(2048) <<NULL>>
 }
 
 entity "analytics.aggregated_metric" as aggregated_metric {
-  * id : bigint
+  * id : bigint <<PK, NN>>
   --
-  aggregation_run_id : bigint
-  event_type_code : varchar(64)
-  stage_type_code : varchar(64)
-  sample_count : bigint
-  avg_ms : numeric
-  p95_ms : numeric
-  p99_ms : numeric
-  error_rate : numeric
+  aggregation_run_id : bigint <<NN, FK>>
+  event_type_code : varchar(64) <<NN, FK>>
+  stage_type_code : varchar(64) <<NULL, FK>>
+  period_start : timestamp <<NN>>
+  period_end : timestamp <<NN>>
+  sample_count : bigint <<NN>>
+  avg_ms : numeric(12,3) <<NN>>
+  p50_ms : numeric(12,3) <<NN>>
+  p95_ms : numeric(12,3) <<NN>>
+  p99_ms : numeric(12,3) <<NN>>
+  max_ms : numeric(12,3) <<NN>>
+  error_rate : numeric(6,3) <<NULL>>
 }
 
 entity "analytics.event_rollup_bucket" as event_rollup {
-  * bucket_start : timestamp
-  * granularity_minutes : int
-  * module_code : varchar
-  * event_type_code : varchar
+  * bucket_start : timestamp <<CK, NN>>
+  * granularity_minutes : int <<CK, NN>>
+  * module_code : varchar <<CK, NN, FK>>
+  * event_type_code : varchar <<CK, NN, FK>>
   --
-  count : bigint
-  error_count : bigint
-  duration_sum_ms : bigint
-  p95_ms : numeric
-  p99_ms : numeric
+  sample_count : bigint <<NN>>
+  error_count : bigint <<NN>>
+  duration_sum : bigint <<NN>>
+  avg_ms : numeric(12,3) <<NN>>
+  p95_ms : numeric(12,3) <<NN>>
+  p99_ms : numeric(12,3) <<NN>>
+  max_ms : numeric(12,3) <<NN>>
 }
 
 entity "analytics.stage_rollup_bucket" as stage_rollup {
-  * bucket_start : timestamp
-  * granularity_minutes : int
-  * stage_type_code : varchar
+  * bucket_start : timestamp <<CK, NN>>
+  * granularity_minutes : int <<CK, NN>>
+  * module_code : varchar <<CK, NN, FK>>
+  * event_type_code : varchar <<CK, NN, FK>>
+  * stage_type_code : varchar <<CK, NN, FK>>
   --
-  module_code : varchar
-  event_type_code : varchar
-  count : bigint
-  duration_sum_ms : bigint
+  sample_count : bigint <<NN>>
+  error_count : bigint <<NN>>
+  duration_sum : bigint <<NN>>
+  avg_ms : numeric(12,3) <<NN>>
+  p95_ms : numeric(12,3) <<NN>>
+  p99_ms : numeric(12,3) <<NN>>
+  max_ms : numeric(12,3) <<NN>>
 }
 
 entity "analytics.stage_metric_rollup_bucket" as metric_rollup {
-  * bucket_start : timestamp
-  * granularity_minutes : int
-  * metric_type_code : varchar
+  * bucket_start : timestamp <<CK, NN>>
+  * granularity_minutes : int <<CK, NN>>
+  * module_code : varchar <<CK, NN, FK>>
+  * event_type_code : varchar <<CK, NN, FK>>
+  * stage_type_code : varchar <<CK, NN, FK>>
+  * metric_type_code : varchar <<CK, NN, FK>>
   --
-  stage_type_code : varchar
-  numeric_count : bigint
-  numeric_sum : numeric
-  p95_value : numeric
+  numeric_count : bigint <<NN>>
+  numeric_sum : numeric <<NN>>
+  p95_value : numeric <<NULL>>
 }
 
 entity "analytics.filter_event_type_day" as filter_event_day {
-  * day : date
-  * event_type_code : varchar
+  * day_start : date <<CK, NN>>
+  * module_code : varchar <<CK, NN, FK>>
+  * event_type_code : varchar <<CK, NN, FK>>
   --
-  module_code : varchar
-  count : bigint
+  sample_count : bigint <<NN>>
 }
 
 entity "analytics.filter_attr_value_day" as filter_attr_day {
-  * day : date
-  * attribute_type_code : varchar
-  * attr_value : varchar
+  * day_start : date <<CK, NN>>
+  * module_code : varchar <<CK, NN, FK>>
+  * event_type_code : varchar <<CK, NN, FK>>
+  * attribute_type_code : varchar <<CK, NN, FK>>
+  * attribute_value : varchar(255) <<CK, NN>>
   --
-  count : bigint
+  sample_count : bigint <<NN>>
+}
+
+entity "analytics.time_rollup_watermark" as watermark {
+  * scope_code : varchar <<CK, NN>>
+  * granularity_minutes : int <<CK, NN>>
+  --
+  processed_until : timestamp <<NN>>
+  updated_at : timestamp <<NN>>
 }
 
 entity "analytics.log_file_index" as log_file {
-  * id : bigint
+  * id : bigint <<PK, NN>>
   --
-  file_name : varchar
-  file_path : varchar
-  module_code : varchar
-  archived : boolean
-  indexed_at : timestamp
+  module_code : varchar <<NULL, FK>>
+  file_name : varchar <<NN>>
+  file_path : varchar <<NN, UQ>>
+  compressed : boolean <<NN>>
+  from_ts : timestamp <<NULL>>
+  to_ts : timestamp <<NULL>>
+  line_count : bigint <<NN>>
+  size_bytes : bigint <<NN>>
+  checksum : varchar <<NULL>>
+  last_modified_at : timestamp <<NN>>
+  indexed_at : timestamp <<NN>>
+  expires_at : timestamp <<NULL>>
+  status : varchar <<NN>>
+  error_count : bigint <<NN>>
+  warn_count : bigint <<NN>>
+  trace_count : bigint <<NN>>
 }
 
 entity "analytics.log_trace_index" as log_trace {
-  * id : bigint
+  * id : bigint <<PK, NN>>
   --
-  trace_id : varchar
-  event_uid : uuid
-  file_index_id : bigint
-  module_code : varchar
-  line_count : int
+  trace_id : varchar <<NN>>
+  event_id : varchar <<NULL>>
+  module_code : varchar <<NULL, FK>>
+  file_id : bigint <<NN, FK>>
+  first_ts : timestamp <<NULL>>
+  last_ts : timestamp <<NULL>>
+  line_count : bigint <<NN>>
+  error_count : bigint <<NN>>
+  warn_count : bigint <<NN>>
+  has_error : boolean <<NN>>
+  top_sources : varchar(1024) <<NULL>>
+  summary : text <<NULL>>
+  indexed_at : timestamp <<NN>>
 }
 
 entity "analytics.log_problem_excerpt" as log_excerpt {
-  * id : bigint
+  * id : bigint <<PK, NN>>
   --
-  trace_id : varchar
-  file_index_id : bigint
-  module_code : varchar
-  level : varchar
-  excerpt : text
+  trace_id : varchar <<NN>>
+  event_id : varchar <<NULL>>
+  module_code : varchar <<NULL, FK>>
+  file_id : bigint <<NN, FK>>
+  timestamp : timestamp <<NULL>>
+  level : varchar <<NN>>
+  source : varchar <<NULL>>
+  message_short : varchar <<NULL>>
+  excerpt : text <<NN>>
+  line_number : bigint <<NULL>>
 }
 
 entity "analytics.admin_user" as admin_user {
-  * id : bigint
+  * id : bigint <<PK, NN>>
   --
-  username : varchar
-  password_hash : varchar
-  role : varchar
-  enabled : boolean
+  username : varchar(96) <<NN, UQ>>
+  password_hash : varchar(255) <<NN>>
+  created_at : timestamp <<NN>>
+  updated_at : timestamp <<NN>>
 }
 
 entity "analytics.code_alias" as code_alias {
-  * id : bigint
+  * id : bigint <<PK, NN>>
   --
-  alias_type : enum
-  old_code : varchar
-  new_code : varchar
+  alias_type : varchar(32) <<NN>>
+  source_code : varchar(64) <<NN>>
+  target_code : varchar(64) <<NN>>
+  is_active : boolean <<NN>>
+  created_at : timestamp <<NN>>
+  updated_at : timestamp <<NN>>
+  uq(alias_type, source_code) <<UQ>>
 }
 
 event ||--o{ stage : event_id
@@ -220,22 +308,24 @@ stage ||--o{ stage_metric : stage_id
 event ||--o{ event_attribute : event_id
 module_type ||--o{ event_type : module_code
 event_type ||--o{ event : event_type_code
-module_type ||--o{ event : module_code
+module_type ||..o{ event : module_code
 stage_type ||--o{ stage : stage_type_code
 metric_type ||--o{ stage_metric : metric_type_code
 attr_type ||--o{ event_attribute : attribute_type_code
 aggregation_run ||--o{ aggregated_metric : aggregation_run_id
+event_type ||..o{ aggregated_metric : event_type_code
+stage_type ||..o{ aggregated_metric : stage_type_code
 event_type ||..o{ event_rollup : event_type_code
 stage_type ||..o{ stage_rollup : stage_type_code
 metric_type ||..o{ metric_rollup : metric_type_code
 event_type ||..o{ filter_event_day : event_type_code
 attr_type ||..o{ filter_attr_day : attribute_type_code
-log_file ||--o{ log_trace : file_index_id
-log_file ||--o{ log_excerpt : file_index_id
+log_file ||--o{ log_trace : file_id
+log_file ||--o{ log_excerpt : file_id
 event ||..o{ log_trace : trace_id/event_uid
-code_alias ..> event_type : переименование кодов
-code_alias ..> module_type : переименование кодов
-code_alias ..> stage_type : переименование кодов
-code_alias ..> metric_type : переименование кодов
-code_alias ..> attr_type : переименование кодов
+code_alias ..> event_type : aliases
+code_alias ..> module_type : aliases
+code_alias ..> stage_type : aliases
+code_alias ..> metric_type : aliases
+code_alias ..> attr_type : aliases
 @enduml

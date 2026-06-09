@@ -7,53 +7,225 @@ skinparam classAttributeIconSize 0
 
 package "com.example.gqw.analytics.entity" {
   class AnalyticsEvent {
-    id
-    eventUid
-    eventTypeCode
-    moduleCode
-    traceId
+    -id : Long
+    -eventUid : UUID
+    -userId : Long
+    -sessionId : String
+    -eventTypeCode : String
+    -moduleCode : String
+    -requestPath : String
+    -httpMethod : String
+    -traceId : String
+    -statusCode : Integer
+    -isError : Boolean
+    -durationMs : Integer
+    +prePersist() : void
   }
+
   class AnalyticsStage {
-    id
-    eventId
-    stageTypeCode
-    durationMs
+    -id : Long
+    -eventId : Long
+    -stageTypeCode : String
+    -stageOrder : Integer
+    -durationMs : Integer
+    -isError : Boolean
+    -logStartedAt : Instant
+    -logEndedAt : Instant
+    +prePersist() : void
   }
+
   class AnalyticsStageMetric {
-    id
-    stageId
-    metricTypeCode
+    -id : Long
+    -stageId : Long
+    -metricTypeCode : String
+    -metricValueNum : BigDecimal
+    -metricValueText : String
+    -unit : String
+    -recordedAt : Instant
+    +prePersist() : void
   }
+
   class AnalyticsEventAttribute {
-    id
-    eventId
-    attributeTypeCode
+    -id : Long
+    -eventId : Long
+    -attributeTypeCode : String
+    -attrValue : String
+    -attrValueJson : String
+    -createdAt : Instant
+    +prePersist() : void
   }
-  class EventType
-  class ModuleType
-  class StageType
-  class StageMetricType
-  class EventAttributeType
-  class AnalyticsAdminUser
-  class AnalyticsCodeAlias
-  class AggregatedMetric
-  class AggregationRun
+
+  class EventType {
+    -code : String
+    -name : String
+    -description : String
+    -moduleCode : String
+    -isSystem : Boolean
+    -isActive : Boolean
+  }
+
+  class ModuleType {
+    -code : String
+    -name : String
+    -description : String
+    -isActive : Boolean
+  }
+
+  class StageType {
+    -code : String
+    -name : String
+    -description : String
+    -isSystem : Boolean
+    -isActive : Boolean
+  }
+
+  class StageMetricType {
+    -code : String
+    -name : String
+    -description : String
+    -readingGuide : String
+    -valueKind : MetricValueKind
+    -unitDefault : String
+    -isSystem : Boolean
+    -isActive : Boolean
+  }
+
+  class EventAttributeType {
+    -code : String
+    -name : String
+    -description : String
+    -valueKind : MetricValueKind
+    -unitDefault : String
+    -isSystem : Boolean
+    -isActive : Boolean
+  }
+
+  class AnalyticsAdminUser {
+    -id : Long
+    -username : String
+    -passwordHash : String
+    -createdAt : Instant
+    -updatedAt : Instant
+    +onCreate() : void
+    +onUpdate() : void
+  }
+
+  class AnalyticsCodeAlias {
+    -id : Long
+    -aliasType : AnalyticsCodeAliasType
+    -sourceCode : String
+    -targetCode : String
+    -isActive : Boolean
+    +onCreate() : void
+    +onUpdate() : void
+  }
+
+  class AggregatedMetric {
+    -id : Long
+    -aggregationRunId : Long
+    -eventTypeCode : String
+    -stageTypeCode : String
+    -periodStart : Instant
+    -periodEnd : Instant
+    -sampleCount : Long
+    -avgMs : BigDecimal
+    -p95Ms : BigDecimal
+    -p99Ms : BigDecimal
+    -errorRate : BigDecimal
+  }
+
+  class AggregationRun {
+    -id : Long
+    -runType : AggregationRunType
+    -granularity : AggregationGranularity
+    -periodStart : Instant
+    -periodEnd : Instant
+    -status : AggregationStatus
+    -rowsWritten : Integer
+    +prePersist() : void
+  }
 }
 
 package "com.example.gqw.analytics.repository" {
-  interface AnalyticsEventRepository
-  interface AnalyticsStageRepository
-  interface AnalyticsStageMetricRepository
-  interface AnalyticsEventAttributeRepository
-  interface EventTypeRepository
-  interface ModuleTypeRepository
-  interface StageTypeRepository
-  interface StageMetricTypeRepository
-  interface EventAttributeTypeRepository
-  interface AnalyticsAdminUserRepository
-  interface AnalyticsCodeAliasRepository
-  interface AggregatedMetricRepository
-  interface AggregationRunRepository
+  interface AnalyticsEventRepository {
+    +findMinStartedAt() : Instant
+    +findByEventUid(eventUid) : Optional<AnalyticsEvent>
+    +countByEventTypeCode(code) : long
+    +countByModuleCode(code) : long
+    +findAllByFilter(...) : Page<AnalyticsEvent>
+    +searchEventsScoped(...) : List<AnalyticsEvent>
+  }
+
+  interface AnalyticsStageRepository {
+    +findByEventIdOrderByStageOrder(eventId) : List<AnalyticsStage>
+    +findByEventIdInOrderByEventIdAscStageOrderAsc(ids) : List<AnalyticsStage>
+    +findTopByEventIdOrderByStageOrderDesc(eventId) : Optional<AnalyticsStage>
+    +countByStageTypeCode(code) : long
+  }
+
+  interface AnalyticsStageMetricRepository {
+    +findByStageId(stageId) : List<AnalyticsStageMetric>
+    +findByStageIdIn(stageIds) : List<AnalyticsStageMetric>
+    +findByStageIdAndMetricTypeCode(...) : Optional<AnalyticsStageMetric>
+    +countByMetricTypeCode(code) : long
+    +findByScope(...) : List<AnalyticsStageMetric>
+  }
+
+  interface AnalyticsEventAttributeRepository {
+    +findByEventId(eventId) : List<AnalyticsEventAttribute>
+    +findByEventIdIn(eventIds) : List<AnalyticsEventAttribute>
+    +countByAttributeTypeCode(code) : long
+    +findDistinctAttributeValuesByScope(...) : List<String>
+  }
+
+  interface EventTypeRepository {
+    +findByIsActiveTrueOrderByNameAsc() : List<EventType>
+    +findByModuleCodeOrderByCodeAsc(moduleCode) : List<EventType>
+    +countByModuleCode(moduleCode) : long
+    +upsert(...) : void
+  }
+
+  interface ModuleTypeRepository {
+    +findByIsActiveTrueOrderByNameAsc() : List<ModuleType>
+    +upsert(...) : void
+  }
+
+  interface StageTypeRepository {
+    +findByIsActiveTrueOrderByNameAsc() : List<StageType>
+    +findByIsSystemTrueOrderByCodeAsc() : List<StageType>
+    +upsert(...) : void
+  }
+
+  interface StageMetricTypeRepository {
+    +findByIsActiveTrueOrderByNameAsc() : List<StageMetricType>
+    +findByIsSystemTrueOrderByCodeAsc() : List<StageMetricType>
+    +upsert(...) : void
+  }
+
+  interface EventAttributeTypeRepository {
+    +findByIsActiveTrueOrderByNameAsc() : List<EventAttributeType>
+    +findByIsSystemTrueOrderByCodeAsc() : List<EventAttributeType>
+    +upsert(...) : void
+  }
+
+  interface AnalyticsAdminUserRepository {
+    +existsByUsernameIgnoreCase(username) : boolean
+    +findByUsernameIgnoreCase(username) : Optional<AnalyticsAdminUser>
+  }
+
+  interface AnalyticsCodeAliasRepository {
+    +findByAliasTypeAndSourceCode(...) : Optional<AnalyticsCodeAlias>
+    +findAllByAliasTypeOrderBySourceCodeAsc(...) : List<AnalyticsCodeAlias>
+  }
+
+  interface AggregatedMetricRepository {
+    +deleteByPeriod(...) : int
+    +findByFilter(...) : List<AggregatedMetric>
+  }
+
+  interface AggregationRunRepository {
+    +findTopByGranularityAndStatusOrderByPeriodEndDesc(...) : Optional<AggregationRun>
+  }
 }
 
 AnalyticsEvent "1" --> "0..*" AnalyticsStage : eventId

@@ -7,50 +7,138 @@ skinparam classAttributeIconSize 0
 
 package "com.example.gqw.analytics.service" {
   class AggregationScheduler {
-    +runHourlyAggregation()
-    +runDailyAggregation()
-    +runMonthlyAggregation()
+    -aggregationService : AggregationService
+    -scheduledJobsPolicy : AnalyticsScheduledJobsPolicy
+    +runHourly() : void
+    +runDaily() : void
+    +runMonthly() : void
   }
+
   class AggregationService {
-    +runAggregation(...)
+    -eventRepository : AnalyticsEventRepository
+    -stageRepository : AnalyticsStageRepository
+    -aggregationRunRepository : AggregationRunRepository
+    -aggregatedMetricRepository : AggregatedMetricRepository
+    +runAggregation(granularity, periodStart, periodEnd) : void
+    +currentPeriodStart(granularity) : Instant
   }
+
   class AnalyticsTimeRollupService {
-    +refreshRecentBuckets()
-    +backfill(...)
+    -jdbcTemplate : NamedParameterJdbcTemplate
+    -enabled : boolean
+    -refreshIntervalMinutes : int
+    -overlapMinutes : int
+    +isEnabled() : boolean
+    +chooseSourceGranularityMinutes(...) : int
+    +loadEventAggregatePoints(...) : List<AggregatePoint>
+    +loadStageAggregatePoints(...) : List<AggregatePoint>
+    +scheduledRefresh() : void
+    +initializeIfNeeded() : void
+    +seriesFromPoints(...) : List<TimeSeriesPointDto>
   }
-  class AnalyticsTimeRollupLifecycle
-  class AnalyticsFilterRollupService
-  class AnalyticsFilterRollupLifecycle
-  class AnalyticsStageMetricRollupService
-  class AnalyticsStageMetricRollupLifecycle
-  class AnalyticsDataLifecycleService
-  class AnalyticsScheduledJobsPolicy
-  class AnalyticsSeriesTime
+
+  class AnalyticsFilterRollupService {
+    -jdbcTemplate : NamedParameterJdbcTemplate
+    -enabled : boolean
+    -refreshIntervalHours : int
+    +initializeIfNeeded() : void
+    +refreshRecentNow() : void
+    +rebuildAllNow() : void
+    +scheduledRefresh() : void
+    +shouldUseRollup(...) : boolean
+    +findEventTypeCodes(...) : List<String>
+    +findAttributeValues(...) : List<String>
+  }
+
+  class AnalyticsStageMetricRollupService {
+    -jdbcTemplate : NamedParameterJdbcTemplate
+    -enabled : boolean
+    -refreshIntervalMinutes : int
+    -overlapMinutes : int
+    +isEnabled() : boolean
+    +scheduledRefresh() : void
+    +initializeIfNeeded() : void
+    +loadMetricSummaries(...) : List<MetricSummaryPoint>
+    +loadNumericSeries(...) : List<TimeSeriesPointDto>
+    +loadTopValues(...) : List<TopValueDto>
+  }
+
+  class AnalyticsDataLifecycleService {
+    -jdbcTemplate : NamedParameterJdbcTemplate
+    -runtimeSettingsService : AnalyticsRuntimeSettingsService
+    -scheduledJobsPolicy : AnalyticsScheduledJobsPolicy
+    +scheduledMaintenance() : void
+    +runMaintenanceNow() : void
+  }
+
+  class AnalyticsScheduledJobsPolicy {
+    -enabled : boolean
+    +isEnabled() : boolean
+  }
+
+  class AnalyticsSeriesTime {
+    +displayTimeForBucket(bucketStart, to, stepSeconds) : Instant
+  }
+
+  class AnalyticsTimeRollupLifecycle {
+    -rollupService : AnalyticsTimeRollupService
+    +onApplicationReady() : void
+  }
+  class AnalyticsFilterRollupLifecycle {
+    -rollupService : AnalyticsFilterRollupService
+    +onApplicationReady() : void
+  }
+  class AnalyticsStageMetricRollupLifecycle {
+    -rollupService : AnalyticsStageMetricRollupService
+    +onApplicationReady() : void
+  }
 }
 
 package "com.example.gqw.analytics.entity" {
-  class AggregatedMetric
-  class AggregationRun
+  class AggregatedMetric {
+    -id : Long
+    -aggregationRunId : Long
+    -eventTypeCode : String
+    -stageTypeCode : String
+    -sampleCount : Long
+    -avgMs : BigDecimal
+    -p95Ms : BigDecimal
+    -p99Ms : BigDecimal
+  }
+  class AggregationRun {
+    -id : Long
+    -runType : AggregationRunType
+    -granularity : AggregationGranularity
+    -status : AggregationStatus
+    -periodStart : Instant
+    -periodEnd : Instant
+    +prePersist() : void
+  }
   enum AggregationGranularity
   enum AggregationRunType
   enum AggregationStatus
 }
 
 package "com.example.gqw.analytics.repository" {
-  interface AggregatedMetricRepository
-  interface AggregationRunRepository
+  interface AggregatedMetricRepository {
+    +deleteByPeriod(...) : int
+    +findByFilter(...) : List<AggregatedMetric>
+  }
+  interface AggregationRunRepository {
+    +findTopByGranularityAndStatusOrderByPeriodEndDesc(...) : Optional<AggregationRun>
+  }
 }
 
-AggregationScheduler --> AnalyticsScheduledJobsPolicy : enabled?
-AggregationScheduler --> AggregationService : legacy aggregation
-AggregationScheduler --> AnalyticsTimeRollupService : event/stage rollup
-AggregationScheduler --> AnalyticsStageMetricRollupService : metric rollup
-AggregationScheduler --> AnalyticsFilterRollupService : fast filters
-AnalyticsTimeRollupLifecycle --> AnalyticsTimeRollupService : initialize
-AnalyticsFilterRollupLifecycle --> AnalyticsFilterRollupService : initialize
-AnalyticsStageMetricRollupLifecycle --> AnalyticsStageMetricRollupService : initialize
-AnalyticsDataLifecycleService --> AnalyticsTimeRollupService : retention
-AnalyticsDataLifecycleService --> AnalyticsStageMetricRollupService : retention
+AggregationScheduler --> AnalyticsScheduledJobsPolicy
+AggregationScheduler --> AggregationService
+AggregationScheduler --> AnalyticsTimeRollupService
+AggregationScheduler --> AnalyticsStageMetricRollupService
+AggregationScheduler --> AnalyticsFilterRollupService
+AnalyticsTimeRollupLifecycle --> AnalyticsTimeRollupService
+AnalyticsFilterRollupLifecycle --> AnalyticsFilterRollupService
+AnalyticsStageMetricRollupLifecycle --> AnalyticsStageMetricRollupService
+AnalyticsDataLifecycleService --> AnalyticsTimeRollupService
+AnalyticsDataLifecycleService --> AnalyticsStageMetricRollupService
 AggregationService --> AggregationRunRepository
 AggregationService --> AggregatedMetricRepository
 AggregationRunRepository --> AggregationRun
@@ -58,5 +146,5 @@ AggregatedMetricRepository --> AggregatedMetric
 AggregationRun --> AggregationGranularity
 AggregationRun --> AggregationRunType
 AggregationRun --> AggregationStatus
-AnalyticsTimeRollupService --> AnalyticsSeriesTime : display bucket time
+AnalyticsTimeRollupService --> AnalyticsSeriesTime
 @enduml

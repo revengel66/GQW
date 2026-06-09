@@ -6,43 +6,144 @@ skinparam shadowing false
 skinparam classAttributeIconSize 0
 
 package "com.example.gqw.analytics.config" {
-  class AnalyticsPersistenceConfig
-  class AnalyticsDataSourceProperties
-  class AnalyticsAdminWebConfig
-  class AnalyticsAdminAuthInterceptor
-  class AnalyticsUiTemplateConfig
-  class AnalyticsBootstrap
-  class AnalyticsScanProperties
-  class AnalyticsEventCodesMigrationConfig
-  class AnalyticsMetricNamesPatchConfig
-  class FrontendAnalyticsDictionaryConfig
-  class SystemAnalyticsAttributeDictionaryConfig
-  class SystemAnalyticsMetricReadingGuideConfig
-  class AnalyticsStrictWarningDictionaryConfig
+  class AnalyticsPersistenceConfig {
+    ~analyticsDataSource(properties) : DataSource
+    ~legacyAnalyticsDataSource(dataSource) : DataSource
+    ~analyticsJdbcTemplate(dataSource) : JdbcTemplate
+    ~analyticsNamedParameterJdbcTemplate(dataSource) : NamedParameterJdbcTemplate
+    ~legacyAnalyticsTransactionManager(factory) : PlatformTransactionManager
+    ~jpaProperties(environment) : Map<String,Object>
+  }
+
+  class BusinessJpaConfig {
+    ~entityManagerFactory(dataSource, environment) : LocalContainerEntityManagerFactoryBean
+    ~transactionManager(entityManagerFactory) : PlatformTransactionManager
+  }
+
+  class AnalyticsJpaConfig {
+    ~analyticsEntityManagerFactory(dataSource, environment) : LocalContainerEntityManagerFactoryBean
+    ~analyticsTransactionManager(entityManagerFactory) : PlatformTransactionManager
+  }
+
+  class AnalyticsDataSourceProperties {
+    -enabled : boolean
+    -url : String
+    -username : String
+    -password : String
+    -driverClassName : String
+    +isEnabled() : boolean
+    +getUrl() : String
+    +setUrl(url) : void
+    +getUsername() : String
+    +getDriverClassName() : String
+  }
+
+  class AnalyticsAdminWebConfig {
+    -analyticsAdminAuthInterceptor : AnalyticsAdminAuthInterceptor
+    +addInterceptors(registry) : void
+    +addResourceHandlers(registry) : void
+    +analyticsStaticUtf8Filter() : FilterRegistrationBean
+  }
+
+  class AnalyticsAdminAuthInterceptor {
+    -authService : AnalyticsAdminAuthService
+    +preHandle(request, response, handler) : boolean
+  }
+
+  class AnalyticsUiTemplateConfig {
+    +analyticsTemplateResolver(applicationContext) : SpringResourceTemplateResolver
+  }
+
+  class AnalyticsBootstrap {
+    -dictionarySyncService : DictionarySyncService
+    -analyticsEventTypeMaintenanceService : AnalyticsEventTypeMaintenanceService
+    +init() : void
+  }
+
+  class AnalyticsScanProperties {
+    -scanPackages : List<String>
+    +getScanPackages() : List<String>
+    +setScanPackages(scanPackages) : void
+    +matches(type) : boolean
+    +matches(packageName) : boolean
+  }
+
+  class AnalyticsEventCodesMigrationConfig {
+    -log : Logger
+    +analyticsEventCodesMigrationRunner(...) : CommandLineRunner
+    -tableExists(jdbcTemplate, regclass) : boolean
+    -schemaExists(jdbcTemplate, schemaName) : boolean
+  }
+
+  class AnalyticsMetricNamesPatchConfig {
+    -log : Logger
+    +analyticsMetricNamesPatchRunner(...) : CommandLineRunner
+    -tableExists(jdbcTemplate, regclass) : boolean
+    -schemaExists(jdbcTemplate, schemaName) : boolean
+  }
+
+  class FrontendAnalyticsDictionaryConfig {
+    ~seedFrontendAnalyticsDictionary(...) : CommandLineRunner
+    -upsertStageTypes(repository) : void
+    -upsertMetricTypes(repository) : void
+  }
+
+  class SystemAnalyticsAttributeDictionaryConfig {
+    ~seedSystemAnalyticsAttributes(repository) : CommandLineRunner
+    -markLegacyAttribute(repository, code, legacyName) : void
+  }
+
+  class SystemAnalyticsMetricReadingGuideConfig {
+    -stageMetricTypeRepository : StageMetricTypeRepository
+    +run(args) : void
+    +onApplicationReady() : void
+    -applyGuides() : void
+  }
+
+  class AnalyticsStrictWarningDictionaryConfig {
+    +STRICT_WARNING_EVENT_CODE : String
+    +ATTR_WARNING_TYPE : String
+    +ATTR_WARNING_CODE : String
+    ~seedAnalyticsStrictWarningDictionary(...) : CommandLineRunner
+  }
 }
 
 package "Runtime services" {
-  class DictionarySyncService
-  class AnalyticsAdminAuthService
-  class AnalyticsRuntimeSettingsService
+  class DictionarySyncService {
+    +syncAll() : void
+  }
+  class AnalyticsAdminAuthService {
+    +isSetupComplete() : boolean
+    +registerInitial(...) : AnalyticsAdminUser
+    +authenticate(...) : AnalyticsAdminUser
+    +requireById(userId) : AnalyticsAdminUser
+    +updateCredentials(...) : AnalyticsAdminUser
+  }
+  class AnalyticsRuntimeSettingsService {
+    +view() : SettingsView
+    +getBoolean(key, fallback) : boolean
+  }
 }
 
 database "analytics datasource" as analytics_ds
 database "business datasource" as business_ds
 folder "META-INF/gqw-analytics\n/templates / static" as resources
 
-AnalyticsPersistenceConfig --> AnalyticsDataSourceProperties : properties
+AnalyticsPersistenceConfig --> AnalyticsDataSourceProperties
+AnalyticsPersistenceConfig *-- BusinessJpaConfig
+AnalyticsPersistenceConfig *-- AnalyticsJpaConfig
 AnalyticsPersistenceConfig --> analytics_ds : analytics JPA
 AnalyticsPersistenceConfig --> business_ds : host JPA
-AnalyticsAdminWebConfig --> AnalyticsAdminAuthInterceptor : registers
+AnalyticsAdminWebConfig --> AnalyticsAdminAuthInterceptor
 AnalyticsAdminAuthInterceptor --> AnalyticsAdminAuthService
 AnalyticsUiTemplateConfig --> resources : template resolver
-AnalyticsBootstrap --> DictionarySyncService : seed dictionaries
-AnalyticsScanProperties --> AnalyticsEventCodesMigrationConfig : scan packages
-AnalyticsEventCodesMigrationConfig --> DictionarySyncService : event codes
-FrontendAnalyticsDictionaryConfig --> DictionarySyncService : frontend dictionaries
-SystemAnalyticsAttributeDictionaryConfig --> DictionarySyncService : system attributes
-SystemAnalyticsMetricReadingGuideConfig --> AnalyticsRuntimeSettingsService : reading guides
-AnalyticsStrictWarningDictionaryConfig --> DictionarySyncService : strict warning types
-AnalyticsMetricNamesPatchConfig --> DictionarySyncService : metric names patch
+AnalyticsBootstrap --> DictionarySyncService
+AnalyticsBootstrap --> AnalyticsEventTypeMaintenanceService
+AnalyticsScanProperties --> AnalyticsEventCodesMigrationConfig
+AnalyticsEventCodesMigrationConfig --> DictionarySyncService
+FrontendAnalyticsDictionaryConfig --> DictionarySyncService
+SystemAnalyticsAttributeDictionaryConfig --> EventAttributeTypeRepository
+SystemAnalyticsMetricReadingGuideConfig --> StageMetricTypeRepository
+AnalyticsStrictWarningDictionaryConfig --> DictionarySyncService
+AnalyticsMetricNamesPatchConfig --> StageMetricTypeRepository
 @enduml
