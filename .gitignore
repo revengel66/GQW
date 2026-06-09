@@ -5,6 +5,7 @@
 bin/
 build/
 out/
+gqw-analytics-module/
 
 logs/
 uploads/
