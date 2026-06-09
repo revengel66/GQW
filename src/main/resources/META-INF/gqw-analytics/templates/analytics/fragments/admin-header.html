@@ -1,0 +1,178 @@
+﻿<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<body>
+<nav th:fragment="adminHeader(activeTab, showSettingsButton, authenticated)"
+    class="navbar navbar-expand-lg bg-white navbar-shadow sticky-top">
+    <div class="container container-wide py-1">
+        <a class="navbar-brand fw-semibold"
+           th:if="${authenticated}"
+           th:href="@{/analytics-admin/dashboard}">Analytics Module</a>
+        <a class="navbar-brand fw-semibold"
+           th:unless="${authenticated}"
+           th:href="@{/analytics-admin/login}">Analytics Module</a>
+        <th:block th:if="${authenticated}">
+            <div class="navbar-nav ms-3">
+                <a class="nav-link"
+                   th:href="@{/analytics-admin/dashboard}"
+                   data-analytics-top-tab="overview"
+                   th:classappend="${activeTab == 'overview'} ? ' active' : ''">Дашборд</a>
+                <a class="nav-link"
+                   th:href="@{/analytics-admin/dashboard(tab='universal')}"
+                   data-analytics-top-tab="universal"
+                   th:classappend="${activeTab == 'universal'} ? ' active' : ''">Диагностика</a>
+                <a class="nav-link"
+                   th:href="@{/analytics-admin/dashboard(tab='raw')}"
+                   data-analytics-top-tab="raw"
+                   th:classappend="${activeTab == 'raw'} ? ' active' : ''">Журнал событий</a>
+                <a class="nav-link"
+                   th:href="@{/analytics-admin/dashboard(tab='system')}"
+                   data-analytics-top-tab="system"
+                   th:classappend="${activeTab == 'system'} ? ' active' : ''">Служебные события</a>
+                <a class="nav-link"
+                   th:href="@{/analytics-admin/dashboard(tab='compare')}"
+                   data-analytics-top-tab="compare"
+                   th:classappend="${activeTab == 'compare'} ? ' active' : ''">Сравнение</a>
+            </div>
+            <div class="ms-auto d-flex align-items-center gap-3 analytics-admin-header-actions">
+                <div class="d-flex align-items-center gap-2 analytics-admin-header-tools">
+                    <button class="btn btn-outline-dark btn-sm analytics-header-icon-btn analytics-help-mode-toggle"
+                            type="button"
+                            id="analytics-help-mode-toggle"
+                            aria-pressed="false"
+                            aria-label="Включить подсказки"
+                            title="Включить подсказки">
+                        <i class="bi bi-question-circle" aria-hidden="true"></i>
+                    </button>
+                    <div class="analytics-admin-menu"
+                         th:classappend="${activeTab == 'settings' or activeTab == 'dictionaries' or activeTab == 'instruction'} ? ' is-active' : ''">
+                        <a class="btn btn-dark btn-sm analytics-header-icon-btn analytics-runtime-settings-trigger analytics-admin-menu-toggle"
+                                th:classappend="${activeTab == 'settings'} ? ' is-enabled' : ''"
+                                th:href="@{/analytics-admin/settings}"
+                                title="Администрирование"
+                                aria-label="Администрирование">
+                            <i class="bi bi-gear-fill" aria-hidden="true"></i>
+                        </a>
+                        <div class="analytics-admin-menu-dropdown" role="menu" aria-label="Администрирование">
+                            <div class="analytics-admin-menu-title">Администрирование</div>
+                            <a class="analytics-admin-menu-item"
+                               th:classappend="${activeTab == 'settings'} ? ' active' : ''"
+                               th:href="@{/analytics-admin/settings}"
+                               role="menuitem">Конфигурация аналитики</a>
+                            <a class="analytics-admin-menu-item"
+                               th:classappend="${activeTab == 'dictionaries'} ? ' active' : ''"
+                               th:href="@{/analytics-admin/dictionaries}"
+                               role="menuitem">Справочники</a>
+                            <a class="analytics-admin-menu-item"
+                               th:classappend="${activeTab == 'instruction'} ? ' active' : ''"
+                               th:href="@{/analytics-admin/instruction}"
+                               target="_blank"
+                               rel="noopener noreferrer"
+                               role="menuitem">Инструкция</a>
+                        </div>
+                    </div>
+                    <form method="post" th:action="@{/analytics-admin/logout}" class="m-0">
+                        <input th:if="${_csrf != null}" type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                        <button class="btn btn-dark btn-sm analytics-header-icon-btn out-btn"
+                                type="submit"
+                                title="Logout"
+                                aria-label="Logout">
+                            <i class="bi bi-box-arrow-right" aria-hidden="true"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </th:block>
+    </div>
+    <script>
+    (function () {
+        var key = "analyticsHelpMode";
+
+        function readEnabled() {
+            try {
+                return window.localStorage.getItem(key) === "on";
+            } catch (error) {
+                return false;
+            }
+        }
+
+        function writeEnabled(enabled) {
+            try {
+                window.localStorage.setItem(key, enabled ? "on" : "off");
+            } catch (error) {
+                // localStorage can be unavailable in restricted modes; default remains off.
+            }
+        }
+
+        function apply(enabled) {
+            document.documentElement.classList.toggle("analytics-help-enabled", enabled);
+            document.documentElement.classList.toggle("analytics-help-disabled", !enabled);
+            var button = document.getElementById("analytics-help-mode-toggle");
+            if (!button) {
+                return;
+            }
+            button.setAttribute("aria-pressed", enabled ? "true" : "false");
+            var title = enabled ? "Выключить подсказки" : "Включить подсказки";
+            button.title = title;
+            button.setAttribute("aria-label", title);
+            button.classList.toggle("is-enabled", enabled);
+            button.classList.toggle("btn-dark", enabled);
+            button.classList.toggle("btn-outline-dark", !enabled);
+        }
+
+        function bindToggle() {
+            apply(readEnabled());
+            var button = document.getElementById("analytics-help-mode-toggle");
+            if (!button || button.dataset.helpToggleBound === "true") {
+                return;
+            }
+            button.dataset.helpToggleBound = "true";
+            button.addEventListener("click", function () {
+                var enabled = !document.documentElement.classList.contains("analytics-help-enabled");
+                writeEnabled(enabled);
+                apply(enabled);
+            });
+        }
+
+        function syncModalStack() {
+            var baseZIndex = 3000;
+            var step = 20;
+            var modals = Array.prototype.slice.call(document.querySelectorAll(".modal.show"));
+            var backdrops = Array.prototype.slice.call(document.querySelectorAll(".modal-backdrop"));
+            modals.forEach(function (modal, index) {
+                modal.style.zIndex = String(baseZIndex + step * index + 10);
+            });
+            backdrops.forEach(function (backdrop, index) {
+                backdrop.style.zIndex = String(baseZIndex + step * index);
+                if (index > 0) {
+                    backdrop.classList.add("analytics-modal-backdrop-nested");
+                } else {
+                    backdrop.classList.remove("analytics-modal-backdrop-nested");
+                }
+            });
+            if (modals.length > 0) {
+                document.body.classList.add("modal-open");
+            }
+        }
+
+        function bindModalStacking() {
+            if (document.documentElement.dataset.analyticsModalStackBound === "true") {
+                return;
+            }
+            document.documentElement.dataset.analyticsModalStackBound = "true";
+            document.addEventListener("shown.bs.modal", function () {
+                window.requestAnimationFrame(syncModalStack);
+            });
+            document.addEventListener("hidden.bs.modal", function () {
+                window.requestAnimationFrame(syncModalStack);
+            });
+        }
+
+        bindToggle();
+        bindModalStacking();
+        document.addEventListener("DOMContentLoaded", bindToggle);
+        document.addEventListener("DOMContentLoaded", bindModalStacking);
+    })();
+    </script>
+</nav>
+</body>
+</html>

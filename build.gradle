@@ -1,0 +1,43 @@
+plugins {
+    id 'java-library'
+}
+
+def springBootVersion = '4.0.4'
+
+group = 'com.example'
+version = '0.0.1-SNAPSHOT'
+description = 'gqw-analytics-module'
+
+// Keep Gradle outputs in an ASCII-only path to avoid Windows/JVM argfile
+// classpath decoding issues for projects located in Cyrillic directories.
+layout.buildDirectory.set(file("${System.getProperty('user.home')}/.gqw-build/${rootProject.name}/${project.name}"))
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation platform("org.springframework.boot:spring-boot-dependencies:${springBootVersion}")
+    annotationProcessor platform("org.springframework.boot:spring-boot-dependencies:${springBootVersion}")
+
+    implementation 'org.springframework.boot:spring-boot-starter-aspectj'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.compilerArgs += '-parameters'
+}
