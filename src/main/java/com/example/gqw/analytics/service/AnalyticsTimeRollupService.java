@@ -39,6 +39,7 @@ public class AnalyticsTimeRollupService {
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
     private final AnalyticsRuntimeSettingsService runtimeSettingsService;
+    private final AnalyticsScheduledJobsPolicy scheduledJobsPolicy;
     private final Clock clock;
     private final boolean defaultEnabled;
     private final int defaultOverlapMinutes;
@@ -50,6 +51,7 @@ public class AnalyticsTimeRollupService {
     public AnalyticsTimeRollupService(
         @Qualifier("analyticsNamedParameterJdbcTemplate") NamedParameterJdbcTemplate jdbcTemplate,
         AnalyticsRuntimeSettingsService runtimeSettingsService,
+        AnalyticsScheduledJobsPolicy scheduledJobsPolicy,
         @Value("${app.analytics.time-rollup.enabled:true}") boolean enabled,
         @Value("${app.analytics.time-rollup.refresh-interval-minutes:5}") int refreshIntervalMinutes,
         @Value("${app.analytics.time-rollup.overlap-minutes:10}") int overlapMinutes,
@@ -57,6 +59,7 @@ public class AnalyticsTimeRollupService {
     ) {
         this.jdbcTemplate = jdbcTemplate;
         this.runtimeSettingsService = runtimeSettingsService;
+        this.scheduledJobsPolicy = scheduledJobsPolicy;
         this.clock = Clock.systemUTC();
         this.defaultEnabled = enabled;
         this.defaultRefreshIntervalMinutes = Math.max(1, refreshIntervalMinutes);
@@ -244,6 +247,9 @@ public class AnalyticsTimeRollupService {
     @Scheduled(cron = "0 * * * * *")
     @Transactional(transactionManager = "analyticsTransactionManager")
     public void scheduledRefresh() {
+        if (!scheduledJobsPolicy.isEnabled()) {
+            return;
+        }
         int intervalMinutes = runtimeSettingsService.getInt(
             AnalyticsRuntimeSettingsService.KEY_TIME_ROLLUP_REFRESH_INTERVAL_MINUTES,
             defaultRefreshIntervalMinutes,

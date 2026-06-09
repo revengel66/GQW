@@ -16,6 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.gqw.analytics.aop.AnalyticsEventAspect;
+import com.example.gqw.analytics.config.AnalyticsStrictWarningDictionaryConfig;
 import com.example.gqw.analytics.entity.AnalyticsEvent;
 import com.example.gqw.analytics.entity.AnalyticsEventAttribute;
 import com.example.gqw.analytics.entity.AnalyticsStage;
@@ -869,13 +870,33 @@ class AnalyticsIntegrationTest {
 
     @Test
     void customLayerDoesNotCreateEventWithoutActiveEventContext() {
-        long eventsBefore = analyticsEventRepository.count();
+        long eventsBefore = countNonStrictWarningEvents();
+        long strictWarningsBefore = analyticsEventRepository.countByEventTypeCode(
+            AnalyticsStrictWarningDictionaryConfig.STRICT_WARNING_EVENT_CODE
+        );
         long stagesBefore = analyticsStageRepository.count();
 
         assertEquals(4, analyticsLayerTestFacade.facadeMetric().size());
 
-        assertEquals(eventsBefore, analyticsEventRepository.count());
+        assertEquals(eventsBefore, countNonStrictWarningEvents());
+        assertTrue(
+            analyticsEventRepository.countByEventTypeCode(AnalyticsStrictWarningDictionaryConfig.STRICT_WARNING_EVENT_CODE)
+                > strictWarningsBefore
+        );
         assertEquals(stagesBefore, analyticsStageRepository.count());
+    }
+
+    private long countNonStrictWarningEvents() {
+        Long count = jdbcTemplate.queryForObject(
+            """
+                select count(*)
+                from analytics.event
+                where event_type_code <> ?
+            """,
+            Long.class,
+            AnalyticsStrictWarningDictionaryConfig.STRICT_WARNING_EVENT_CODE
+        );
+        return count == null ? 0 : count;
     }
 
     @Test

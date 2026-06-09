@@ -48,13 +48,16 @@ public class AnalyticsHttpErrorTrackingService {
     private static final Set<String> PENDING_FLUSH_IN_PROGRESS = ConcurrentHashMap.newKeySet();
 
     private final AnalyticsInstrumentationPolicy instrumentationPolicy;
+    private final AnalyticsScheduledJobsPolicy scheduledJobsPolicy;
     private final AnalyticsTrackingApi analyticsTrackingApi;
 
     public AnalyticsHttpErrorTrackingService(
         AnalyticsInstrumentationPolicy instrumentationPolicy,
+        AnalyticsScheduledJobsPolicy scheduledJobsPolicy,
         AnalyticsTrackingApi analyticsTrackingApi
     ) {
         this.instrumentationPolicy = instrumentationPolicy;
+        this.scheduledJobsPolicy = scheduledJobsPolicy;
         this.analyticsTrackingApi = analyticsTrackingApi;
     }
 
@@ -98,6 +101,9 @@ public class AnalyticsHttpErrorTrackingService {
 
     @Scheduled(fixedDelayString = "${app.analytics.http-fallback.retry-delay-ms:5000}")
     public void flushPendingFallbackErrorsScheduled() {
+        if (!scheduledJobsPolicy.isEnabled()) {
+            return;
+        }
         if (!instrumentationPolicy.isEnabled()) {
             return;
         }

@@ -2,6 +2,7 @@ package com.example.gqw.analytics.service;
 
 import java.util.Locale;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -16,23 +17,26 @@ public class AnalyticsLoggingPolicy {
 
     private final AnalyticsRuntimeSettingsService runtimeSettingsService;
     private final AnalyticsInstrumentationPolicy instrumentationPolicy;
+    private final boolean defaultBuiltInLoggingEnabled;
 
     public AnalyticsLoggingPolicy(AnalyticsRuntimeSettingsService runtimeSettingsService) {
-        this(runtimeSettingsService, new AnalyticsInstrumentationPolicy(true));
+        this(runtimeSettingsService, new AnalyticsInstrumentationPolicy(true), true);
     }
 
     @Autowired
     public AnalyticsLoggingPolicy(
         AnalyticsRuntimeSettingsService runtimeSettingsService,
-        AnalyticsInstrumentationPolicy instrumentationPolicy
+        AnalyticsInstrumentationPolicy instrumentationPolicy,
+        @Value("${app.analytics.logging.enabled:true}") boolean builtInLoggingEnabled
     ) {
         this.runtimeSettingsService = runtimeSettingsService;
         this.instrumentationPolicy = instrumentationPolicy;
+        this.defaultBuiltInLoggingEnabled = builtInLoggingEnabled;
     }
 
     public boolean isBuiltInEnabled() {
         return instrumentationPolicy.isEnabled()
-            && runtimeSettingsService.getBoolean(AnalyticsRuntimeSettingsService.KEY_ANALYTICS_LOGGING_ENABLED, true)
+            && defaultBuiltInLoggingEnabled
             && level() != BuiltInLogLevel.OFF;
     }
 
@@ -52,7 +56,7 @@ public class AnalyticsLoggingPolicy {
         if (!instrumentationPolicy.isEnabled()) {
             return false;
         }
-        if (!runtimeSettingsService.getBoolean(AnalyticsRuntimeSettingsService.KEY_ANALYTICS_LOGGING_ENABLED, true)) {
+        if (!defaultBuiltInLoggingEnabled) {
             return false;
         }
         BuiltInLogLevel configured = level();

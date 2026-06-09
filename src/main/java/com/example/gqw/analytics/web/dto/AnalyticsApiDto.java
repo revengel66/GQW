@@ -71,8 +71,20 @@ public final class AnalyticsApiDto {
         int bucketMinutes,
         KpiSnapshot totals,
         List<EventKpiDto> eventBreakdown,
-        List<TimeSeriesPointDto> series
+        List<TimeSeriesPointDto> series,
+        boolean partial,
+        String warning
     ) {
+        public OverviewResponse(
+            Instant from,
+            Instant to,
+            int bucketMinutes,
+            KpiSnapshot totals,
+            List<EventKpiDto> eventBreakdown,
+            List<TimeSeriesPointDto> series
+        ) {
+            this(from, to, bucketMinutes, totals, eventBreakdown, series, false, null);
+        }
     }
 
     public record OverviewCompareResponse(
@@ -85,8 +97,18 @@ public final class AnalyticsApiDto {
         List<OptionDto> modules,
         List<OptionDto> eventTypes,
         List<OptionDto> attributeTypes,
-        List<OptionDto> attributeValues
+        List<OptionDto> attributeValues,
+        boolean partial,
+        String warning
     ) {
+        public FilterOptionsResponse(
+            List<OptionDto> modules,
+            List<OptionDto> eventTypes,
+            List<OptionDto> attributeTypes,
+            List<OptionDto> attributeValues
+        ) {
+            this(modules, eventTypes, attributeTypes, attributeValues, false, null);
+        }
     }
 
     public record StageKpiDto(
@@ -113,8 +135,19 @@ public final class AnalyticsApiDto {
         Instant to,
         int bucketMinutes,
         List<StageKpiDto> stages,
-        List<StageSeriesDto> series
+        List<StageSeriesDto> series,
+        boolean partial,
+        String warning
     ) {
+        public StageBreakdownResponse(
+            Instant from,
+            Instant to,
+            int bucketMinutes,
+            List<StageKpiDto> stages,
+            List<StageSeriesDto> series
+        ) {
+            this(from, to, bucketMinutes, stages, series, false, null);
+        }
     }
 
     public record StageBreakdownCompareResponse(
@@ -155,8 +188,37 @@ public final class AnalyticsApiDto {
         boolean selectedNumeric,
         List<StageMetricSummaryDto> summaries,
         List<TimeSeriesPointDto> numericSeries,
-        List<TopValueDto> selectedTopValues
+        List<TopValueDto> selectedTopValues,
+        boolean partial,
+        String warning
     ) {
+        public StageMetricResponse(
+            Instant from,
+            Instant to,
+            int bucketMinutes,
+            String selectedMetricTypeCode,
+            String selectedMetricTypeName,
+            String selectedUnit,
+            boolean selectedNumeric,
+            List<StageMetricSummaryDto> summaries,
+            List<TimeSeriesPointDto> numericSeries,
+            List<TopValueDto> selectedTopValues
+        ) {
+            this(
+                from,
+                to,
+                bucketMinutes,
+                selectedMetricTypeCode,
+                selectedMetricTypeName,
+                selectedUnit,
+                selectedNumeric,
+                summaries,
+                numericSeries,
+                selectedTopValues,
+                false,
+                null
+            );
+        }
     }
 
     public record StageMetricCompareResponse(
@@ -198,8 +260,19 @@ public final class AnalyticsApiDto {
         int page,
         int size,
         boolean hasMore,
-        List<EventListItemDto> items
+        List<EventListItemDto> items,
+        boolean partial,
+        String warning
     ) {
+        public EventListResponse(
+            long total,
+            int page,
+            int size,
+            boolean hasMore,
+            List<EventListItemDto> items
+        ) {
+            this(total, page, size, hasMore, items, false, null);
+        }
     }
 
     public record EventStageMetricDto(

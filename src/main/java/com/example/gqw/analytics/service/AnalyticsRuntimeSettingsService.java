@@ -25,6 +25,7 @@ public class AnalyticsRuntimeSettingsService {
     public static final String KEY_LIFECYCLE_DELETE_BATCH_SIZE = "analytics.lifecycle.delete-batch-size";
 
     public static final String KEY_RAW_RETENTION_DAYS = "analytics.raw.retention.days";
+    public static final String KEY_AGGREGATE_RETENTION_DAYS = "analytics.aggregate.retention.days";
     public static final String KEY_RAW_HOT_DAYS = "analytics.raw.hot.days";
     public static final String KEY_RAW_WARM_DAYS = "analytics.raw.warm.days";
 
@@ -618,6 +619,15 @@ public class AnalyticsRuntimeSettingsService {
                     3650
                 ),
                 def(
+                    KEY_AGGREGATE_RETENTION_DAYS,
+                    "Aggregate retention, days",
+                    "Maximum retention for prepared aggregate data used by charts and reports.",
+                    SettingKind.INTEGER,
+                    "1095",
+                    7,
+                    3650
+                ),
+                def(
                     KEY_RAW_HOT_DAYS,
                     "Hot raw, ????",
                     "???? ????????? raw-?????? ??? ????? ??????? ???????? ? ?????????????.",
@@ -863,13 +873,6 @@ public class AnalyticsRuntimeSettingsService {
                 "\u041b\u043e\u0433\u0438\u0440\u043e\u0432\u0430\u043d\u0438\u0435",
                 "\u0423\u043f\u0440\u0430\u0432\u043b\u044f\u0435\u0442 \u0432\u0441\u0442\u0440\u043e\u0435\u043d\u043d\u044b\u043c\u0438 \u043b\u043e\u0433\u0430\u043c\u0438 Analytics \u0438 \u043b\u043e\u0433\u0430\u043c\u0438 \u0432 \u0442\u0440\u0430\u0441\u0441\u0438\u0440\u043e\u0432\u043a\u0435.",
                 def(
-                    KEY_ANALYTICS_LOGGING_ENABLED,
-                    "\u0412\u0441\u0442\u0440\u043e\u0435\u043d\u043d\u044b\u0435 \u043b\u043e\u0433\u0438 Analytics",
-                    "\u041e\u0442\u043a\u043b\u044e\u0447\u0430\u0435\u0442 \u0442\u043e\u043b\u044c\u043a\u043e log-line \u0441\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u044f Analytics. \u0421\u043e\u0431\u044b\u0442\u0438\u044f, \u044d\u0442\u0430\u043f\u044b, \u0430\u0442\u0440\u0438\u0431\u0443\u0442\u044b, \u043c\u0435\u0442\u0440\u0438\u043a\u0438 \u0438 MDC \u0440\u0430\u0431\u043e\u0442\u0430\u044e\u0442.",
-                    SettingKind.BOOLEAN,
-                    "true"
-                ),
-                def(
                     KEY_ANALYTICS_LOGGING_LEVEL,
                     "\u0423\u0440\u043e\u0432\u0435\u043d\u044c \u0432\u0441\u0442\u0440\u043e\u0435\u043d\u043d\u044b\u0445 \u043b\u043e\u0433\u043e\u0432",
                     "\u041c\u0438\u043d\u0438\u043c\u0430\u043b\u044c\u043d\u044b\u0439 \u0443\u0440\u043e\u0432\u0435\u043d\u044c \u0432\u0441\u0442\u0440\u043e\u0435\u043d\u043d\u044b\u0445 Analytics-\u0441\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u0439.",
@@ -1014,9 +1017,9 @@ public class AnalyticsRuntimeSettingsService {
                 def(
                     KEY_LOG_INDEX_INCLUDE_LEVELS,
                     "?????? ??? excerpts",
-                    "????? ?????? ????????? ??? ?????? ????????. ?????? WARN,ERROR,SLOW.",
+                    "????? ?????? ????????? ??? ?????? ????????. ?????? WARN,ERROR,FATAL,SLOW.",
                     SettingKind.TEXT,
-                    "WARN,ERROR,SLOW"
+                    "WARN,ERROR,FATAL,SLOW"
                 ),
                 def(
                     KEY_LOG_ARCHIVE_READ_ENABLED,

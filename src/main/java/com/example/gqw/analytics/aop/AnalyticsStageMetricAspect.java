@@ -5,6 +5,7 @@ import com.example.gqw.analytics.entity.StageMetricType;
 import com.example.gqw.analytics.repository.StageMetricTypeRepository;
 import com.example.gqw.analytics.service.AnalyticsInstrumentationPolicy;
 import com.example.gqw.analytics.service.AnalyticsLoggingPolicy;
+import com.example.gqw.analytics.service.AnalyticsStrictWarningEventService;
 import com.example.gqw.analytics.service.AnalyticsTrackingApi;
 import com.example.gqw.config.TraceIdFilter;
 import jakarta.servlet.http.HttpServletRequest;
@@ -42,6 +43,7 @@ public class AnalyticsStageMetricAspect {
     private final StageMetricTypeRepository stageMetricTypeRepository;
     private final AnalyticsInstrumentationPolicy instrumentationPolicy;
     private final AnalyticsLoggingPolicy loggingPolicy;
+    private final AnalyticsStrictWarningEventService strictWarningEventService;
     private final ExpressionParser expressionParser = new SpelExpressionParser();
     private final ParameterNameDiscoverer parameterNameDiscoverer = new DefaultParameterNameDiscoverer();
 
@@ -49,12 +51,14 @@ public class AnalyticsStageMetricAspect {
         AnalyticsTrackingApi analyticsTrackingApi,
         StageMetricTypeRepository stageMetricTypeRepository,
         AnalyticsInstrumentationPolicy instrumentationPolicy,
-        AnalyticsLoggingPolicy loggingPolicy
+        AnalyticsLoggingPolicy loggingPolicy,
+        AnalyticsStrictWarningEventService strictWarningEventService
     ) {
         this.analyticsTrackingApi = analyticsTrackingApi;
         this.stageMetricTypeRepository = stageMetricTypeRepository;
         this.instrumentationPolicy = instrumentationPolicy;
         this.loggingPolicy = loggingPolicy;
+        this.strictWarningEventService = strictWarningEventService;
     }
 
     @Around("@annotation(com.example.gqw.analytics.aop.TrackAnalyticsStageMetric)")
@@ -276,42 +280,52 @@ public class AnalyticsStageMetricAspect {
         String reason,
         RuntimeException exception
     ) {
-        if (!loggingPolicy.isStrictWarningsEnabled()) {
-            return;
-        }
         AnalyticsEventContext context = AnalyticsEventContextHolder.get();
         String eventUid = context == null ? "" : String.valueOf(context.eventUid());
         String traceId = MDC.get(TraceIdFilter.TRACE_ID_MDC_KEY);
         String path = request == null ? "" : request.getRequestURI();
-        if (exception == null) {
-            log.warn(
-                "Analytics metric skipped: code={}, expression={}, class={}, method={}, path={}, traceId={}, eventUid={}, stageId={}, required={}, reason={}",
-                metric.code(),
-                metric.value(),
-                method.getDeclaringClass().getSimpleName(),
-                method.getName(),
-                path,
-                traceId == null ? "" : traceId,
-                eventUid,
-                stageId,
-                metric.required(),
-                reason
-            );
-            return;
+        if (loggingPolicy.isStrictWarningsEnabled()) {
+            if (exception == null) {
+                log.warn(
+                    "Analytics metric skipped: code={}, expression={}, class={}, method={}, path={}, traceId={}, eventUid={}, stageId={}, required={}, reason={}",
+                    metric.code(),
+                    metric.value(),
+                    method.getDeclaringClass().getSimpleName(),
+                    method.getName(),
+                    path,
+                    traceId == null ? "" : traceId,
+                    eventUid,
+                    stageId,
+                    metric.required(),
+                    reason
+                );
+            } else {
+                log.warn(
+                    "Analytics metric skipped: code={}, expression={}, class={}, method={}, path={}, traceId={}, eventUid={}, stageId={}, required={}, reason={}",
+                    metric.code(),
+                    metric.value(),
+                    method.getDeclaringClass().getSimpleName(),
+                    method.getName(),
+                    path,
+                    traceId == null ? "" : traceId,
+                    eventUid,
+                    stageId,
+                    metric.required(),
+                    reason,
+                    exception
+                );
+            }
         }
-        log.warn(
-            "Analytics metric skipped: code={}, expression={}, class={}, method={}, path={}, traceId={}, eventUid={}, stageId={}, required={}, reason={}",
+        strictWarningEventService.record(
+            "metric",
             metric.code(),
-            metric.value(),
+            reason,
             method.getDeclaringClass().getSimpleName(),
             method.getName(),
             path,
             traceId == null ? "" : traceId,
             eventUid,
-            stageId,
-            metric.required(),
-            reason,
-            exception
+            stageId
         );
     }
 

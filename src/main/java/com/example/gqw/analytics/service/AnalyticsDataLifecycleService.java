@@ -25,6 +25,7 @@ public class AnalyticsDataLifecycleService {
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
     private final AnalyticsRuntimeSettingsService runtimeSettingsService;
+    private final AnalyticsScheduledJobsPolicy scheduledJobsPolicy;
     private final Clock clock;
     private final boolean defaultLifecycleEnabled;
     private final Object runLock = new Object();
@@ -33,10 +34,12 @@ public class AnalyticsDataLifecycleService {
     public AnalyticsDataLifecycleService(
         @Qualifier("analyticsNamedParameterJdbcTemplate") NamedParameterJdbcTemplate jdbcTemplate,
         AnalyticsRuntimeSettingsService runtimeSettingsService,
+        AnalyticsScheduledJobsPolicy scheduledJobsPolicy,
         @Value("${app.analytics.lifecycle.enabled:true}") boolean lifecycleEnabled
     ) {
         this.jdbcTemplate = jdbcTemplate;
         this.runtimeSettingsService = runtimeSettingsService;
+        this.scheduledJobsPolicy = scheduledJobsPolicy;
         this.clock = Clock.systemUTC();
         this.defaultLifecycleEnabled = lifecycleEnabled;
     }
@@ -44,6 +47,9 @@ public class AnalyticsDataLifecycleService {
     @Scheduled(cron = "0 * * * * *")
     @Transactional(transactionManager = "analyticsTransactionManager")
     public void scheduledMaintenance() {
+        if (!scheduledJobsPolicy.isEnabled()) {
+            return;
+        }
         if (!runtimeSettingsService.getBoolean(
             AnalyticsRuntimeSettingsService.KEY_LIFECYCLE_ENABLED,
             defaultLifecycleEnabled
@@ -195,28 +201,41 @@ public class AnalyticsDataLifecycleService {
         if (!tableExists("analytics.event_rollup_bucket")) {
             return;
         }
+        int aggregateRetentionDays = aggregateRetentionDays();
         pruneRollupByGranularity(
             "analytics.event_rollup_bucket",
             now,
-            runtimeSettingsService.getInt(AnalyticsRuntimeSettingsService.KEY_EVENT_ROLLUP_RETENTION_1M_DAYS, 30, 1, 3650),
+            cappedRetentionDays(
+                runtimeSettingsService.getInt(AnalyticsRuntimeSettingsService.KEY_EVENT_ROLLUP_RETENTION_1M_DAYS, 30, 1, 3650),
+                aggregateRetentionDays
+            ),
             GR_1M
         );
         pruneRollupByGranularity(
             "analytics.event_rollup_bucket",
             now,
-            runtimeSettingsService.getInt(AnalyticsRuntimeSettingsService.KEY_EVENT_ROLLUP_RETENTION_5M_DAYS, 90, 1, 3650),
+            cappedRetentionDays(
+                runtimeSettingsService.getInt(AnalyticsRuntimeSettingsService.KEY_EVENT_ROLLUP_RETENTION_5M_DAYS, 90, 1, 3650),
+                aggregateRetentionDays
+            ),
             GR_5M
         );
         pruneRollupByGranularity(
             "analytics.event_rollup_bucket",
             now,
-            runtimeSettingsService.getInt(AnalyticsRuntimeSettingsService.KEY_EVENT_ROLLUP_RETENTION_1H_DAYS, 730, 1, 3650),
+            cappedRetentionDays(
+                runtimeSettingsService.getInt(AnalyticsRuntimeSettingsService.KEY_EVENT_ROLLUP_RETENTION_1H_DAYS, 730, 1, 3650),
+                aggregateRetentionDays
+            ),
             GR_1H
         );
         pruneRollupByGranularity(
             "analytics.event_rollup_bucket",
             now,
-            runtimeSettingsService.getInt(AnalyticsRuntimeSettingsService.KEY_EVENT_ROLLUP_RETENTION_1D_DAYS, 1095, 1, 3650),
+            cappedRetentionDays(
+                runtimeSettingsService.getInt(AnalyticsRuntimeSettingsService.KEY_EVENT_ROLLUP_RETENTION_1D_DAYS, 1095, 1, 3650),
+                aggregateRetentionDays
+            ),
             GR_1D
         );
     }
@@ -225,28 +244,41 @@ public class AnalyticsDataLifecycleService {
         if (!tableExists("analytics.stage_rollup_bucket")) {
             return;
         }
+        int aggregateRetentionDays = aggregateRetentionDays();
         pruneRollupByGranularity(
             "analytics.stage_rollup_bucket",
             now,
-            runtimeSettingsService.getInt(AnalyticsRuntimeSettingsService.KEY_STAGE_ROLLUP_RETENTION_1M_DAYS, 30, 1, 3650),
+            cappedRetentionDays(
+                runtimeSettingsService.getInt(AnalyticsRuntimeSettingsService.KEY_STAGE_ROLLUP_RETENTION_1M_DAYS, 30, 1, 3650),
+                aggregateRetentionDays
+            ),
             GR_1M
         );
         pruneRollupByGranularity(
             "analytics.stage_rollup_bucket",
             now,
-            runtimeSettingsService.getInt(AnalyticsRuntimeSettingsService.KEY_STAGE_ROLLUP_RETENTION_5M_DAYS, 90, 1, 3650),
+            cappedRetentionDays(
+                runtimeSettingsService.getInt(AnalyticsRuntimeSettingsService.KEY_STAGE_ROLLUP_RETENTION_5M_DAYS, 90, 1, 3650),
+                aggregateRetentionDays
+            ),
             GR_5M
         );
         pruneRollupByGranularity(
             "analytics.stage_rollup_bucket",
             now,
-            runtimeSettingsService.getInt(AnalyticsRuntimeSettingsService.KEY_STAGE_ROLLUP_RETENTION_1H_DAYS, 730, 1, 3650),
+            cappedRetentionDays(
+                runtimeSettingsService.getInt(AnalyticsRuntimeSettingsService.KEY_STAGE_ROLLUP_RETENTION_1H_DAYS, 730, 1, 3650),
+                aggregateRetentionDays
+            ),
             GR_1H
         );
         pruneRollupByGranularity(
             "analytics.stage_rollup_bucket",
             now,
-            runtimeSettingsService.getInt(AnalyticsRuntimeSettingsService.KEY_STAGE_ROLLUP_RETENTION_1D_DAYS, 1095, 1, 3650),
+            cappedRetentionDays(
+                runtimeSettingsService.getInt(AnalyticsRuntimeSettingsService.KEY_STAGE_ROLLUP_RETENTION_1D_DAYS, 1095, 1, 3650),
+                aggregateRetentionDays
+            ),
             GR_1D
         );
     }
@@ -255,38 +287,54 @@ public class AnalyticsDataLifecycleService {
         if (!tableExists("analytics.stage_metric_rollup_bucket")) {
             return;
         }
+        int aggregateRetentionDays = aggregateRetentionDays();
         pruneRollupByGranularity(
             "analytics.stage_metric_rollup_bucket",
             now,
-            runtimeSettingsService.getInt(AnalyticsRuntimeSettingsService.KEY_STAGE_METRIC_ROLLUP_RETENTION_1M_DAYS, 30, 1, 3650),
+            cappedRetentionDays(
+                runtimeSettingsService.getInt(AnalyticsRuntimeSettingsService.KEY_STAGE_METRIC_ROLLUP_RETENTION_1M_DAYS, 30, 1, 3650),
+                aggregateRetentionDays
+            ),
             GR_1M
         );
         pruneRollupByGranularity(
             "analytics.stage_metric_rollup_bucket",
             now,
-            runtimeSettingsService.getInt(AnalyticsRuntimeSettingsService.KEY_STAGE_METRIC_ROLLUP_RETENTION_5M_DAYS, 90, 1, 3650),
+            cappedRetentionDays(
+                runtimeSettingsService.getInt(AnalyticsRuntimeSettingsService.KEY_STAGE_METRIC_ROLLUP_RETENTION_5M_DAYS, 90, 1, 3650),
+                aggregateRetentionDays
+            ),
             GR_5M
         );
         pruneRollupByGranularity(
             "analytics.stage_metric_rollup_bucket",
             now,
-            runtimeSettingsService.getInt(AnalyticsRuntimeSettingsService.KEY_STAGE_METRIC_ROLLUP_RETENTION_1H_DAYS, 730, 1, 3650),
+            cappedRetentionDays(
+                runtimeSettingsService.getInt(AnalyticsRuntimeSettingsService.KEY_STAGE_METRIC_ROLLUP_RETENTION_1H_DAYS, 730, 1, 3650),
+                aggregateRetentionDays
+            ),
             GR_1H
         );
         pruneRollupByGranularity(
             "analytics.stage_metric_rollup_bucket",
             now,
-            runtimeSettingsService.getInt(AnalyticsRuntimeSettingsService.KEY_STAGE_METRIC_ROLLUP_RETENTION_1D_DAYS, 1095, 1, 3650),
+            cappedRetentionDays(
+                runtimeSettingsService.getInt(AnalyticsRuntimeSettingsService.KEY_STAGE_METRIC_ROLLUP_RETENTION_1D_DAYS, 1095, 1, 3650),
+                aggregateRetentionDays
+            ),
             GR_1D
         );
     }
 
     private void purgeFilterRollups(Instant now) {
-        int retentionDays = runtimeSettingsService.getInt(
-            AnalyticsRuntimeSettingsService.KEY_FILTER_ROLLUP_RETENTION_DAYS,
-            730,
-            7,
-            3650
+        int retentionDays = cappedRetentionDays(
+            runtimeSettingsService.getInt(
+                AnalyticsRuntimeSettingsService.KEY_FILTER_ROLLUP_RETENTION_DAYS,
+                730,
+                7,
+                3650
+            ),
+            aggregateRetentionDays()
         );
         Date cutoffDate = Date.valueOf(now.minus(retentionDays, ChronoUnit.DAYS).atZone(clock.getZone()).toLocalDate());
         Map<String, Object> params = Map.of("cutoffDate", cutoffDate);
@@ -303,6 +351,19 @@ public class AnalyticsDataLifecycleService {
                 params
             );
         }
+    }
+
+    private int aggregateRetentionDays() {
+        return runtimeSettingsService.getInt(
+            AnalyticsRuntimeSettingsService.KEY_AGGREGATE_RETENTION_DAYS,
+            1095,
+            7,
+            3650
+        );
+    }
+
+    private static int cappedRetentionDays(int retentionDays, int aggregateRetentionDays) {
+        return Math.min(retentionDays, aggregateRetentionDays);
     }
 
     private void pruneRollupByGranularity(String tableName, Instant now, int retentionDays, int granularityMinutes) {

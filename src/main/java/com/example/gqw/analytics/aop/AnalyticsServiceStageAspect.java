@@ -4,6 +4,7 @@ import com.example.gqw.analytics.service.AnalyticsTrackingApi;
 import com.example.gqw.analytics.service.ErrorClassClassifier;
 import com.example.gqw.analytics.service.AnalyticsInstrumentationPolicy;
 import com.example.gqw.analytics.service.AnalyticsLoggingPolicy;
+import com.example.gqw.analytics.service.AnalyticsStrictWarningEventService;
 import com.example.gqw.config.TraceIdFilter;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -32,15 +33,18 @@ public class AnalyticsServiceStageAspect {
     private final AnalyticsTrackingApi analyticsTrackingApi;
     private final AnalyticsInstrumentationPolicy instrumentationPolicy;
     private final AnalyticsLoggingPolicy loggingPolicy;
+    private final AnalyticsStrictWarningEventService strictWarningEventService;
 
     public AnalyticsServiceStageAspect(
         AnalyticsTrackingApi analyticsTrackingApi,
         AnalyticsInstrumentationPolicy instrumentationPolicy,
-        AnalyticsLoggingPolicy loggingPolicy
+        AnalyticsLoggingPolicy loggingPolicy,
+        AnalyticsStrictWarningEventService strictWarningEventService
     ) {
         this.analyticsTrackingApi = analyticsTrackingApi;
         this.instrumentationPolicy = instrumentationPolicy;
         this.loggingPolicy = loggingPolicy;
+        this.strictWarningEventService = strictWarningEventService;
     }
 
     @Around(
@@ -77,6 +81,17 @@ public class AnalyticsServiceStageAspect {
                     exception
                 );
             }
+            strictWarningEventService.record(
+                "stage",
+                "SERVICE",
+                exception.getMessage(),
+                joinPoint.getSignature().getDeclaringTypeName(),
+                joinPoint.getSignature().getName(),
+                null,
+                safeMdc(TraceIdFilter.TRACE_ID_MDC_KEY),
+                String.valueOf(context.eventUid()),
+                null
+            );
             return joinPoint.proceed();
         }
         context.pushStageId(stageId);

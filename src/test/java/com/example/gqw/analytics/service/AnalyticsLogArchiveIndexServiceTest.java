@@ -48,7 +48,11 @@ class AnalyticsLogArchiveIndexServiceTest {
             """
         );
         settingsService = new AnalyticsRuntimeSettingsService(new NamedParameterJdbcTemplate(dataSource));
-        logIndexService = new AnalyticsLogArchiveIndexService(new NamedParameterJdbcTemplate(dataSource), settingsService);
+        logIndexService = new AnalyticsLogArchiveIndexService(
+            new NamedParameterJdbcTemplate(dataSource),
+            settingsService,
+            new AnalyticsScheduledJobsPolicy(true)
+        );
         ReflectionTestUtils.setField(logIndexService, "appLogFilePath", tempDir.resolve("logs").resolve("gqw.log").toString());
         ReflectionTestUtils.setField(logIndexService, "moduleLogDir", tempDir.resolve("logs").resolve("analytics").resolve("modules").toString());
     }

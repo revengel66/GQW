@@ -65,6 +65,7 @@ public class AnalyticsLogArchiveIndexService {
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
     private final AnalyticsRuntimeSettingsService runtimeSettingsService;
+    private final AnalyticsScheduledJobsPolicy scheduledJobsPolicy;
     private final Clock clock;
     private final AtomicBoolean running = new AtomicBoolean(false);
     private volatile Instant lastScheduledRunAt = Instant.EPOCH;
@@ -78,15 +79,20 @@ public class AnalyticsLogArchiveIndexService {
 
     public AnalyticsLogArchiveIndexService(
         @Qualifier("analyticsNamedParameterJdbcTemplate") NamedParameterJdbcTemplate jdbcTemplate,
-        AnalyticsRuntimeSettingsService runtimeSettingsService
+        AnalyticsRuntimeSettingsService runtimeSettingsService,
+        AnalyticsScheduledJobsPolicy scheduledJobsPolicy
     ) {
         this.jdbcTemplate = jdbcTemplate;
         this.runtimeSettingsService = runtimeSettingsService;
+        this.scheduledJobsPolicy = scheduledJobsPolicy;
         this.clock = Clock.systemUTC();
     }
 
     @Scheduled(cron = "0 * * * * *")
     public void scheduledIndexTick() {
+        if (!scheduledJobsPolicy.isEnabled()) {
+            return;
+        }
         if (!runtimeSettingsService.getBoolean(AnalyticsRuntimeSettingsService.KEY_LOG_INDEX_ENABLED, false)) {
             return;
         }
@@ -106,6 +112,9 @@ public class AnalyticsLogArchiveIndexService {
 
     @Scheduled(cron = "30 * * * * *")
     public void scheduledRetentionTick() {
+        if (!scheduledJobsPolicy.isEnabled()) {
+            return;
+        }
         if (!runtimeSettingsService.getBoolean(AnalyticsRuntimeSettingsService.KEY_LOG_RETENTION_CLEANUP_ENABLED, false)) {
             return;
         }
@@ -472,7 +481,7 @@ public class AnalyticsLogArchiveIndexService {
         );
         Set<String> includeLevels = parseIncludeLevels(runtimeSettingsService.getText(
             AnalyticsRuntimeSettingsService.KEY_LOG_INDEX_INCLUDE_LEVELS,
-            "WARN,ERROR,SLOW"
+            "WARN,ERROR,FATAL,SLOW"
         ));
         long linesWithTrace = 0L;
         long parseErrors = 0L;
@@ -1232,6 +1241,7 @@ public class AnalyticsLogArchiveIndexService {
         }
         String normalized = level == null ? "" : level.trim().toUpperCase(Locale.ROOT);
         return switch (normalized) {
+            case "FATAL" -> "FATAL";
             case "ERROR" -> "ERROR";
             case "WARN" -> "WARN";
             case "DEBUG" -> "DEBUG";
@@ -1294,6 +1304,7 @@ public class AnalyticsLogArchiveIndexService {
         if (result.isEmpty()) {
             result.add("WARN");
             result.add("ERROR");
+            result.add("FATAL");
             result.add("SLOW");
         }
         return result;

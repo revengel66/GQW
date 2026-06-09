@@ -96,19 +96,16 @@ class AnalyticsRuntimeSettingsServiceTest {
 
     @Test
     void loggingSettingsAreExposedAndPolicyUsesRuntimeValues() {
-        AnalyticsRuntimeSettingsService.SettingView enabled = findSetting(
-            service.view(),
-            AnalyticsRuntimeSettingsService.KEY_ANALYTICS_LOGGING_ENABLED
-        );
         AnalyticsRuntimeSettingsService.SettingView level = findSetting(
             service.view(),
             AnalyticsRuntimeSettingsService.KEY_ANALYTICS_LOGGING_LEVEL
         );
         AnalyticsLoggingPolicy policy = new AnalyticsLoggingPolicy(service);
 
-        assertEquals("BOOLEAN", enabled.kind());
-        assertEquals("true", enabled.defaultValue());
-        assertTrue(enabled.label().contains("Analytics"));
+        assertThrows(
+            java.util.NoSuchElementException.class,
+            () -> findSetting(service.view(), AnalyticsRuntimeSettingsService.KEY_ANALYTICS_LOGGING_ENABLED)
+        );
         assertEquals("ENUM", level.kind());
         assertTrue(policy.isInfoEnabled());
         assertTrue(policy.isControllerEnabled());
@@ -117,15 +114,14 @@ class AnalyticsRuntimeSettingsServiceTest {
         assertFalse(policy.isInfoEnabled());
         assertTrue(policy.isWarnEnabled());
         assertTrue(policy.isErrorEnabled());
-
-        service.update(Map.of(AnalyticsRuntimeSettingsService.KEY_ANALYTICS_LOGGING_ENABLED, "false"), "test");
-        assertFalse(policy.isControllerEnabled());
-        assertFalse(policy.isDatabaseEnabled());
         assertTrue(policy.isStrictWarningsEnabled());
 
-        service.update(Map.of(AnalyticsRuntimeSettingsService.KEY_ANALYTICS_LOGGING_LEVEL, "ERROR"), "test");
+        service.update(Map.of(AnalyticsRuntimeSettingsService.KEY_ANALYTICS_LOGGING_LEVEL, "OFF"), "test");
+        assertFalse(policy.isControllerEnabled());
+        assertFalse(policy.isDatabaseEnabled());
         assertFalse(policy.isStrictWarningsEnabled());
 
+        service.update(Map.of(AnalyticsRuntimeSettingsService.KEY_ANALYTICS_LOGGING_LEVEL, "WARN"), "test");
         service.update(Map.of(AnalyticsRuntimeSettingsService.KEY_ANALYTICS_LOGGING_STRICT_WARNINGS_ENABLED, "false"), "test");
         assertFalse(policy.isStrictWarningsEnabled());
     }

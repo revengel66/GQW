@@ -14,6 +14,7 @@
     let diagnosticsTimer = null;
     let operationInFlight = false;
     let runtimeTooltipEl = null;
+    let activeSectionObserver = null;
 
     const RUNTIME_DIAG_HELP = {
         rawRowsEstimate: "Количество исходных событий, сохранённых в аналитике. Если значение быстро растёт, проверьте сроки хранения.",
@@ -62,16 +63,26 @@
 
     document.addEventListener("DOMContentLoaded", () => {
         initRefs();
-        if (!refs.openButton || !refs.modalEl) {
+        const hasPage = Boolean(refs.pageRoot);
+        const hasModalTrigger = Boolean(refs.openButton && refs.modalEl);
+        if (!hasPage && !hasModalTrigger) {
             return;
         }
-        modalInstance = new bootstrap.Modal(refs.modalEl);
+        if (hasModalTrigger) {
+            modalInstance = new bootstrap.Modal(refs.modalEl);
+        }
         bindEvents();
+        if (hasPage) {
+            void reloadSettings();
+            startDiagnosticsPolling();
+        }
     });
 
     function initRefs() {
         refs.openButton = document.getElementById("analytics-runtime-settings-open");
         refs.modalEl = document.getElementById("analytics-runtime-settings-modal");
+        refs.pageRoot = document.getElementById("analytics-runtime-settings-page");
+        refs.navRoot = document.getElementById("analytics-runtime-settings-nav");
         refs.formRoot = document.getElementById("analytics-runtime-settings-form");
         refs.error = document.getElementById("analytics-runtime-settings-error");
         refs.status = document.getElementById("analytics-runtime-settings-status");
@@ -92,6 +103,9 @@
 
     function bindEvents() {
         refs.openButton?.addEventListener("click", async () => {
+            if (!modalInstance) {
+                return;
+            }
             modalInstance.show();
             await reloadSettings();
             startDiagnosticsPolling();
@@ -129,18 +143,23 @@
         refs.opLogCleanupButton?.addEventListener("click", () => {
             void runOperation("cleanup_logs_now", "Очистка старых логов выполнена.");
         });
-        refs.modalEl?.addEventListener("click", handleRuntimeHelpClick, true);
-        refs.modalEl?.addEventListener("mouseover", handleRuntimeTooltipEnter, true);
-        refs.modalEl?.addEventListener("focusin", handleRuntimeTooltipEnter, true);
-        refs.modalEl?.addEventListener("mouseout", handleRuntimeTooltipLeave, true);
-        refs.modalEl?.addEventListener("focusout", handleRuntimeTooltipLeave, true);
-        refs.modalEl?.addEventListener("scroll", hideRuntimeTooltip, true);
-        refs.modalEl?.addEventListener("keydown", (event) => {
+        const helpScope = runtimeHelpScope();
+        helpScope?.addEventListener("click", handleRuntimeHelpClick, true);
+        helpScope?.addEventListener("mouseover", handleRuntimeTooltipEnter, true);
+        helpScope?.addEventListener("focusin", handleRuntimeTooltipEnter, true);
+        helpScope?.addEventListener("mouseout", handleRuntimeTooltipLeave, true);
+        helpScope?.addEventListener("focusout", handleRuntimeTooltipLeave, true);
+        helpScope?.addEventListener("scroll", hideRuntimeTooltip, true);
+        helpScope?.addEventListener("keydown", (event) => {
             if (event.key !== "Enter" && event.key !== " ") {
                 return;
             }
             handleRuntimeHelpClick(event);
         }, true);
+    }
+
+    function runtimeHelpScope() {
+        return refs.pageRoot || refs.modalEl;
     }
 
     async function reloadSettings() {
@@ -149,6 +168,7 @@
         setDiagnosticsStatus("Загрузка диагностики...");
         setOperationStatus("");
         renderDiagnosticsContent("<div class='text-muted small'>Загрузка...</div>");
+        setSaveButtonLabel("Загрузка...");
         toggleSave(false);
 
         const [settingsResult, diagnosticsResult] = await Promise.allSettled([
@@ -178,6 +198,7 @@
         }
 
         toggleSave(true);
+        setSaveButtonLabel("");
     }
 
     async function saveSettings() {
@@ -188,18 +209,29 @@
             return;
         }
         const values = collectValues();
+        const scrollY = window.scrollY;
+        setSaveButtonLabel("Сохранение...");
         setError("");
         setStatus("Сохраняем...");
         toggleSave(false);
         try {
             loadedPayload = await postJson(SETTINGS_API, {values});
             renderSettings(loadedPayload);
+            if (refs.pageRoot) {
+                window.scrollTo({top: scrollY, behavior: "instant"});
+            } else if (modalInstance) {
+                modalInstance.hide();
+            }
             setStatus(buildStatusText(loadedPayload, "Сохранено."));
+            showSettingsToast("Настройки сохранены");
             await reloadDiagnostics();
         } catch (error) {
             setError(error?.message || "Не удалось сохранить настройки.");
+            console.warn("Failed to save analytics settings", error);
+            showSettingsToast("Не удалось сохранить настройки", true);
         } finally {
             toggleSave(true);
+            setSaveButtonLabel("");
         }
     }
 
@@ -282,6 +314,8 @@
     function renderSettings(payload) {
         const groups = Array.isArray(payload?.groups) ? payload.groups : [];
         refs.formRoot.innerHTML = groups.map((group) => renderGroup(group)).join("");
+        renderSettingsNavigation(groups);
+        observeRuntimeSections();
         initTooltips();
         attachRuntimeSettingTooltips();
     }
@@ -311,7 +345,7 @@
             <p class="analytics-runtime-diag-description">
                 Индекс логов помогает находить трассировки даже тогда, когда исходный файл уже перемещён в архив. Полные логи остаются в файлах, а в базе хранится только быстрый указатель и короткая диагностическая сводка.
             </p>
-            <div class="table-responsive mb-2">
+            <div class="table-responsive mb-4">
                 <table class="table table-sm analytics-runtime-diag-table">
                     <tbody>
                         <tr><th>Статус</th><td>${renderEtaStatus(logIndex.status || "OK")}</td></tr>
@@ -326,7 +360,7 @@
                 </table>
             </div>
             <div class="analytics-runtime-diag-block-title">Свежесть агрегатов по интервалам</div>
-            <div class="table-responsive mb-2">
+            <div class="table-responsive mb-4">
                 <table class="table table-sm analytics-runtime-diag-table">
                     <thead>
                     <tr>
@@ -351,8 +385,8 @@
                 </table>
             </div>
             <div class="analytics-runtime-diag-block-title">Когда данные догонят последние события</div>
-            <div class="table-responsive mb-2">
-                <table class="table table-sm analytics-runtime-diag-table">
+            <div class="table-responsive mb-4">
+                <table class="table table-sm analytics-runtime-diag-table analytics-runtime-diag-table-when">
                     <thead>
                     <tr>
                         <th>Тип данных</th>
@@ -376,7 +410,7 @@
                 </table>
             </div>
             <div class="analytics-runtime-diag-block-title">Размеры таблиц с аналитическими данными</div>
-            <div class="table-responsive">
+            <div class="table-responsive mb-4">
                 <table class="table table-sm analytics-runtime-diag-table">
                     <thead>
                     <tr>
@@ -411,10 +445,24 @@
         const title = escapeHtml(formatRuntimeGroupTitle(groupCode, group?.title));
         const description = escapeHtml(formatRuntimeGroupDescription(groupCode, group?.description));
         const settings = (Array.isArray(group?.settings) ? group.settings : [])
-            .filter((setting) => !isReservedRuntimeSetting(setting?.key));
-        const rows = settings.map((setting) => renderSetting(setting)).join("");
+            .filter((setting) => !isHiddenRuntimeSetting(setting?.key) && !isReservedRuntimeSetting(setting?.key));
+        const primarySettings = settings.filter((setting) => !isAdvancedLogIndexerSetting(setting?.key));
+        const advancedSettings = settings.filter((setting) => isAdvancedLogIndexerSetting(setting?.key));
+        const rows = primarySettings.map((setting) => renderSetting(setting)).join("");
+        const advancedRows = advancedSettings.map((setting) => renderSetting(setting)).join("");
+        const advancedBlock = advancedRows ? `
+            <details class="analytics-runtime-advanced mt-3">
+                <summary class="analytics-runtime-advanced-summary">
+                    <span>Дополнительные настройки индексатора логов</span>
+                    <span class="analytics-runtime-advanced-sub">Внутренние лимиты обработки логов</span>
+                </summary>
+                <div class="analytics-runtime-grid analytics-runtime-advanced-grid">
+                    ${advancedRows}
+                </div>
+            </details>
+        ` : "";
         return `
-            <section class="analytics-runtime-group mb-3">
+            <section class="analytics-runtime-group analytics-settings-section mb-3" id="${runtimeGroupSectionId(groupCode)}">
                 <div class="analytics-runtime-group-head">
                     <div class="analytics-runtime-group-title">${title}</div>
                     <div class="analytics-runtime-group-sub">${description}</div>
@@ -422,8 +470,76 @@
                 <div class="analytics-runtime-grid">
                     ${rows}
                 </div>
+                ${advancedBlock}
             </section>
         `;
+    }
+
+    function renderSettingsNavigation(groups) {
+        if (!refs.navRoot) {
+            return;
+        }
+        const groupLinks = (Array.isArray(groups) ? groups : [])
+            .map((group) => {
+                const groupCode = String(group?.code || "");
+                const title = escapeHtml(formatRuntimeGroupTitle(groupCode, group?.title));
+                return `<a class="analytics-settings-nav-link" href="#${runtimeGroupSectionId(groupCode)}">${title}</a>`;
+            })
+            .join("");
+        refs.navRoot.innerHTML = `
+            <a class="analytics-settings-nav-link is-active" href="#runtime-section-diagnostics">Диагностика состояния</a>
+            ${groupLinks}
+        `;
+        refs.navRoot.querySelectorAll("a[href^='#']").forEach((link) => {
+            link.addEventListener("click", (event) => {
+                const target = document.querySelector(link.getAttribute("href"));
+                if (!target) {
+                    return;
+                }
+                event.preventDefault();
+                target.scrollIntoView({behavior: "smooth", block: "start"});
+                setActiveSettingsNav(link.getAttribute("href").slice(1));
+            });
+        });
+    }
+
+    function observeRuntimeSections() {
+        if (!refs.pageRoot || !refs.navRoot || typeof IntersectionObserver === "undefined") {
+            return;
+        }
+        activeSectionObserver?.disconnect();
+        const sections = refs.pageRoot.querySelectorAll(".analytics-settings-section[id]");
+        activeSectionObserver = new IntersectionObserver((entries) => {
+            const visible = entries
+                .filter((entry) => entry.isIntersecting)
+                .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+            if (visible?.target?.id) {
+                setActiveSettingsNav(visible.target.id);
+            }
+        }, {
+            root: null,
+            rootMargin: "-90px 0px -55% 0px",
+            threshold: [0.1, 0.25, 0.5]
+        });
+        sections.forEach((section) => activeSectionObserver.observe(section));
+    }
+
+    function setActiveSettingsNav(sectionId) {
+        if (!refs.navRoot || !sectionId) {
+            return;
+        }
+        refs.navRoot.querySelectorAll(".analytics-settings-nav-link").forEach((link) => {
+            link.classList.toggle("is-active", link.getAttribute("href") === `#${sectionId}`);
+        });
+    }
+
+    function runtimeGroupSectionId(groupCode) {
+        const normalized = String(groupCode || "settings")
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-+|-+$/g, "");
+        return `runtime-section-${normalized || "settings"}`;
     }
 
     function renderSetting(setting) {
@@ -439,6 +555,7 @@
         const max = setting?.maxValue;
         const custom = Boolean(setting?.custom);
         const input = renderInput(kind, key, value, min, max, setting?.options);
+        const valueHint = runtimeSettingValueHint(rawKey);
         const defaultLabel = `\u041f\u043e \u0443\u043c\u043e\u043b\u0447\u0430\u043d\u0438\u044e ${escapeHtml(defaultValue || "\u2014")}`;
 
         return `
@@ -456,6 +573,7 @@
                 <div class="analytics-runtime-item-input">
                     ${input}
                 </div>
+                ${valueHint ? `<div class="analytics-runtime-item-hint">${escapeHtml(valueHint)}</div>` : ""}
                 <div class="analytics-runtime-item-meta">
                     <span class="text-muted">${defaultLabel}</span>
                     ${isReservedRuntimeSetting(rawKey) ? "<span class=\"text-warning\">Пока не используется в текущей версии</span>" : ""}
@@ -482,16 +600,21 @@
         if (kind === "INTEGER") {
             const minAttr = Number.isFinite(Number(min)) ? `min="${Number(min)}"` : "";
             const maxAttr = Number.isFinite(Number(max)) ? `max="${Number(max)}"` : "";
+            const unit = runtimeSettingUnit(key);
+            const unitHtml = unit ? `<span class="input-group-text analytics-runtime-unit">${escapeHtml(unit)}</span>` : "";
             return `
-                <input class="form-control form-control-sm"
-                       type="number"
-                       id="${id}"
-                       value="${escapeHtml(value)}"
-                       ${minAttr}
-                       ${maxAttr}
-                       step="1"
-                       data-setting-key="${key}"
-                       data-setting-kind="${kind}">
+                <div class="input-group input-group-sm analytics-runtime-input-group">
+                    <input class="form-control form-control-sm"
+                           type="number"
+                           id="${id}"
+                           value="${escapeHtml(value)}"
+                           ${minAttr}
+                           ${maxAttr}
+                           step="1"
+                           data-setting-key="${key}"
+                           data-setting-kind="${kind}">
+                    ${unitHtml}
+                </div>
             `;
         }
         if (kind === "ENUM") {
@@ -516,8 +639,75 @@
                    id="${id}"
                    value="${escapeHtml(value)}"
                    data-setting-key="${key}"
-                   data-setting-kind="${kind}">
+            data-setting-kind="${kind}">
         `;
+    }
+
+    function isAdvancedLogIndexerSetting(key) {
+        return new Set([
+            "analytics.log-index.batch-size",
+            "analytics.log-index.max-file-size-mb",
+            "analytics.log-index.max-lines-per-trace",
+            "analytics.log-index.max-excerpts-per-trace",
+            "analytics.log-index.excerpt-max-length",
+            "analytics.log-index.archive-read-max-lines",
+            "analytics.log-index.include-levels",
+            "analytics.log-retention.delete-batch-size",
+            "analytics.log-retention.safe-mode-enabled",
+            "analytics.log-retention.archive-indexed-only"
+        ]).has(String(key || ""));
+    }
+
+    function runtimeSettingUnit(key) {
+        const units = {
+            "analytics.lifecycle.interval-minutes": "мин",
+            "analytics.lifecycle.delete-batch-size": "событий",
+            "analytics.raw.retention.days": "дней",
+            "analytics.aggregate.retention.days": "дней",
+            "analytics.time-rollup.overlap-minutes": "мин",
+            "analytics.time-rollup.bootstrap-lookback-days": "дней",
+            "analytics.time-rollup.refresh-interval-minutes": "мин",
+            "analytics.stage-metric-rollup.overlap-minutes": "мин",
+            "analytics.stage-metric-rollup.bootstrap-lookback-days": "дней",
+            "analytics.stage-metric-rollup.refresh-interval-minutes": "мин",
+            "analytics.filter-rollup.long-range-days": "дней",
+            "analytics.filter-rollup.refresh-recent-days": "дней",
+            "analytics.filter-rollup.refresh-interval-minutes": "мин",
+            "analytics.filter-rollup.retention.days": "дней",
+            "analytics.event-rollup.retention.1m.days": "дней",
+            "analytics.event-rollup.retention.5m.days": "дней",
+            "analytics.event-rollup.retention.1h.days": "дней",
+            "analytics.event-rollup.retention.1d.days": "дней",
+            "analytics.stage-rollup.retention.1m.days": "дней",
+            "analytics.stage-rollup.retention.5m.days": "дней",
+            "analytics.stage-rollup.retention.1h.days": "дней",
+            "analytics.stage-rollup.retention.1d.days": "дней",
+            "analytics.stage-metric-rollup.retention.1m.days": "дней",
+            "analytics.stage-metric-rollup.retention.5m.days": "дней",
+            "analytics.stage-metric-rollup.retention.1h.days": "дней",
+            "analytics.stage-metric-rollup.retention.1d.days": "дней",
+            "analytics.log-index.interval-minutes": "мин",
+            "analytics.log-index.batch-size": "файлов",
+            "analytics.log-index.max-file-size-mb": "МБ",
+            "analytics.log-index.max-lines-per-trace": "строк",
+            "analytics.log-index.max-excerpts-per-trace": "фрагментов",
+            "analytics.log-index.excerpt-max-length": "символов",
+            "analytics.log-index.retention-days": "дней",
+            "analytics.log-index.archive-read-max-lines": "строк",
+            "analytics.log-retention.current-days": "дней",
+            "analytics.log-retention.archive-days": "дней",
+            "analytics.log-retention.index-days": "дней",
+            "analytics.log-retention.interval-hours": "часов",
+            "analytics.log-retention.delete-batch-size": "файлов"
+        };
+        return units[String(key || "")] || "";
+    }
+
+    function runtimeSettingValueHint(key) {
+        if (String(key || "") === "analytics.log-index.include-levels") {
+            return "Допустимые значения: FATAL, ERROR, WARN, SLOW.";
+        }
+        return "";
     }
 
     function formatRuntimeGroupTitle(code, fallback) {
@@ -548,6 +738,7 @@
             "analytics.lifecycle.interval-minutes": "Как часто запускать обслуживание",
             "analytics.lifecycle.delete-batch-size": "Событий удалять за один проход",
             "analytics.raw.retention.days": "Срок хранения сырых событий",
+            "analytics.aggregate.retention.days": "Срок хранения агрегатов",
             "analytics.raw.hot.days": "Период быстрых сырых данных",
             "analytics.raw.warm.days": "Период редко используемых сырых данных",
             "analytics.tiering.enabled": "Перенос старых данных включён",
@@ -602,7 +793,7 @@
             "analytics.log-retention.archive-days": "Хранить архивы логов, дней",
             "analytics.log-retention.index-days": "Хранить индекс логов, дней",
             "analytics.log-retention.interval-hours": "Как часто очищать логи, часов",
-            "analytics.log-retention.delete-batch-size": "Размер удаления за один запуск",
+            "analytics.log-retention.delete-batch-size": "Файлов удалять за один запуск",
             "analytics.log-retention.archive-indexed-only": "Удалять архив только после индексации",
             "analytics.log-retention.safe-mode-enabled": "Безопасная очистка"
         };
@@ -610,25 +801,42 @@
     }
 
     function formatRuntimeSettingHelp(key, fallback) {
-        if (isReservedRuntimeSetting(key)) {
-            return "Пока не используется в текущей версии. Это зарезервированная настройка для будущего хранения или обслуживания данных; изменение значения сейчас не меняет backend-поведение.";
+        const normalizedKey = String(key || "");
+        const explicitHelp = runtimeSettingHelpText(normalizedKey);
+        if (explicitHelp) {
+            return explicitHelp;
         }
-        if (key.startsWith("analytics.log-index.")) {
-            return "Управляет индексом текущих и архивных логов: частотой обхода, лимитами чтения, сроком хранения индекса и безопасным чтением архивов из UI.";
+        if (isReservedRuntimeSetting(normalizedKey)) {
+            return "Параметр зарезервирован для будущих сценариев хранения или обслуживания данных. В текущей версии изменение этого значения не влияет на работу Analytics.";
         }
-        if (key.startsWith("analytics.log-retention.")) {
-            return "Управляет очисткой файлов логов и строк индекса. Безопасный режим показывает dry-run/status без физического удаления файлов.";
+        if (normalizedKey.includes("rollup.retention")) {
+            return "Определяет, сколько дней хранить подготовленные данные для выбранной детализации. Больший срок даёт более длинную историю анализа, но занимает больше места в базе данных.";
         }
-        if (key.includes("rollup.retention")) {
-            return "Определяет, сколько дней хранить подготовленные rollup-данные для выбранной детализации. Больший срок даёт более длинную историю, но занимает больше места.";
+        if (normalizedKey.startsWith("analytics.log-index.")) {
+            return "Управляет индексированием логов: как часто читать файлы, сколько данных сохранять для трассировок и как долго хранить быстрый индекс поиска.";
         }
-        if (key.includes("rollup")) {
-            return "Управляет фоновым пересчётом подготовленных данных для быстрых графиков и длинных периодов.";
+        if (normalizedKey.startsWith("analytics.log-retention.")) {
+            return "Управляет хранением и очисткой файлов логов. Эти параметры помогают не накапливать лишние файлы и сохранять доступность диагностической истории.";
         }
-        if (key.includes("lifecycle")) {
-            return "Управляет плановым обслуживанием аналитических данных: очисткой устаревших записей и служебными отметками.";
+        if (normalizedKey.includes("rollup")) {
+            return "Управляет подготовкой данных для быстрых графиков и отчётов. Подготовленные данные ускоряют просмотр больших периодов и уменьшают нагрузку на исходные события.";
         }
-        return cleanRuntimeText(fallback, "Описание отсутствует.");
+        if (normalizedKey.includes("lifecycle")) {
+            return "Управляет плановым обслуживанием аналитических данных: очисткой устаревших записей и поддержанием служебного состояния.";
+        }
+        if (normalizedKey.includes("retention")) {
+            return "Определяет срок хранения данных. Увеличение срока расширяет историю анализа, но требует больше места в хранилище.";
+        }
+        if (normalizedKey.includes("partitioning")) {
+            return "Управляет обслуживанием больших объёмов данных. Эти параметры нужны для стабильной работы хранилища при длительном накоплении аналитики.";
+        }
+        return cleanRuntimeText(fallback, "Настройка влияет на работу Analytics Module. Изменяйте значение только если понимаете ожидаемый эффект.");
+    }
+
+    function isHiddenRuntimeSetting(key) {
+        return new Set([
+            "analytics.logging.enabled"
+        ]).has(String(key || ""));
     }
 
     function isReservedRuntimeSetting(key) {
@@ -643,6 +851,59 @@
             "analytics.partitioning.precreate-days",
             "analytics.partitioning.drop-after-days"
         ]).has(String(key || ""));
+    }
+
+    function runtimeSettingHelpText(key) {
+        const help = {
+            "analytics.logging.level": "Определяет, какие встроенные сообщения Analytics попадут в логи приложения. INFO показывает информационные сообщения, предупреждения и ошибки; WARN оставляет только предупреждения и ошибки; ERROR оставляет только ошибки; OFF полностью отключает встроенные сообщения Analytics.",
+            "analytics.logging.controller.enabled": "Включает служебные сообщения о начале и завершении обработки контроллеров. Это помогает сопоставлять пользовательский запрос с трассировкой, но не влияет на запись событий, этапов и метрик.",
+            "analytics.logging.service.enabled": "Включает служебные сообщения о работе сервисного слоя приложения. Это помогает видеть, где выполнялась бизнес-логика, но не управляет сохранением самих этапов аналитики.",
+            "analytics.logging.database.enabled": "Включает служебные сообщения о вызовах к базе данных. Это влияет только на строки логов; этапы базы данных и их метрики продолжают сохраняться отдельно.",
+            "analytics.logging.custom-layer.enabled": "Сохраняет в логах информацию о работе пользовательских слоёв приложения для последующего анализа производительности и поиска узких мест.",
+            "analytics.logging.user-log-capture.enabled": "Разрешает показывать пользовательские сообщения разработчика в логах трассировки, если они были записаны внутри активного аналитического события.",
+            "analytics.logging.strict-warnings.enabled": "Включает предупреждения строгой модели. Если код события, модуля, этапа, атрибута или метрики неизвестен либо отключён, Analytics запишет предупреждение в лог и создаст диагностическое служебное событие.",
+            "analytics.lifecycle.enabled": "Включает плановое обслуживание аналитических данных. Оно помогает очищать устаревшие записи и поддерживать подготовленные данные в актуальном состоянии.",
+            "analytics.lifecycle.interval-minutes": "Определяет, как часто запускать обслуживание аналитических данных. Слишком короткий интервал повышает нагрузку, слишком длинный откладывает очистку и обновление служебных данных.",
+            "analytics.lifecycle.delete-batch-size": "Ограничивает количество записей, которые обслуживание удаляет за один проход. Меньшее значение снижает нагрузку на базу данных, большее быстрее освобождает место.",
+            "analytics.raw.retention.days": "Определяет, сколько дней хранить исходные события и подробные данные. Чем больше срок, тем глубже история расследований и тем больше требуется места.",
+            "analytics.aggregate.retention.days": "Определяет, сколько дней хранить подготовленные данные для графиков и отчётов. Если срок меньше детальных настроек агрегатов, старые точки на графиках будут удалены по этому общему сроку.",
+            "analytics.tail-merge.enabled": "Позволяет графикам дополнять подготовленные данные свежими событиями, которые ещё не попали в фоновый пересчёт. Это делает последние минуты на графиках более актуальными.",
+            "analytics.time-rollup.enabled": "Включает подготовку данных по времени для быстрых графиков количества, ошибок и длительности. Отключение замедлит просмотр длинных периодов.",
+            "analytics.time-rollup.overlap-minutes": "Задаёт запас повторного пересчёта по времени, чтобы поздно записанные события корректно попали в графики.",
+            "analytics.time-rollup.bootstrap-lookback-days": "Определяет, за сколько прошлых дней выполнить первичную подготовку данных при запуске или ручном пересчёте.",
+            "analytics.time-rollup.refresh-interval-minutes": "Определяет частоту обновления подготовленных данных для графиков по времени.",
+            "analytics.stage-metric-rollup.enabled": "Включает подготовку данных по метрикам этапов. Это ускоряет анализ производительности слоёв и операций на длинных периодах.",
+            "analytics.stage-metric-rollup.overlap-minutes": "Задаёт запас повторного пересчёта метрик этапов, чтобы поздно записанные данные не выпадали из агрегатов.",
+            "analytics.stage-metric-rollup.bootstrap-lookback-days": "Определяет, за сколько прошлых дней пересчитать метрики этапов при первичной подготовке данных.",
+            "analytics.stage-metric-rollup.refresh-interval-minutes": "Определяет частоту обновления подготовленных данных по метрикам этапов.",
+            "analytics.filter-rollup.enabled": "Включает подготовку значений для фильтров. Это ускоряет выбор событий, атрибутов и маршрутов на больших периодах.",
+            "analytics.filter-rollup.long-range-days": "Определяет, с какого размера периода фильтры должны использовать подготовленные данные вместо просмотра исходных событий.",
+            "analytics.filter-rollup.refresh-recent-days": "Определяет, сколько последних дней обновлять для быстрых фильтров при плановом пересчёте.",
+            "analytics.filter-rollup.refresh-interval-minutes": "Определяет частоту обновления подготовленных данных для фильтров.",
+            "analytics.log-index.enabled": "Включает или отключает быстрый поиск по логам. Если выключить, трассировки, ошибки и предупреждения будет сложнее находить в Analytics Admin.",
+            "analytics.log-index.interval-minutes": "Определяет, как часто система проверяет папку логов на новые файлы и записи. Чем меньше значение, тем быстрее обновляется поиск, но тем чаще система обращается к диску.",
+            "analytics.log-index.batch-size": "Задаёт, сколько лог-файлов можно обработать за один цикл. Меньшее значение снижает разовую нагрузку, но большие папки будут обрабатываться дольше.",
+            "analytics.log-index.current-logs-enabled": "Разрешает читать активные лог-файлы, которые приложение ещё продолжает записывать. Если выключить, свежие трассировки появятся позже.",
+            "analytics.log-index.archives-enabled": "Разрешает учитывать архивные лог-файлы при поиске по трассировкам, ошибкам и предупреждениям. Если выключить, новые архивы не будут попадать в быстрый поиск и диагностическую сводку.",
+            "analytics.log-index.max-file-size-mb": "Файлы больше указанного размера будут пропущены. Это защищает систему от чрезмерной нагрузки при слишком больших логах.",
+            "analytics.log-index.max-lines-per-trace": "Ограничивает, сколько строк трассировки сохраняется в быстром индексе для одного traceId. Полный текст остаётся в лог-файле, если файл ещё доступен для чтения.",
+            "analytics.log-index.max-excerpts-per-trace": "Задаёт, сколько важных сообщений сохранить в диагностической сводке одной трассировки. Сообщения сверх лимита не попадают в эту сводку, но могут оставаться в исходном файле лога.",
+            "analytics.log-index.excerpt-max-length": "Ограничивает длину одного сохранённого диагностического фрагмента. Это влияет только на краткую сводку, а не на исходный лог-файл.",
+            "analytics.log-index.retention-days": "Определяет, через сколько дней устаревшие данные поиска по логам будут удаляться. Чем больше срок, тем дольше доступна история поиска.",
+            "analytics.log-index.include-levels": "Определяет, какие уровни логирования считаются важными и попадают в диагностическую сводку. Поддерживаются значения: FATAL, ERROR, WARN, SLOW.",
+            "analytics.log-index.archive-read-enabled": "Разрешает открывать содержимое архивных логов из Analytics Admin. Индексация помогает найти нужный архив, а эта настройка разрешает показать строки из него.",
+            "analytics.log-index.archive-read-max-lines": "Ограничивает количество строк трассировки, которое можно показать из архивного файла за один запрос. Индекс при этом может знать о трассировке больше, чем отображается в интерфейсе.",
+            "analytics.log-index.allowed-directory": "Задаёт папку, в которой система ищет текущие и архивные лог-файлы. Если путь указан неверно, поиск по логам не найдёт нужные файлы.",
+            "analytics.log-retention.cleanup-enabled": "Разрешает автоматически удалять устаревшие лог-файлы. Если выключить, старые файлы нужно очищать вручную или внешними средствами.",
+            "analytics.log-retention.current-days": "Определяет, сколько дней хранить обычные лог-файлы. После истечения срока они могут быть удалены правилами очистки.",
+            "analytics.log-retention.archive-days": "Определяет, сколько дней хранить архивные файлы логов.",
+            "analytics.log-retention.index-days": "Определяет, сколько дней хранить индекс логов и быстрые диагностические фрагменты.",
+            "analytics.log-retention.interval-hours": "Определяет, как часто запускать очистку старых логов.",
+            "analytics.log-retention.delete-batch-size": "Ограничивает количество лог-файлов, которое можно удалить за один запуск очистки. Меньшее значение снижает разовую нагрузку, но очистка больших каталогов займёт больше циклов.",
+            "analytics.log-retention.archive-indexed-only": "Если включено, архивный файл удаляется только после того, как он был проиндексирован.",
+            "analytics.log-retention.safe-mode-enabled": "В безопасном режиме очистка показывает состояние и расчёт, но не удаляет файлы физически."
+        };
+        return help[String(key || "")] || "";
     }
 
     function cleanRuntimeText(value, fallback) {
@@ -822,11 +1083,12 @@
             const body = button.getAttribute("data-runtime-help-body") || "Поясняет назначение параметра и влияние изменения.";
             setRuntimeTooltip(button, body);
         });
-        const overview = refs.modalEl?.querySelector("[data-runtime-overview-help]");
+        const scope = runtimeHelpScope();
+        const overview = scope?.querySelector("[data-runtime-overview-help]");
         if (overview) {
             setRuntimeTooltip(overview, "Здесь настраиваются сроки хранения, пересчёт агрегатов, обслуживание логов и фоновые задачи аналитики.");
         }
-        refs.modalEl?.querySelectorAll("[data-runtime-action-help]").forEach((button) => {
+        scope?.querySelectorAll("[data-runtime-action-help]").forEach((button) => {
             const help = actionHelpPayload(button.getAttribute("data-runtime-action-help") || "");
             setRuntimeTooltip(button, help.body || "Запускает служебную операцию аналитики.");
         });
@@ -882,7 +1144,7 @@
 
     function handleRuntimeTooltipEnter(event) {
         const button = event.target?.closest?.("[data-runtime-tooltip]");
-        if (!button || !refs.modalEl?.contains(button)) {
+        if (!button || !runtimeHelpScope()?.contains(button)) {
             return;
         }
         showRuntimeTooltip(button);
@@ -890,7 +1152,7 @@
 
     function handleRuntimeTooltipLeave(event) {
         const button = event.target?.closest?.("[data-runtime-tooltip]");
-        if (!button || !refs.modalEl?.contains(button)) {
+        if (!button || !runtimeHelpScope()?.contains(button)) {
             return;
         }
         const next = event.relatedTarget;
@@ -1080,7 +1342,7 @@
     function startDiagnosticsPolling() {
         stopDiagnosticsPolling();
         diagnosticsTimer = window.setInterval(() => {
-            if (!refs.modalEl?.classList.contains("show")) {
+            if (!refs.pageRoot && !refs.modalEl?.classList.contains("show")) {
                 return;
             }
             void reloadDiagnostics();
@@ -1208,6 +1470,41 @@
             return;
         }
         refs.saveButton.disabled = !enabled;
+    }
+
+    function setSaveButtonLabel(label) {
+        if (!refs.saveButton) {
+            return;
+        }
+        if (!refs.saveButton.dataset.defaultLabel) {
+            refs.saveButton.dataset.defaultLabel = refs.saveButton.textContent.trim() || "Сохранить";
+        }
+        refs.saveButton.textContent = label || refs.saveButton.dataset.defaultLabel;
+    }
+
+    function showSettingsToast(message, isError = false) {
+        const toast = ensureSettingsToast();
+        toast.textContent = String(message || "");
+        toast.classList.toggle("is-error", Boolean(isError));
+        toast.classList.add("is-visible");
+        window.clearTimeout(toast._analyticsSettingsTimer);
+        toast._analyticsSettingsTimer = window.setTimeout(() => {
+            toast.classList.remove("is-visible");
+        }, 2600);
+    }
+
+    function ensureSettingsToast() {
+        let toast = document.getElementById("analytics-api-toast");
+        if (toast) {
+            return toast;
+        }
+        toast = document.createElement("div");
+        toast.id = "analytics-api-toast";
+        toast.className = "analytics-api-toast";
+        toast.setAttribute("role", "status");
+        toast.setAttribute("aria-live", "polite");
+        document.body.appendChild(toast);
+        return toast;
     }
 
     function escapeHtml(value) {

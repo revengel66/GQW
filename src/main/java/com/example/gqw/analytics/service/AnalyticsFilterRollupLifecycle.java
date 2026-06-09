@@ -8,13 +8,21 @@ import org.springframework.stereotype.Component;
 public class AnalyticsFilterRollupLifecycle {
 
     private final AnalyticsFilterRollupService rollupService;
+    private final AnalyticsScheduledJobsPolicy scheduledJobsPolicy;
 
-    public AnalyticsFilterRollupLifecycle(AnalyticsFilterRollupService rollupService) {
+    public AnalyticsFilterRollupLifecycle(
+        AnalyticsFilterRollupService rollupService,
+        AnalyticsScheduledJobsPolicy scheduledJobsPolicy
+    ) {
         this.rollupService = rollupService;
+        this.scheduledJobsPolicy = scheduledJobsPolicy;
     }
 
     @EventListener(ApplicationReadyEvent.class)
     public void warmUpRollups() {
+        if (!scheduledJobsPolicy.isEnabled()) {
+            return;
+        }
         rollupService.initializeIfNeeded();
     }
 }

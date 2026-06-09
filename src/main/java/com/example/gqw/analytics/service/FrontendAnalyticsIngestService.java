@@ -14,6 +14,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.slf4j.MDC;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -41,15 +42,18 @@ public class FrontendAnalyticsIngestService {
     private final AnalyticsTrackingApi analyticsTrackingApi;
     private final AnalyticsEventRepository analyticsEventRepository;
     private final AnalyticsStageRepository analyticsStageRepository;
+    private final AnalyticsStrictWarningEventService strictWarningEventService;
 
     public FrontendAnalyticsIngestService(
         AnalyticsTrackingApi analyticsTrackingApi,
         AnalyticsEventRepository analyticsEventRepository,
-        AnalyticsStageRepository analyticsStageRepository
+        AnalyticsStageRepository analyticsStageRepository,
+        AnalyticsStrictWarningEventService strictWarningEventService
     ) {
         this.analyticsTrackingApi = analyticsTrackingApi;
         this.analyticsEventRepository = analyticsEventRepository;
         this.analyticsStageRepository = analyticsStageRepository;
+        this.strictWarningEventService = strictWarningEventService;
     }
 
     public void ingest(FrontendAnalyticsIngestRequest request, HttpServletRequest httpRequest) {
@@ -93,7 +97,7 @@ public class FrontendAnalyticsIngestService {
         UUID parentEventUid = resolveParentEventUidWithRetry(payload, code, traceId, requestPath, moduleCode, isError);
         Long parentEventId = findEventIdByUid(parentEventUid);
         if (parentEventUid != null && parentEventId != null) {
-            ingestAsLinkedFrontendStage(parentEventUid, parentEventId, payload, isError, errorMessage);
+            ingestAsLinkedFrontendStage(parentEventUid, parentEventId, payload, isError, errorMessage, requestPath, traceId);
         } else {
             // Frontend technical payloads are stored only as stages/metrics of business events.
             // Do not create standalone FRONTEND_* events.
@@ -106,12 +110,14 @@ public class FrontendAnalyticsIngestService {
         Long parentEventId,
         FrontendAnalyticsIngestRequest.FrontendEventPayload payload,
         boolean isError,
-        String errorMessage
+        String errorMessage,
+        String requestPath,
+        String traceId
     ) {
         Long stageId = null;
         Instant logAt = Instant.now();
         try {
-            stageId = startFrontendStage(parentEventUid, parentEventId);
+            stageId = startFrontendStage(parentEventUid, parentEventId, requestPath, traceId);
             if (stageId == null) {
                 return;
             }
@@ -229,7 +235,7 @@ public class FrontendAnalyticsIngestService {
             .orElse(null);
     }
 
-    private Long startFrontendStage(UUID eventUid, Long eventId) {
+    private Long startFrontendStage(UUID eventUid, Long eventId, String requestPath, String traceId) {
         if (eventUid == null || eventId == null) {
             return null;
         }
@@ -241,6 +247,17 @@ public class FrontendAnalyticsIngestService {
                 return analyticsTrackingApi.startStage(eventUid, FRONTEND_STAGE_CODE, nextOrder);
             } catch (IllegalArgumentException ex) {
                 if (ex.getMessage() != null && ex.getMessage().contains("Unknown stage type")) {
+                    strictWarningEventService.record(
+                        "stage",
+                        FRONTEND_STAGE_CODE,
+                        ex.getMessage(),
+                        FrontendAnalyticsIngestService.class.getSimpleName(),
+                        "startFrontendStage",
+                        requestPath,
+                        traceId,
+                        String.valueOf(eventUid),
+                        null
+                    );
                     return null;
                 }
                 throw ex;
@@ -265,6 +282,17 @@ public class FrontendAnalyticsIngestService {
                 analyticsTrackingApi.recordMetricNum(stageId, code, value, null);
             } catch (RuntimeException ignored) {
                 // Unknown metric type or invalid value must not break ingestion.
+                strictWarningEventService.record(
+                    "metric",
+                    code,
+                    "Unknown metric type or invalid value",
+                    FrontendAnalyticsIngestService.class.getSimpleName(),
+                    "recordMetricsNum",
+                    null,
+                    null,
+                    String.valueOf(findEventUidByStageId(stageId)),
+                    stageId
+                );
             }
         }
     }
@@ -283,8 +311,30 @@ public class FrontendAnalyticsIngestService {
                 analyticsTrackingApi.recordMetricText(stageId, code, value, null);
             } catch (RuntimeException ignored) {
                 // Unknown metric type or invalid value must not break ingestion.
+                strictWarningEventService.record(
+                    "metric",
+                    code,
+                    "Unknown metric type or invalid value",
+                    FrontendAnalyticsIngestService.class.getSimpleName(),
+                    "recordMetricsText",
+                    null,
+                    null,
+                    String.valueOf(findEventUidByStageId(stageId)),
+                    stageId
+                );
             }
         }
+    }
+
+    private UUID findEventUidByStageId(Long stageId) {
+        if (stageId == null) {
+            return null;
+        }
+        return analyticsStageRepository.findById(stageId)
+            .map(stage -> analyticsEventRepository.findById(stage.getEventId()))
+            .flatMap(java.util.function.Function.identity())
+            .map(AnalyticsEvent::getEventUid)
+            .orElse(null);
     }
 
     private String normalizeCode(String value) {

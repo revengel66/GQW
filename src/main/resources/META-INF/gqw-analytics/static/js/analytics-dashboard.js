@@ -90,6 +90,12 @@
         submitUniversalFilters: null,
         preserveChartUiStateDuringMainSubmit: false,
         globalLoadingDepth: 0,
+        analyticsApiLoadingDepth: 0,
+        analyticsApiLoadingTimer: null,
+        analyticsApiLongLoadingShown: false,
+        analyticsApiHadError: false,
+        analyticsApiSuccessPending: false,
+        analyticsApiToastTimer: null,
         panelLoadingDepthByElement: new WeakMap(),
         sectionLocalLoadingDepthByElement: new WeakMap(),
         mainFiltersSubmitting: false,
@@ -183,12 +189,14 @@
         eventsSize: 15,
         eventsHasMore: false,
         eventsRequestId: 0,
+        eventsAbortController: null,
         eventsLoading: false,
         eventsForcedEventCodes: null,
         eventsSortBy: "startedAt",
         eventsSortDir: "desc",
         eventDetailsRequestId: 0,
         systemChartRequestId: 0,
+        systemChartAbortController: null,
         systemMetricSelectionBeforeSingle: [],
         systemMetricSingleForced: false,
         systemEventsSortBy: "startedAt",
@@ -3482,12 +3490,13 @@
             } catch (error) {
                 console.error("Event-type options bootstrap failed, continue", error);
             }
-            await syncSystemChartFiltersFromMain({force: true, refreshOptions: true});
-            await reloadAll();
             if (state.currentDashboardTab === "system") {
-                await loadSystemEventsChart();
+                await syncSystemChartFiltersFromMain({force: true, refreshOptions: true});
             }
-            await loadCompare();
+            await reloadAll();
+            if (state.currentDashboardTab === "compare") {
+                await loadCompare();
+            }
             applyUniversalChartZoom("chart-universal-timeline", refs.universalTimelineZoomX?.value, refs.universalTimelineZoomY?.value);
             applyUniversalChartZoom("chart-universal-stages", refs.universalStagesZoomX?.value, refs.universalStagesZoomY?.value);
             applyUniversalChartZoom("chart-universal-event-kpi", refs.universalEventKpiZoomX?.value, refs.universalEventKpiZoomY?.value);
@@ -3895,6 +3904,22 @@
         if (normalized === "compare") {
             void loadCompare();
         }
+        if (shouldPushState) {
+            if (normalized === "overview") {
+                void reloadActiveDashboardTab(nextMainReloadRequestId())
+                    .catch((error) => console.error("Overview tab lazy load failed", error));
+            } else if (normalized === "universal") {
+                void withUniversalChartLoaders(() => loadUniversal())
+                    .catch((error) => console.error("Diagnostics tab lazy load failed", error));
+            } else if (normalized === "metrics") {
+                void withStageMetricLoaders("all", () => loadStageMetrics())
+                    .catch((error) => console.error("Metrics tab lazy load failed", error));
+            } else if (normalized === "raw") {
+                state.eventsPage = 0;
+                void loadEvents(true)
+                    .catch((error) => console.error("Events tab lazy load failed", error));
+            }
+        }
 
         if (!shouldPushState) {
             return;
@@ -3960,7 +3985,8 @@
             syncStageTextQuickRangeFromMain();
             syncStageTextRangesFromMain(true);
             syncEventsRangeFromMain(true);
-            // Critical path for perceived responsiveness: show main charts first.
+            await reloadActiveDashboardTab(mainReloadRequestId);
+            return;
             const criticalResults = await Promise.allSettled([
                 loadOverview(mainReloadRequestId),
                 loadStages(mainReloadRequestId)
@@ -3991,6 +4017,47 @@
             void withStageMetricLoaders("all", () => loadStageMetrics())
                 .catch((error) => console.error("Фоновое обновление метрик не удалось", error));
             void runPanelBackgroundRefresh(refs.eventsPanel, () => loadEvents(true), "Events background refresh failed");
+        }
+    }
+
+    async function reloadActiveDashboardTab(mainReloadRequestId) {
+        const tab = state.currentDashboardTab || "overview";
+        if (tab === "universal") {
+            await withUniversalChartLoaders(() => loadUniversal(mainReloadRequestId));
+            return;
+        }
+        if (tab === "metrics") {
+            await withStageMetricLoaders("all", () => loadStageMetrics());
+            return;
+        }
+        if (tab === "raw") {
+            state.eventsPage = 0;
+            await loadEvents(true);
+            return;
+        }
+        if (tab === "system") {
+            state.eventsPage = 0;
+            await syncSystemChartFiltersFromMain({refreshOptions: true});
+            await Promise.all([loadSystemEventsChart(), loadEvents(true)]);
+            return;
+        }
+        if (tab === "compare") {
+            await loadCompare();
+            return;
+        }
+        const criticalResults = await Promise.allSettled([
+            loadOverview(mainReloadRequestId),
+            loadStages(mainReloadRequestId)
+        ]);
+        criticalResults.forEach((result, index) => {
+            if (result.status === "rejected") {
+                const label = index === 0 ? "loadOverview" : "loadStages";
+                console.error(`${label} failed`, result.reason);
+            }
+        });
+        const firstRejected = criticalResults.find((result) => result.status === "rejected");
+        if (firstRejected && firstRejected.reason) {
+            throw firstRejected.reason;
         }
     }
 
@@ -11606,6 +11673,9 @@
             return;
         }
         const requestId = ++state.systemChartRequestId;
+        state.systemChartAbortController?.abort?.();
+        const abortController = new AbortController();
+        state.systemChartAbortController = abortController;
         if (refs.systemChartStatus) {
             refs.systemChartStatus.textContent = "Загрузка...";
         }
@@ -11621,10 +11691,10 @@
             const durationMs = range.toDate.getTime() - range.fromDate.getTime();
             const beforeTo = new Date(range.fromDate.getTime());
             const beforeFrom = new Date(beforeTo.getTime() - durationMs);
-            const currentRequest = fetchJson(`${api("/universal")}?${params.toString()}`);
+            const currentRequest = fetchJson(`${api("/universal")}?${params.toString()}`, {signal: abortController.signal});
             const baselineRequest = compareMode === "off"
                 ? Promise.resolve(null)
-                : fetchJson(`${api("/universal")}?${systemChartParams(beforeFrom, beforeTo).toString()}`);
+                : fetchJson(`${api("/universal")}?${systemChartParams(beforeFrom, beforeTo).toString()}`, {signal: abortController.signal});
             const [current, baseline] = await Promise.all([currentRequest, baselineRequest]);
             if (requestId !== state.systemChartRequestId) {
                 return;
@@ -11649,6 +11719,9 @@
                     : "За выбранный период служебных событий нет.";
             }
         } catch (error) {
+            if (error?.name === "AbortError") {
+                return;
+            }
             if (requestId !== state.systemChartRequestId) {
                 return;
             }
@@ -11658,6 +11731,10 @@
                     : "Не удалось загрузить график.";
             }
             console.error("System events chart failed", error);
+        } finally {
+            if (requestId === state.systemChartRequestId && state.systemChartAbortController === abortController) {
+                state.systemChartAbortController = null;
+            }
         }
     }
 
@@ -11788,6 +11865,9 @@
         }
         const requestId = ++state.eventsRequestId;
         const requestSystemOnly = !!state.eventsSystemOnly;
+        state.eventsAbortController?.abort?.();
+        const abortController = new AbortController();
+        state.eventsAbortController = abortController;
         state.eventsLoading = true;
         if (refs.eventsLoadMore) {
             refs.eventsLoadMore.disabled = true;
@@ -11889,7 +11969,7 @@
         }
 
         try {
-            const data = await fetchJson(`${api("/events")}?${params.toString()}`);
+            const data = await fetchJson(`${api("/events")}?${params.toString()}`, {signal: abortController.signal});
             if (requestId !== state.eventsRequestId || requestSystemOnly !== !!state.eventsSystemOnly) {
                 return;
             }
@@ -11929,6 +12009,9 @@
                 refs.eventsTableBody.insertAdjacentHTML("beforeend", rowsHtml);
             }
         } catch (error) {
+            if (error?.name === "AbortError") {
+                return;
+            }
             if (requestId !== state.eventsRequestId || requestSystemOnly !== !!state.eventsSystemOnly) {
                 return;
             }
@@ -11940,6 +12023,9 @@
         } finally {
             if (requestId === state.eventsRequestId) {
                 state.eventsLoading = false;
+                if (state.eventsAbortController === abortController) {
+                    state.eventsAbortController = null;
+                }
                 if (refs.eventsLoadMore) {
                     refs.eventsLoadMore.disabled = !state.eventsHasMore;
                 }
@@ -12158,7 +12244,7 @@
             : (code === "ARCHIVE_INDEX_ONLY" ? "text-bg-warning" : "text-bg-secondary");
         const title = code === "ARCHIVE_AVAILABLE"
             ? "Логи найдены в архиве"
-            : (code === "ARCHIVE_INDEX_ONLY" ? "Доступна только сводка индекса" : "Логи не найдены");
+            : (code === "ARCHIVE_INDEX_ONLY" ? "Полный архивный лог недоступен" : "Логи не найдены");
         const excerpts = Array.isArray(status?.excerpts) ? status.excerpts : [];
         const excerptsHtml = excerpts.length ? `
             <div class="mt-2">
@@ -12171,6 +12257,11 @@
                         </div>
                     `).join("")}
                 </div>
+            </div>
+        ` : "";
+        const archiveIndexOnlyDetails = code === "ARCHIVE_INDEX_ONLY" ? `
+            <div class="small mt-2 analytics-trace-log-status-note">
+                Полные строки архивного файла сейчас нельзя показать. Отображается сохранённая диагностическая сводка из индекса: имя файла, количество найденных строк и важные фрагменты WARN/ERROR/SLOW/FATAL, если они были сохранены.
             </div>
         ` : "";
         const reasons = code === "NOT_FOUND" ? `
@@ -12197,6 +12288,7 @@
                     </div>
                 ` : ""}
                 ${summary ? `<div class="small mt-1"><b>Сводка:</b> ${escapeHtml(summary)}</div>` : ""}
+                ${archiveIndexOnlyDetails}
                 ${excerptsHtml}
                 ${reasons}
             </div>
@@ -14309,6 +14401,8 @@
         const signal = options?.signal;
         const perfLabel = String(options?.perfLabel || "").trim();
         const perfStarted = typeof performance !== "undefined" ? performance.now() : Date.now();
+        const loadingToken = beginAnalyticsApiLoading();
+        try {
         const response = await fetch(url, {
             headers: {
                 "Accept": "application/json",
@@ -14376,7 +14470,100 @@
                 url: String(url || "").replace(window.location.origin, "")
             });
         }
+        notifyPartialAnalyticsPayload(payload);
+        state.analyticsApiSuccessPending = true;
         return payload;
+        } catch (error) {
+            if (error?.name !== "AbortError") {
+                state.analyticsApiHadError = true;
+            }
+            throw error;
+        } finally {
+            endAnalyticsApiLoading(loadingToken);
+        }
+    }
+
+    function beginAnalyticsApiLoading() {
+        const previousDepth = Math.max(0, Number(state.analyticsApiLoadingDepth || 0));
+        state.analyticsApiLoadingDepth = previousDepth + 1;
+        if (previousDepth === 0) {
+            state.analyticsApiHadError = false;
+            state.analyticsApiSuccessPending = false;
+            state.analyticsApiLongLoadingShown = false;
+            clearTimeout(state.analyticsApiLoadingTimer);
+            state.analyticsApiLoadingTimer = setTimeout(() => {
+                state.analyticsApiLongLoadingShown = true;
+                showAnalyticsApiToast("Загрузка аналитики, выполняется обработка большого объёма данных...", false);
+            }, 2000);
+        }
+        return {};
+    }
+
+    function endAnalyticsApiLoading(_token) {
+        state.analyticsApiLoadingDepth = Math.max(0, Number(state.analyticsApiLoadingDepth || 0) - 1);
+        if (state.analyticsApiLoadingDepth > 0) {
+            return;
+        }
+        clearTimeout(state.analyticsApiLoadingTimer);
+        state.analyticsApiLoadingTimer = null;
+        if (state.analyticsApiHadError) {
+            showAnalyticsApiToast("Не удалось загрузить данные", true);
+        } else if (state.analyticsApiSuccessPending) {
+            showAnalyticsApiToast("Данные обновлены", false);
+        }
+    }
+
+    function showAnalyticsApiToast(message, isError) {
+        const toast = ensureAnalyticsApiToast();
+        toast.classList.toggle("is-error", !!isError);
+        toast.textContent = message;
+        toast.classList.add("is-visible");
+        clearTimeout(state.analyticsApiToastTimer);
+        state.analyticsApiToastTimer = setTimeout(() => {
+            toast.classList.remove("is-visible");
+        }, isError ? 4200 : 2600);
+    }
+
+    function ensureAnalyticsApiToast() {
+        let toast = document.getElementById("analytics-api-toast");
+        if (toast) {
+            return toast;
+        }
+        toast = document.createElement("div");
+        toast.id = "analytics-api-toast";
+        toast.className = "analytics-api-toast";
+        toast.setAttribute("role", "status");
+        toast.setAttribute("aria-live", "polite");
+        document.body.appendChild(toast);
+        return toast;
+    }
+
+    function setAnalyticsApiControlsDisabled(disabled) {
+        void disabled;
+    }
+
+    function notifyPartialAnalyticsPayload(payload) {
+        const warning = partialAnalyticsWarning(payload);
+        if (!warning) {
+            return;
+        }
+        console.debug("[Analytics] partial read-side payload", warning);
+    }
+
+    function partialAnalyticsWarning(payload) {
+        if (!payload || typeof payload !== "object") {
+            return "";
+        }
+        if (payload.partial && payload.warning) {
+            return String(payload.warning);
+        }
+        if (payload.before?.partial && payload.before?.warning) {
+            return String(payload.before.warning);
+        }
+        if (payload.after?.partial && payload.after?.warning) {
+            return String(payload.after.warning);
+        }
+        return "";
     }
 
     function redirectToAnalyticsLogin() {

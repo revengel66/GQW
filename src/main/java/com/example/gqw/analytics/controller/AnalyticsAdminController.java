@@ -131,6 +131,20 @@ public class AnalyticsAdminController {
         return "analytics/admin-dashboard";
     }
 
+    @GetMapping("/analytics-admin/settings")
+    public String settings(
+        Model model,
+        HttpServletRequest request
+    ) {
+        model.addAttribute(
+            "analyticsAdminUsername",
+            request.getSession(true).getAttribute(AnalyticsAdminAuthService.SESSION_KEY_USERNAME)
+        );
+        model.addAttribute("analyticsActiveTab", "settings");
+        model.addAttribute("analyticsApiBase", "/analytics-admin/api");
+        return "analytics/admin-settings";
+    }
+
     @GetMapping("/analytics-admin/dictionaries")
     public String dictionaries(
         Model model,

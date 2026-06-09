@@ -28,6 +28,7 @@ public class AnalyticsEventService {
     private final AnalyticsCodeResolverService codeResolverService;
     private final AnalyticsSystemEventClassifier systemEventClassifier;
     private final AnalyticsLoggingPolicy loggingPolicy;
+    private final AnalyticsStrictWarningEventService strictWarningEventService;
 
     public AnalyticsEventService(
         AnalyticsEventRepository eventRepository,
@@ -35,7 +36,8 @@ public class AnalyticsEventService {
         ModuleTypeRepository moduleTypeRepository,
         AnalyticsCodeResolverService codeResolverService,
         AnalyticsSystemEventClassifier systemEventClassifier,
-        AnalyticsLoggingPolicy loggingPolicy
+        AnalyticsLoggingPolicy loggingPolicy,
+        AnalyticsStrictWarningEventService strictWarningEventService
     ) {
         this.eventRepository = eventRepository;
         this.eventTypeRepository = eventTypeRepository;
@@ -43,6 +45,7 @@ public class AnalyticsEventService {
         this.codeResolverService = codeResolverService;
         this.systemEventClassifier = systemEventClassifier;
         this.loggingPolicy = loggingPolicy;
+        this.strictWarningEventService = strictWarningEventService;
     }
 
     @Transactional(transactionManager = "analyticsTransactionManager", propagation = Propagation.REQUIRES_NEW)
@@ -54,6 +57,33 @@ public class AnalyticsEventService {
         String httpMethod,
         String traceId
     ) {
+        return createEvent(UUID.randomUUID(), eventTypeCode, userId, sessionId, requestPath, httpMethod, traceId);
+    }
+
+    @Transactional(transactionManager = "analyticsTransactionManager", propagation = Propagation.REQUIRES_NEW)
+    public AnalyticsEvent createEvent(
+        UUID eventUid,
+        String eventTypeCode,
+        Long userId,
+        String sessionId,
+        String requestPath,
+        String httpMethod,
+        String traceId
+    ) {
+        return createEvent(eventUid, eventTypeCode, userId, sessionId, requestPath, httpMethod, traceId, Instant.now());
+    }
+
+    @Transactional(transactionManager = "analyticsTransactionManager", propagation = Propagation.REQUIRES_NEW)
+    public AnalyticsEvent createEvent(
+        UUID eventUid,
+        String eventTypeCode,
+        Long userId,
+        String sessionId,
+        String requestPath,
+        String httpMethod,
+        String traceId,
+        Instant startedAt
+    ) {
         String resolvedCode = codeResolverService.resolveEventTypeCode(eventTypeCode);
         var type = eventTypeRepository.findById(resolvedCode)
             .orElseThrow(() -> new IllegalArgumentException("Unknown event type: " + resolvedCode));
@@ -64,7 +94,7 @@ public class AnalyticsEventService {
         alignEventTypeModuleIfNeeded(type, resolvedCode);
 
         AnalyticsEvent event = new AnalyticsEvent();
-        event.setEventUid(UUID.randomUUID());
+        event.setEventUid(eventUid == null ? UUID.randomUUID() : eventUid);
         event.setEventTypeCode(resolvedCode);
         String moduleCode = normalizeModuleCode(type.getModuleCode());
         validateModuleType(resolvedCode, moduleCode);
@@ -74,7 +104,7 @@ public class AnalyticsEventService {
         event.setRequestPath(requestPath);
         event.setHttpMethod(httpMethod);
         event.setTraceId(traceId);
-        event.setStartedAt(Instant.now());
+        event.setStartedAt(startedAt == null ? Instant.now() : startedAt);
         event.setIsError(false);
         return eventRepository.save(event);
     }
@@ -96,14 +126,23 @@ public class AnalyticsEventService {
     }
 
     private void logDictionaryMismatch(String moduleCode, String eventTypeCode, String reason) {
-        if (!loggingPolicy.isStrictWarningsEnabled()) {
-            return;
+        if (loggingPolicy.isStrictWarningsEnabled()) {
+            log.warn(
+                "Analytics dictionary mismatch: module={} eventType={} reason={}",
+                moduleCode,
+                eventTypeCode,
+                reason
+            );
         }
-        log.warn(
-            "Analytics dictionary mismatch: module={} eventType={} reason={}",
+        strictWarningEventService.record(
+            "module",
             moduleCode,
-            eventTypeCode,
-            reason
+            reason,
+            AnalyticsEventService.class.getSimpleName(),
+            "validateModuleType",
+            null,
+            null,
+            null
         );
     }
 
@@ -235,25 +274,35 @@ public class AnalyticsEventService {
 
     @Transactional(transactionManager = "analyticsTransactionManager", propagation = Propagation.REQUIRES_NEW)
     public void finishEventSuccess(UUID eventUid, Integer statusCode) {
+        finishEventSuccessAt(eventUid, statusCode, Instant.now());
+    }
+
+    @Transactional(transactionManager = "analyticsTransactionManager", propagation = Propagation.REQUIRES_NEW)
+    public void finishEventSuccessAt(UUID eventUid, Integer statusCode, Instant endedAt) {
         AnalyticsEvent event = findByEventUid(eventUid);
-        Instant endedAt = Instant.now();
-        event.setEndedAt(endedAt);
+        Instant finishedAt = endedAt == null ? Instant.now() : endedAt;
+        event.setEndedAt(finishedAt);
         event.setStatusCode(statusCode);
         event.setIsError(false);
-        event.setDurationMs((int) Duration.between(event.getStartedAt(), endedAt).toMillis());
+        event.setDurationMs((int) Duration.between(event.getStartedAt(), finishedAt).toMillis());
         markStoredEventTypeIfNeeded(event);
         eventRepository.save(event);
     }
 
     @Transactional(transactionManager = "analyticsTransactionManager", propagation = Propagation.REQUIRES_NEW)
     public void finishEventError(UUID eventUid, Integer statusCode, String errorMessage) {
+        finishEventErrorAt(eventUid, statusCode, errorMessage, Instant.now());
+    }
+
+    @Transactional(transactionManager = "analyticsTransactionManager", propagation = Propagation.REQUIRES_NEW)
+    public void finishEventErrorAt(UUID eventUid, Integer statusCode, String errorMessage, Instant endedAt) {
         AnalyticsEvent event = findByEventUid(eventUid);
-        Instant endedAt = Instant.now();
-        event.setEndedAt(endedAt);
+        Instant finishedAt = endedAt == null ? Instant.now() : endedAt;
+        event.setEndedAt(finishedAt);
         event.setStatusCode(statusCode);
         event.setIsError(true);
         event.setErrorMessage(errorMessage);
-        event.setDurationMs((int) Duration.between(event.getStartedAt(), endedAt).toMillis());
+        event.setDurationMs((int) Duration.between(event.getStartedAt(), finishedAt).toMillis());
         markStoredEventTypeIfNeeded(event);
         eventRepository.save(event);
         log.warn(

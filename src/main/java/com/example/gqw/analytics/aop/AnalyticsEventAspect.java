@@ -4,6 +4,7 @@ import com.example.gqw.analytics.service.AnalyticsTrackingApi;
 import com.example.gqw.analytics.service.AnalyticsHttpErrorTrackingService;
 import com.example.gqw.analytics.service.AnalyticsInstrumentationPolicy;
 import com.example.gqw.analytics.service.AnalyticsLoggingPolicy;
+import com.example.gqw.analytics.service.AnalyticsStrictWarningEventService;
 import com.example.gqw.analytics.service.ErrorClassClassifier;
 import com.example.gqw.analytics.entity.EventType;
 import com.example.gqw.analytics.entity.MetricValueKind;
@@ -62,6 +63,7 @@ public class AnalyticsEventAspect {
     private final StageMetricTypeRepository stageMetricTypeRepository;
     private final AnalyticsInstrumentationPolicy instrumentationPolicy;
     private final AnalyticsLoggingPolicy loggingPolicy;
+    private final AnalyticsStrictWarningEventService strictWarningEventService;
     private final ExpressionParser expressionParser = new SpelExpressionParser();
     private final ParameterNameDiscoverer parameterNameDiscoverer = new DefaultParameterNameDiscoverer();
 
@@ -70,13 +72,15 @@ public class AnalyticsEventAspect {
         CurrentUserService currentUserService,
         StageMetricTypeRepository stageMetricTypeRepository,
         AnalyticsInstrumentationPolicy instrumentationPolicy,
-        AnalyticsLoggingPolicy loggingPolicy
+        AnalyticsLoggingPolicy loggingPolicy,
+        AnalyticsStrictWarningEventService strictWarningEventService
     ) {
         this.analyticsTrackingApi = analyticsTrackingApi;
         this.currentUserService = currentUserService;
         this.stageMetricTypeRepository = stageMetricTypeRepository;
         this.instrumentationPolicy = instrumentationPolicy;
         this.loggingPolicy = loggingPolicy;
+        this.strictWarningEventService = strictWarningEventService;
     }
 
     @Around("@annotation(TrackAnalyticsEvent)")
@@ -142,6 +146,17 @@ public class AnalyticsEventAspect {
                     exception
                 );
             }
+            strictWarningEventService.record(
+                "event",
+                eventCode,
+                exception.getMessage(),
+                method.getDeclaringClass().getSimpleName(),
+                method.getName(),
+                request.getRequestURI(),
+                resolveTraceId(request),
+                null,
+                null
+            );
             AnalyticsEventContextHolder.clear();
             MDC.remove(ANALYTICS_EVENT_UID_MDC_KEY);
             restoreMdc(APP_MODULE_MDC_KEY, previousAppModule);
@@ -264,6 +279,10 @@ public class AnalyticsEventAspect {
             logMetricWarning(metric, method, request, stageId, "Metric code is blank", null);
             return;
         }
+        if (analyticsTrackingApi.isSnapshotEnabled()) {
+            recordMetricForSnapshot(metric, method, args, request, result, throwable, stageId, code);
+            return;
+        }
         StageMetricType type = stageMetricTypeRepository.findById(code).orElse(null);
         if (type == null) {
             logMetricWarning(metric, method, request, stageId, "Unknown metric type: " + code, null);
@@ -313,6 +332,41 @@ public class AnalyticsEventAspect {
         } catch (RuntimeException exception) {
             logMetricWarning(metric, method, request, stageId, exception.getMessage(), exception);
         }
+    }
+
+    private void recordMetricForSnapshot(
+        TrackAnalyticsMetric metric,
+        Method method,
+        Object[] args,
+        HttpServletRequest request,
+        Object result,
+        Throwable throwable,
+        Long stageId,
+        String code
+    ) {
+        MetricExpressionResult expressionResult = evaluateMetricExpression(method, args, request, result, throwable, metric.value());
+        if (expressionResult.error() != null) {
+            logMetricWarning(
+                metric,
+                method,
+                request,
+                stageId,
+                "Metric expression failed: " + metric.value(),
+                expressionResult.error()
+            );
+            return;
+        }
+        Object value = expressionResult.value();
+        if (value == null || (value instanceof CharSequence text && text.toString().isBlank())) {
+            logMetricWarning(metric, method, request, stageId, "Metric expression returned null/blank value", null);
+            return;
+        }
+        BigDecimal number = toBigDecimal(value);
+        if (number != null) {
+            analyticsTrackingApi.recordMetricNum(stageId, code, number, normalizeMetricUnit(metric.unit()));
+            return;
+        }
+        analyticsTrackingApi.recordMetricText(stageId, code, String.valueOf(value), normalizeMetricUnit(metric.unit()));
     }
 
     private void recordAttributes(
@@ -418,6 +472,17 @@ public class AnalyticsEventAspect {
                     exception
                 );
             }
+            AnalyticsEventContext context = AnalyticsEventContextHolder.get();
+            strictWarningEventService.record(
+                "attribute",
+                code,
+                exception.getMessage(),
+                AnalyticsEventAspect.class.getSimpleName(),
+                "addAttributeSafe",
+                null,
+                context == null ? null : String.valueOf(context.eventUid()),
+                null
+            );
         }
     }
 
@@ -471,6 +536,17 @@ public class AnalyticsEventAspect {
                     exception
                 );
             }
+            AnalyticsEventContext context = AnalyticsEventContextHolder.get();
+            strictWarningEventService.record(
+                "metric",
+                metricTypeCode,
+                exception.getMessage(),
+                AnalyticsEventAspect.class.getSimpleName(),
+                "safeRecordMetricNum",
+                null,
+                context == null ? null : String.valueOf(context.eventUid()),
+                stageId
+            );
         }
     }
 
@@ -487,6 +563,17 @@ public class AnalyticsEventAspect {
                     exception
                 );
             }
+            AnalyticsEventContext context = AnalyticsEventContextHolder.get();
+            strictWarningEventService.record(
+                "metric",
+                metricTypeCode,
+                exception.getMessage(),
+                AnalyticsEventAspect.class.getSimpleName(),
+                "safeRecordMetricText",
+                null,
+                context == null ? null : String.valueOf(context.eventUid()),
+                stageId
+            );
         }
     }
 
@@ -618,42 +705,52 @@ public class AnalyticsEventAspect {
         String reason,
         RuntimeException exception
     ) {
-        if (!loggingPolicy.isStrictWarningsEnabled()) {
-            return;
-        }
         String traceId = request == null ? "" : resolveTraceId(request);
         String path = request == null ? "" : request.getRequestURI();
         AnalyticsEventContext context = AnalyticsEventContextHolder.get();
         String eventUid = context == null ? "" : String.valueOf(context.eventUid());
-        if (exception == null) {
-            log.warn(
-                "Analytics metric skipped: code={}, expression={}, class={}, method={}, path={}, traceId={}, eventUid={}, stageId={}, required={}, reason={}",
-                metric.code(),
-                metric.value(),
-                method.getDeclaringClass().getSimpleName(),
-                method.getName(),
-                path,
-                traceId,
-                eventUid,
-                stageId,
-                metric.required(),
-                reason
-            );
-            return;
+        if (loggingPolicy.isStrictWarningsEnabled()) {
+            if (exception == null) {
+                log.warn(
+                    "Analytics metric skipped: code={}, expression={}, class={}, method={}, path={}, traceId={}, eventUid={}, stageId={}, required={}, reason={}",
+                    metric.code(),
+                    metric.value(),
+                    method.getDeclaringClass().getSimpleName(),
+                    method.getName(),
+                    path,
+                    traceId,
+                    eventUid,
+                    stageId,
+                    metric.required(),
+                    reason
+                );
+            } else {
+                log.warn(
+                    "Analytics metric skipped: code={}, expression={}, class={}, method={}, path={}, traceId={}, eventUid={}, stageId={}, required={}, reason={}",
+                    metric.code(),
+                    metric.value(),
+                    method.getDeclaringClass().getSimpleName(),
+                    method.getName(),
+                    path,
+                    traceId,
+                    eventUid,
+                    stageId,
+                    metric.required(),
+                    reason,
+                    exception
+                );
+            }
         }
-        log.warn(
-            "Analytics metric skipped: code={}, expression={}, class={}, method={}, path={}, traceId={}, eventUid={}, stageId={}, required={}, reason={}",
+        strictWarningEventService.record(
+            "metric",
             metric.code(),
-            metric.value(),
+            reason,
             method.getDeclaringClass().getSimpleName(),
             method.getName(),
             path,
             traceId,
             eventUid,
-            stageId,
-            metric.required(),
-            reason,
-            exception
+            stageId
         );
     }
 
@@ -664,38 +761,48 @@ public class AnalyticsEventAspect {
         String reason,
         RuntimeException exception
     ) {
-        if (!loggingPolicy.isStrictWarningsEnabled()) {
-            return;
-        }
         String traceId = request == null ? "" : resolveTraceId(request);
         String path = request == null ? "" : request.getRequestURI();
         AnalyticsEventContext context = AnalyticsEventContextHolder.get();
         String eventUid = context == null ? "" : String.valueOf(context.eventUid());
-        if (exception == null) {
-            log.warn(
-                "Analytics attribute skipped: code={}, expression={}, class={}, method={}, path={}, traceId={}, eventUid={}, reason={}",
-                attribute.code(),
-                attribute.value(),
-                method.getDeclaringClass().getSimpleName(),
-                method.getName(),
-                path,
-                traceId,
-                eventUid,
-                reason
-            );
-            return;
+        if (loggingPolicy.isStrictWarningsEnabled()) {
+            if (exception == null) {
+                log.warn(
+                    "Analytics attribute skipped: code={}, expression={}, class={}, method={}, path={}, traceId={}, eventUid={}, reason={}",
+                    attribute.code(),
+                    attribute.value(),
+                    method.getDeclaringClass().getSimpleName(),
+                    method.getName(),
+                    path,
+                    traceId,
+                    eventUid,
+                    reason
+                );
+            } else {
+                log.warn(
+                    "Analytics attribute skipped: code={}, expression={}, class={}, method={}, path={}, traceId={}, eventUid={}, reason={}",
+                    attribute.code(),
+                    attribute.value(),
+                    method.getDeclaringClass().getSimpleName(),
+                    method.getName(),
+                    path,
+                    traceId,
+                    eventUid,
+                    reason,
+                    exception
+                );
+            }
         }
-        log.warn(
-            "Analytics attribute skipped: code={}, expression={}, class={}, method={}, path={}, traceId={}, eventUid={}, reason={}",
+        strictWarningEventService.record(
+            "attribute",
             attribute.code(),
-            attribute.value(),
+            reason,
             method.getDeclaringClass().getSimpleName(),
             method.getName(),
             path,
             traceId,
             eventUid,
-            reason,
-            exception
+            null
         );
     }
 

@@ -36,6 +36,7 @@ public class AnalyticsStageMetricRollupService {
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
     private final AnalyticsRuntimeSettingsService runtimeSettingsService;
+    private final AnalyticsScheduledJobsPolicy scheduledJobsPolicy;
     private final Clock clock;
     private final boolean defaultEnabled;
     private final int defaultOverlapMinutes;
@@ -47,6 +48,7 @@ public class AnalyticsStageMetricRollupService {
     public AnalyticsStageMetricRollupService(
         @Qualifier("analyticsNamedParameterJdbcTemplate") NamedParameterJdbcTemplate jdbcTemplate,
         AnalyticsRuntimeSettingsService runtimeSettingsService,
+        AnalyticsScheduledJobsPolicy scheduledJobsPolicy,
         @Value("${app.analytics.stage-metric-rollup.enabled:true}") boolean enabled,
         @Value("${app.analytics.stage-metric-rollup.refresh-interval-minutes:5}") int refreshIntervalMinutes,
         @Value("${app.analytics.stage-metric-rollup.overlap-minutes:10}") int overlapMinutes,
@@ -54,6 +56,7 @@ public class AnalyticsStageMetricRollupService {
     ) {
         this.jdbcTemplate = jdbcTemplate;
         this.runtimeSettingsService = runtimeSettingsService;
+        this.scheduledJobsPolicy = scheduledJobsPolicy;
         this.clock = Clock.systemUTC();
         this.defaultEnabled = enabled;
         this.defaultRefreshIntervalMinutes = Math.max(1, refreshIntervalMinutes);
@@ -76,6 +79,9 @@ public class AnalyticsStageMetricRollupService {
     @Scheduled(cron = "0 * * * * *")
     @Transactional(transactionManager = "analyticsTransactionManager")
     public void scheduledRefresh() {
+        if (!scheduledJobsPolicy.isEnabled()) {
+            return;
+        }
         int intervalMinutes = runtimeSettingsService.getInt(
             AnalyticsRuntimeSettingsService.KEY_STAGE_METRIC_ROLLUP_REFRESH_INTERVAL_MINUTES,
             defaultRefreshIntervalMinutes,

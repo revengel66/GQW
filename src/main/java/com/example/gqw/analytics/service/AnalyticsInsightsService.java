@@ -44,6 +44,7 @@ import com.example.gqw.analytics.web.dto.AnalyticsApiDto.UniversalEventStageBrea
 import com.example.gqw.analytics.web.dto.AnalyticsApiDto.UniversalResponse;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -60,7 +61,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -69,9 +69,13 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
 public class AnalyticsInsightsService {
     private static final Logger log = LoggerFactory.getLogger(AnalyticsInsightsService.class);
-    private static final int DEFAULT_EVENT_PAGE_SIZE = 20;
+    private static final int DEFAULT_EVENT_PAGE_SIZE = 50;
     private static final int MAX_EVENT_PAGE_SIZE = 100;
     private static final int IN_CLAUSE_BATCH_SIZE = 2000;
+    private static final int FILTER_OPTION_LIMIT = 200;
+    private static final Duration MAX_RAW_READ_RANGE = Duration.ofHours(24);
+    private static final String RAW_READ_WARNING =
+        "Отображается ограниченная выборка: агрегаты для выбранного среза недоступны, raw-данные ограничены последними 24 часами выбранного периода.";
 
     private final AnalyticsEventRepository eventRepository;
     private final AnalyticsStageRepository stageRepository;
@@ -82,7 +86,7 @@ public class AnalyticsInsightsService {
     private final StageTypeRepository stageTypeRepository;
     private final StageMetricTypeRepository stageMetricTypeRepository;
     private final EventAttributeTypeRepository eventAttributeTypeRepository;
-    private final AnalyticsLogViewService analyticsLogViewService;
+    private final AnalyticsTraceLogLookupService traceLogLookupService;
     private final AnalyticsFilterRollupService filterRollupService;
     private final AnalyticsTimeRollupService timeRollupService;
     private final AnalyticsStageMetricRollupService stageMetricRollupService;
@@ -97,7 +101,7 @@ public class AnalyticsInsightsService {
         StageTypeRepository stageTypeRepository,
         StageMetricTypeRepository stageMetricTypeRepository,
         EventAttributeTypeRepository eventAttributeTypeRepository,
-        AnalyticsLogViewService analyticsLogViewService,
+        AnalyticsTraceLogLookupService traceLogLookupService,
         AnalyticsFilterRollupService filterRollupService,
         AnalyticsTimeRollupService timeRollupService,
         AnalyticsStageMetricRollupService stageMetricRollupService
@@ -111,7 +115,7 @@ public class AnalyticsInsightsService {
         this.stageTypeRepository = stageTypeRepository;
         this.stageMetricTypeRepository = stageMetricTypeRepository;
         this.eventAttributeTypeRepository = eventAttributeTypeRepository;
-        this.analyticsLogViewService = analyticsLogViewService;
+        this.traceLogLookupService = traceLogLookupService;
         this.filterRollupService = filterRollupService;
         this.timeRollupService = timeRollupService;
         this.stageMetricRollupService = stageMetricRollupService;
@@ -152,6 +156,27 @@ public class AnalyticsInsightsService {
         return eventRepository.findMinStartedAt();
     }
 
+    private ReadWindow boundedRawReadWindow(Instant from, Instant to, String endpoint) {
+        if (from == null || to == null || !from.isBefore(to)) {
+            return new ReadWindow(from, to, false, null);
+        }
+        Duration requested = Duration.between(from, to);
+        if (requested.compareTo(MAX_RAW_READ_RANGE) <= 0) {
+            return new ReadWindow(from, to, false, null);
+        }
+        Instant effectiveFrom = to.minus(MAX_RAW_READ_RANGE);
+        log.warn(
+            "Analytics Admin raw read bounded endpoint={} requestedFrom={} requestedTo={} effectiveFrom={} effectiveTo={} maxRangeHours={}",
+            endpoint,
+            from,
+            to,
+            effectiveFrom,
+            to,
+            MAX_RAW_READ_RANGE.toHours()
+        );
+        return new ReadWindow(effectiveFrom, to, true, RAW_READ_WARNING);
+    }
+
     public FilterOptionsResponse filterOptions(
         Instant from,
         Instant to,
@@ -187,45 +212,51 @@ public class AnalyticsInsightsService {
         Map<String, String> attributeTypeNames = eventAttributeTypeNameMap();
 
         boolean useRollup = filterRollupService.shouldUseRollup(from, to, normalizedRequestPath);
+        ReadWindow rawWindow = useRollup ? new ReadWindow(from, to, false, null) : boundedRawReadWindow(from, to, "/api/filter-options");
+        Instant effectiveFrom = rawWindow.from();
+        Instant effectiveTo = rawWindow.to();
 
         List<String> moduleCodes = useRollup
-            ? filterRollupService.findModuleCodes(from, to, scopedEventCodes)
+            ? filterRollupService.findModuleCodes(effectiveFrom, effectiveTo, scopedEventCodes)
             : (normalizedRequestPath == null
-                ? eventRepository.findDistinctModuleCodesByScopeNoPath(from, to, scopedEventCodes)
-                : eventRepository.findDistinctModuleCodesByScope(from, to, scopedEventCodes, normalizedRequestPath));
+                ? eventRepository.findDistinctModuleCodesByScopeNoPath(effectiveFrom, effectiveTo, scopedEventCodes)
+                : eventRepository.findDistinctModuleCodesByScope(effectiveFrom, effectiveTo, scopedEventCodes, normalizedRequestPath));
         List<OptionDto> modules = moduleCodes.stream()
+            .limit(FILTER_OPTION_LIMIT)
             .map(code -> new OptionDto(code, moduleTypeNames.getOrDefault(code, code)))
             .toList();
 
         List<String> eventTypeCodes = useRollup
-            ? filterRollupService.findEventTypeCodes(from, to, normalizedModuleCode)
+            ? filterRollupService.findEventTypeCodes(effectiveFrom, effectiveTo, normalizedModuleCode)
             : (normalizedRequestPath == null
-                ? eventRepository.findDistinctEventTypeCodesByScopeNoPath(from, to, normalizedModuleCode)
-                : eventRepository.findDistinctEventTypeCodesByScope(from, to, normalizedModuleCode, normalizedRequestPath));
+                ? eventRepository.findDistinctEventTypeCodesByScopeNoPath(effectiveFrom, effectiveTo, normalizedModuleCode)
+                : eventRepository.findDistinctEventTypeCodesByScope(effectiveFrom, effectiveTo, normalizedModuleCode, normalizedRequestPath));
         List<OptionDto> eventTypes = eventTypeCodes
             .stream()
+            .limit(FILTER_OPTION_LIMIT)
             .filter(code -> scopedEventCodes.contains(normalizeCode(code)))
             .map(code -> new OptionDto(code, eventTypeNames.getOrDefault(code, code)))
             .toList();
 
         List<String> attributeTypeCodes = useRollup
-            ? filterRollupService.findAttributeTypeCodes(from, to, normalizedModuleCode, normalizedEventType)
+            ? filterRollupService.findAttributeTypeCodes(effectiveFrom, effectiveTo, normalizedModuleCode, normalizedEventType)
             : (normalizedRequestPath == null
                 ? eventAttributeRepository.findDistinctAttributeTypeCodesByScopeNoPath(
-                    from,
-                    to,
+                    effectiveFrom,
+                    effectiveTo,
                     normalizedModuleCode,
                     normalizedEventType
                 )
                 : eventAttributeRepository.findDistinctAttributeTypeCodesByScope(
-                    from,
-                    to,
+                    effectiveFrom,
+                    effectiveTo,
                     normalizedModuleCode,
                     normalizedEventType,
                     normalizedRequestPath
                 ));
         List<OptionDto> attributeTypes = attributeTypeCodes
             .stream()
+            .limit(FILTER_OPTION_LIMIT)
             .map(code -> new OptionDto(code, attributeTypeNames.getOrDefault(code, code)))
             .toList();
 
@@ -233,33 +264,34 @@ public class AnalyticsInsightsService {
             ? List.of()
             : (useRollup
                 ? filterRollupService.findAttributeValues(
-                    from,
-                    to,
+                    effectiveFrom,
+                    effectiveTo,
                     normalizedModuleCode,
                     normalizedEventType,
                     normalizedAttributeCode
                 )
                 : (normalizedRequestPath == null
                     ? eventAttributeRepository.findDistinctAttributeValuesByScopeNoPath(
-                        from,
-                        to,
+                        effectiveFrom,
+                        effectiveTo,
                         normalizedModuleCode,
                         normalizedEventType,
                         normalizedAttributeCode
                     )
                     : eventAttributeRepository.findDistinctAttributeValuesByScope(
-                        from,
-                        to,
+                        effectiveFrom,
+                        effectiveTo,
                         normalizedModuleCode,
                         normalizedEventType,
                         normalizedRequestPath,
                         normalizedAttributeCode
                     )))
                 .stream()
+                .limit(FILTER_OPTION_LIMIT)
                 .map(value -> new OptionDto(value, value))
                 .toList();
 
-        return new FilterOptionsResponse(modules, eventTypes, attributeTypes, attributeValues);
+        return new FilterOptionsResponse(modules, eventTypes, attributeTypes, attributeValues, rawWindow.partial(), rawWindow.warning());
     }
 
     public OverviewResponse overview(
@@ -333,8 +365,11 @@ public class AnalyticsInsightsService {
             return new OverviewResponse(from, to, resolvedBucket, totals, breakdown, series);
         }
 
+        ReadWindow rawWindow = boundedRawReadWindow(from, to, "/api/overview");
+        Instant effectiveFrom = rawWindow.from();
+        Instant effectiveTo = rawWindow.to();
         List<AnalyticsEvent> events = filterEventsByRequestPath(
-            eventRepository.findAllByRangeOrdered(from, to, normalizedEventType, normalizedModuleCode),
+            eventRepository.findAllByRangeOrdered(effectiveFrom, effectiveTo, normalizedEventType, normalizedModuleCode),
             normalizedRequestPath
         );
         events = filterEventsByScope(events, false);
@@ -365,15 +400,15 @@ public class AnalyticsInsightsService {
             .toList();
 
         List<TimeSeriesPointDto> series = buildSeries(
-            from,
-            to,
+            effectiveFrom,
+            effectiveTo,
             resolvedBucket,
             events,
             AnalyticsEvent::getStartedAt,
             AnalyticsEvent::getDurationMs,
             event -> Boolean.TRUE.equals(event.getIsError())
         );
-        return new OverviewResponse(from, to, resolvedBucket, totals, breakdown, series);
+        return new OverviewResponse(effectiveFrom, effectiveTo, resolvedBucket, totals, breakdown, series, rawWindow.partial(), rawWindow.warning());
     }
 
     public StageBreakdownResponse stageBreakdown(
@@ -467,15 +502,18 @@ public class AnalyticsInsightsService {
             return new StageBreakdownResponse(from, to, resolvedBucket, kpi, stageSeries);
         }
 
+        ReadWindow rawWindow = boundedRawReadWindow(from, to, "/api/stages");
+        Instant effectiveFrom = rawWindow.from();
+        Instant effectiveTo = rawWindow.to();
         List<AnalyticsEvent> events = filterEventsByRequestPath(
-            eventRepository.findAllByRangeOrdered(from, to, normalizedEventType, normalizedModuleCode),
+            eventRepository.findAllByRangeOrdered(effectiveFrom, effectiveTo, normalizedEventType, normalizedModuleCode),
             normalizedRequestPath
         );
         events = filterEventsByScope(events, false);
         events = filterEventsByMetric(events, filterMetricTypeCode, filterMetricValue, filterMetricMinValue, filterMetricMaxValue);
         events = filterEventsByAttribute(events, filterAttributeCode, filterAttributeValue, filterAttributeMinValue, filterAttributeMaxValue);
         if (events.isEmpty()) {
-            return new StageBreakdownResponse(from, to, resolvedBucket, List.of(), List.of());
+            return new StageBreakdownResponse(effectiveFrom, effectiveTo, resolvedBucket, List.of(), List.of(), rawWindow.partial(), rawWindow.warning());
         }
 
         Map<String, String> stageTypeNames = stageTypeNameMap();
@@ -516,8 +554,8 @@ public class AnalyticsInsightsService {
                 entry.getKey(),
                 stageTypeNames.getOrDefault(entry.getKey(), entry.getKey()),
                 buildSeries(
-                    from,
-                    to,
+                    effectiveFrom,
+                    effectiveTo,
                     resolvedBucket,
                     entry.getValue(),
                     AnalyticsStage::getStartedAt,
@@ -528,7 +566,7 @@ public class AnalyticsInsightsService {
             .sorted(Comparator.comparing(StageSeriesDto::stageTypeCode))
             .toList();
 
-        return new StageBreakdownResponse(from, to, resolvedBucket, kpi, stageSeries);
+        return new StageBreakdownResponse(effectiveFrom, effectiveTo, resolvedBucket, kpi, stageSeries, rawWindow.partial(), rawWindow.warning());
     }
 
     public StageMetricResponse stageMetrics(
@@ -879,6 +917,10 @@ public class AnalyticsInsightsService {
             return response;
         }
 
+        ReadWindow rawWindow = boundedRawReadWindow(from, to, "/api/stage-metrics");
+        Instant effectiveFrom = rawWindow.from();
+        Instant effectiveTo = rawWindow.to();
+
         // Fast path for large periods: direct DB join for a concrete metric type, without loading all events/stages into memory.
         if (!includeSummaries
             && normalizedMetricType != null
@@ -886,8 +928,8 @@ public class AnalyticsInsightsService {
             && !hasAdditionalEventFilters) {
             long directQueryStarted = System.nanoTime();
             List<AnalyticsStageMetric> scopedMetrics = stageMetricRepository.findByScope(
-                from,
-                to,
+                effectiveFrom,
+                effectiveTo,
                 normalizedModuleCode,
                 normalizedEventType,
                 normalizedStageType,
@@ -917,7 +959,20 @@ public class AnalyticsInsightsService {
                     0,
                     0
                 );
-                return new StageMetricResponse(from, to, resolvedBucket, null, null, null, false, List.of(), List.of(), List.of());
+                return new StageMetricResponse(
+                    effectiveFrom,
+                    effectiveTo,
+                    resolvedBucket,
+                    null,
+                    null,
+                    null,
+                    false,
+                    List.of(),
+                    List.of(),
+                    List.of(),
+                    rawWindow.partial(),
+                    rawWindow.warning()
+                );
             }
 
             long buildStarted = System.nanoTime();
@@ -933,9 +988,9 @@ public class AnalyticsInsightsService {
                 .findFirst()
                 .orElse(null);
             List<TimeSeriesPointDto> numericSeries = numeric && includeSeries
-                ? buildSeries(
-                    from,
-                    to,
+                    ? buildSeries(
+                    effectiveFrom,
+                    effectiveTo,
                     resolvedBucket,
                     scopedMetrics.stream()
                         .filter(metric -> metric.getMetricValueNum() != null)
@@ -950,8 +1005,8 @@ public class AnalyticsInsightsService {
             long buildMs = elapsedMs(buildStarted);
 
             StageMetricResponse response = new StageMetricResponse(
-                from,
-                to,
+                effectiveFrom,
+                effectiveTo,
                 resolvedBucket,
                 normalizedMetricType,
                 metricTypeNames.getOrDefault(normalizedMetricType, normalizedMetricType),
@@ -959,7 +1014,9 @@ public class AnalyticsInsightsService {
                 numeric,
                 List.of(),
                 numericSeries,
-                selectedTopValues
+                selectedTopValues,
+                rawWindow.partial(),
+                rawWindow.warning()
             );
             logStageMetricsServicePerf(
                 serviceStarted,
@@ -988,7 +1045,7 @@ public class AnalyticsInsightsService {
 
         long rawQueryStarted = System.nanoTime();
         List<AnalyticsEvent> events = filterEventsByRequestPath(
-            eventRepository.findAllByRangeOrdered(from, to, normalizedEventType, normalizedModuleCode),
+            eventRepository.findAllByRangeOrdered(effectiveFrom, effectiveTo, normalizedEventType, normalizedModuleCode),
             normalizedRequestPath
         );
         events = filterEventsByScope(events, false);
@@ -1018,7 +1075,20 @@ public class AnalyticsInsightsService {
                 0,
                 0
             );
-            return new StageMetricResponse(from, to, resolvedBucket, null, null, null, false, List.of(), List.of(), List.of());
+            return new StageMetricResponse(
+                effectiveFrom,
+                effectiveTo,
+                resolvedBucket,
+                null,
+                null,
+                null,
+                false,
+                List.of(),
+                List.of(),
+                List.of(),
+                rawWindow.partial(),
+                rawWindow.warning()
+            );
         }
 
         long groupingStarted = System.nanoTime();
@@ -1047,7 +1117,20 @@ public class AnalyticsInsightsService {
                 0,
                 0
             );
-            return new StageMetricResponse(from, to, resolvedBucket, null, null, null, false, List.of(), List.of(), List.of());
+            return new StageMetricResponse(
+                effectiveFrom,
+                effectiveTo,
+                resolvedBucket,
+                null,
+                null,
+                null,
+                false,
+                List.of(),
+                List.of(),
+                List.of(),
+                rawWindow.partial(),
+                rawWindow.warning()
+            );
         }
 
         List<AnalyticsStageMetric> metrics = findStageMetricsByStageIds(
@@ -1077,7 +1160,20 @@ public class AnalyticsInsightsService {
                 0,
                 0
             );
-            return new StageMetricResponse(from, to, resolvedBucket, null, null, null, false, List.of(), List.of(), List.of());
+            return new StageMetricResponse(
+                effectiveFrom,
+                effectiveTo,
+                resolvedBucket,
+                null,
+                null,
+                null,
+                false,
+                List.of(),
+                List.of(),
+                List.of(),
+                rawWindow.partial(),
+                rawWindow.warning()
+            );
         }
         long groupingMs = elapsedMs(groupingStarted);
 
@@ -1095,14 +1191,40 @@ public class AnalyticsInsightsService {
                     .findFirst()
                     .orElse(null);
             if (selectedCode == null) {
-                return new StageMetricResponse(from, to, resolvedBucket, null, null, null, false, List.of(), List.of(), List.of());
+                return new StageMetricResponse(
+                    effectiveFrom,
+                    effectiveTo,
+                    resolvedBucket,
+                    null,
+                    null,
+                    null,
+                    false,
+                    List.of(),
+                    List.of(),
+                    List.of(),
+                    rawWindow.partial(),
+                    rawWindow.warning()
+                );
             }
 
             List<AnalyticsStageMetric> selectedMetrics = metrics.stream()
                 .filter(metric -> Objects.equals(metric.getMetricTypeCode(), selectedCode))
                 .toList();
             if (selectedMetrics.isEmpty()) {
-                return new StageMetricResponse(from, to, resolvedBucket, null, null, null, false, List.of(), List.of(), List.of());
+                return new StageMetricResponse(
+                    effectiveFrom,
+                    effectiveTo,
+                    resolvedBucket,
+                    null,
+                    null,
+                    null,
+                    false,
+                    List.of(),
+                    List.of(),
+                    List.of(),
+                    rawWindow.partial(),
+                    rawWindow.warning()
+                );
             }
 
             List<BigDecimal> numericValues = selectedMetrics.stream()
@@ -1117,8 +1239,8 @@ public class AnalyticsInsightsService {
                 .orElse(null);
             List<TimeSeriesPointDto> numericSeries = numeric && includeSeries
                 ? buildSeries(
-                    from,
-                    to,
+                    effectiveFrom,
+                    effectiveTo,
                     resolvedBucket,
                     selectedMetrics.stream()
                         .filter(metric -> metric.getMetricValueNum() != null)
@@ -1132,8 +1254,8 @@ public class AnalyticsInsightsService {
 
             List<TopValueDto> selectedTopValues = includeTopValues ? topValuesForMetrics(selectedMetrics) : List.of();
             StageMetricResponse response = new StageMetricResponse(
-                from,
-                to,
+                effectiveFrom,
+                effectiveTo,
                 resolvedBucket,
                 selectedCode,
                 metricTypeNames.getOrDefault(selectedCode, selectedCode),
@@ -1141,7 +1263,9 @@ public class AnalyticsInsightsService {
                 numeric,
                 List.of(),
                 numericSeries,
-                selectedTopValues
+                selectedTopValues,
+                rawWindow.partial(),
+                rawWindow.warning()
             );
             logStageMetricsServicePerf(
                 serviceStarted,
@@ -1209,7 +1333,20 @@ public class AnalyticsInsightsService {
             .toList();
 
         if (summaries.isEmpty()) {
-            return new StageMetricResponse(from, to, resolvedBucket, null, null, null, false, List.of(), List.of(), List.of());
+            return new StageMetricResponse(
+                effectiveFrom,
+                effectiveTo,
+                resolvedBucket,
+                null,
+                null,
+                null,
+                false,
+                List.of(),
+                List.of(),
+                List.of(),
+                rawWindow.partial(),
+                rawWindow.warning()
+            );
         }
 
         StageMetricSummaryDto selected = summaries.stream()
@@ -1223,8 +1360,8 @@ public class AnalyticsInsightsService {
         List<AnalyticsStageMetric> selectedMetrics = byMetricType.getOrDefault(selected.metricTypeCode(), List.of());
         List<TimeSeriesPointDto> numericSeries = selected.numeric() && includeSeries
             ? buildSeries(
-                from,
-                to,
+                effectiveFrom,
+                effectiveTo,
                 resolvedBucket,
                 selectedMetrics.stream()
                     .filter(metric -> metric.getMetricValueNum() != null)
@@ -1239,8 +1376,8 @@ public class AnalyticsInsightsService {
         List<TopValueDto> selectedTopValues = includeTopValues ? selected.topValues() : List.of();
 
         StageMetricResponse response = new StageMetricResponse(
-            from,
-            to,
+            effectiveFrom,
+            effectiveTo,
             resolvedBucket,
             selected.metricTypeCode(),
             selected.metricTypeName(),
@@ -1248,7 +1385,9 @@ public class AnalyticsInsightsService {
             selected.numeric(),
             summaries,
             numericSeries,
-            selectedTopValues
+            selectedTopValues,
+            rawWindow.partial(),
+            rawWindow.warning()
         );
         logStageMetricsServicePerf(
             serviceStarted,
@@ -1974,7 +2113,7 @@ public class AnalyticsInsightsService {
         boolean eventTypeFilterEnabled = !normalizedEventTypes.isEmpty();
         Set<String> eventTypeCodesForQuery = eventTypeFilterEnabled ? normalizedEventTypes : Set.of("__ALL__");
 
-        Page<AnalyticsEvent> eventPage = eventRepository.searchEventsScoped(
+        List<AnalyticsEvent> eventRows = eventRepository.searchEventsScoped(
             from,
             to,
             eventTypeFilterEnabled,
@@ -1995,10 +2134,11 @@ public class AnalyticsInsightsService {
             systemEventsOnly,
             normalizedSortBy,
             sortAscending,
-            PageRequest.of(safePage, safeSize)
+            PageRequest.of(safePage, safeSize + 1)
         );
-        long totalElements = eventPage.getTotalElements();
-        List<AnalyticsEvent> events = eventPage.getContent();
+        boolean hasMore = eventRows.size() > safeSize;
+        List<AnalyticsEvent> events = hasMore ? eventRows.subList(0, safeSize) : eventRows;
+        long totalElements = (long) safePage * safeSize + events.size() + (hasMore ? 1 : 0);
         List<Long> eventIds = ids(events);
         List<AnalyticsStage> stages = findStagesByEventIds(eventIds);
         List<AnalyticsEventAttribute> attributes = findAttributesByEventIds(eventIds);
@@ -2048,8 +2188,10 @@ public class AnalyticsInsightsService {
             ))
             .toList();
 
-        boolean hasMore = eventPage.hasNext();
-        return new EventListResponse(totalElements, safePage, safeSize, hasMore, items);
+        String warning = hasMore
+            ? "Список событий загружается постранично. Для больших периодов отображается текущая страница без полного пересчёта общего количества."
+            : null;
+        return new EventListResponse(totalElements, safePage, safeSize, hasMore, items, hasMore, warning);
     }
 
     private boolean eventTypeMatchesSystemScope(String eventTypeCode, boolean systemEventsOnly) {
@@ -2340,7 +2482,7 @@ public class AnalyticsInsightsService {
         Map<String, String> stageTypeNames = stageTypeNameMap();
         Map<String, String> metricTypeNames = stageMetricTypeNameMap();
         Map<String, String> attributeTypeNames = eventAttributeTypeNameMap();
-        AnalyticsLogViewService.TraceLogLookupResult traceLogLookup = safeLoadTraceLogs(event);
+        AnalyticsLogViewService.TraceLogLookupResult traceLogLookup = traceLogLookupService.loadTraceLogsSafely(event);
         List<EventLogEntryDto> traceLogs = traceLogLookup.rows();
 
         Map<Long, List<EventStageMetricDto>> metricsByStage = metrics.stream()
@@ -2407,28 +2549,6 @@ public class AnalyticsInsightsService {
             traceLogLookup.status(),
             traceLogs
         );
-    }
-
-    private AnalyticsLogViewService.TraceLogLookupResult safeLoadTraceLogs(AnalyticsEvent event) {
-        try {
-            return analyticsLogViewService.loadTraceLogs(
-                event.getTraceId(),
-                event.getEventUid() == null ? null : event.getEventUid().toString(),
-                event.getModuleCode(),
-                event.getStartedAt(),
-                event.getEndedAt()
-            );
-        } catch (RuntimeException ex) {
-            log.warn(
-                "Trace log lookup failed for eventUid={}, traceId={}: {}",
-                event.getEventUid(),
-                event.getTraceId(),
-                ex.getMessage()
-            );
-            return AnalyticsLogViewService.TraceLogLookupResult.notFound(
-                "Trace logs are temporarily unavailable, event details are shown without log rows."
-            );
-        }
     }
 
     private List<EventLogEntryDto> filterLogsForStage(
@@ -3176,5 +3296,13 @@ public class AnalyticsInsightsService {
             }
         }
         return result;
+    }
+
+    private record ReadWindow(
+        Instant from,
+        Instant to,
+        boolean partial,
+        String warning
+    ) {
     }
 }

@@ -4,6 +4,7 @@ import com.example.gqw.analytics.service.AnalyticsTrackingApi;
 import com.example.gqw.analytics.service.ErrorClassClassifier;
 import com.example.gqw.analytics.service.AnalyticsInstrumentationPolicy;
 import com.example.gqw.analytics.service.AnalyticsLoggingPolicy;
+import com.example.gqw.analytics.service.AnalyticsStrictWarningEventService;
 import com.example.gqw.config.TraceIdFilter;
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -31,15 +32,18 @@ public class AnalyticsRepositoryStageAspect {
     private final AnalyticsTrackingApi analyticsTrackingApi;
     private final AnalyticsInstrumentationPolicy instrumentationPolicy;
     private final AnalyticsLoggingPolicy loggingPolicy;
+    private final AnalyticsStrictWarningEventService strictWarningEventService;
 
     public AnalyticsRepositoryStageAspect(
         AnalyticsTrackingApi analyticsTrackingApi,
         AnalyticsInstrumentationPolicy instrumentationPolicy,
-        AnalyticsLoggingPolicy loggingPolicy
+        AnalyticsLoggingPolicy loggingPolicy,
+        AnalyticsStrictWarningEventService strictWarningEventService
     ) {
         this.analyticsTrackingApi = analyticsTrackingApi;
         this.instrumentationPolicy = instrumentationPolicy;
         this.loggingPolicy = loggingPolicy;
+        this.strictWarningEventService = strictWarningEventService;
     }
 
     @Around("execution(public * org.springframework.data.repository.CrudRepository+.*(..))")
@@ -78,6 +82,17 @@ public class AnalyticsRepositoryStageAspect {
                     exception
                 );
             }
+            strictWarningEventService.record(
+                "stage",
+                "DATABASE",
+                exception.getMessage(),
+                className,
+                methodName,
+                null,
+                traceId,
+                eventUid,
+                null
+            );
             return joinPoint.proceed();
         }
         context.pushStageId(stageId);

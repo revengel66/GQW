@@ -34,18 +34,6 @@
                    th:classappend="${activeTab == 'compare'} ? ' active' : ''">Сравнение</a>
             </div>
             <div class="ms-auto d-flex align-items-center gap-3 analytics-admin-header-actions">
-                <a class="analytics-admin-header-link"
-                   th:classappend="${activeTab == 'dictionaries'} ? ' active' : ''"
-                   th:href="@{/analytics-admin/dictionaries}">
-                    Справочники
-                </a>
-                <a class="analytics-admin-header-link"
-                   th:classappend="${activeTab == 'instruction'} ? ' active' : ''"
-                   th:href="@{/analytics-admin/instruction}"
-                   target="_blank"
-                   rel="noopener noreferrer">
-                    Инструкция
-                </a>
                 <div class="d-flex align-items-center gap-2 analytics-admin-header-tools">
                     <button class="btn btn-outline-dark btn-sm analytics-header-icon-btn analytics-help-mode-toggle"
                             type="button"
@@ -55,14 +43,33 @@
                             title="Включить подсказки">
                         <i class="bi bi-question-circle" aria-hidden="true"></i>
                     </button>
-                    <button th:if="${showSettingsButton}"
-                            class="btn btn-dark btn-sm analytics-header-icon-btn analytics-runtime-settings-trigger"
-                            type="button"
-                            id="analytics-runtime-settings-open"
-                            title="Настройки аналитики"
-                            aria-label="Настройки аналитики">
-                        <i class="bi bi-gear-fill" aria-hidden="true"></i>
-                    </button>
+                    <div class="analytics-admin-menu"
+                         th:classappend="${activeTab == 'settings' or activeTab == 'dictionaries' or activeTab == 'instruction'} ? ' is-active' : ''">
+                        <a class="btn btn-dark btn-sm analytics-header-icon-btn analytics-runtime-settings-trigger analytics-admin-menu-toggle"
+                                th:classappend="${activeTab == 'settings'} ? ' is-enabled' : ''"
+                                th:href="@{/analytics-admin/settings}"
+                                title="Администрирование"
+                                aria-label="Администрирование">
+                            <i class="bi bi-gear-fill" aria-hidden="true"></i>
+                        </a>
+                        <div class="analytics-admin-menu-dropdown" role="menu" aria-label="Администрирование">
+                            <div class="analytics-admin-menu-title">Администрирование</div>
+                            <a class="analytics-admin-menu-item"
+                               th:classappend="${activeTab == 'settings'} ? ' active' : ''"
+                               th:href="@{/analytics-admin/settings}"
+                               role="menuitem">Конфигурация аналитики</a>
+                            <a class="analytics-admin-menu-item"
+                               th:classappend="${activeTab == 'dictionaries'} ? ' active' : ''"
+                               th:href="@{/analytics-admin/dictionaries}"
+                               role="menuitem">Справочники</a>
+                            <a class="analytics-admin-menu-item"
+                               th:classappend="${activeTab == 'instruction'} ? ' active' : ''"
+                               th:href="@{/analytics-admin/instruction}"
+                               target="_blank"
+                               rel="noopener noreferrer"
+                               role="menuitem">Инструкция</a>
+                        </div>
+                    </div>
                     <form method="post" th:action="@{/analytics-admin/logout}" class="m-0">
                         <input th:if="${_csrf != null}" type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
                         <button class="btn btn-dark btn-sm analytics-header-icon-btn out-btn"

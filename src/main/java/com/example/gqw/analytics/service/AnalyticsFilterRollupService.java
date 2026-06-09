@@ -23,6 +23,7 @@ public class AnalyticsFilterRollupService {
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
     private final AnalyticsRuntimeSettingsService runtimeSettingsService;
+    private final AnalyticsScheduledJobsPolicy scheduledJobsPolicy;
     private final Clock clock;
     private final boolean defaultEnabled;
     private final int defaultLongRangeDays;
@@ -34,6 +35,7 @@ public class AnalyticsFilterRollupService {
     public AnalyticsFilterRollupService(
         @Qualifier("analyticsNamedParameterJdbcTemplate") NamedParameterJdbcTemplate jdbcTemplate,
         AnalyticsRuntimeSettingsService runtimeSettingsService,
+        AnalyticsScheduledJobsPolicy scheduledJobsPolicy,
         @Value("${app.analytics.filter-rollup.enabled:true}") boolean enabled,
         @Value("${app.analytics.filter-rollup.long-range-days:30}") int longRangeDays,
         @Value("${app.analytics.filter-rollup.refresh-recent-days:7}") int refreshRecentDays,
@@ -41,6 +43,7 @@ public class AnalyticsFilterRollupService {
     ) {
         this.jdbcTemplate = jdbcTemplate;
         this.runtimeSettingsService = runtimeSettingsService;
+        this.scheduledJobsPolicy = scheduledJobsPolicy;
         this.clock = Clock.systemUTC();
         this.defaultEnabled = enabled;
         this.defaultLongRangeDays = Math.max(1, longRangeDays);
@@ -97,6 +100,9 @@ public class AnalyticsFilterRollupService {
     @Scheduled(cron = "0 * * * * *")
     @Transactional(transactionManager = "analyticsTransactionManager")
     public void scheduledRefresh() {
+        if (!scheduledJobsPolicy.isEnabled()) {
+            return;
+        }
         int intervalMinutes = runtimeSettingsService.getInt(
             AnalyticsRuntimeSettingsService.KEY_FILTER_ROLLUP_REFRESH_INTERVAL_MINUTES,
             defaultRefreshIntervalMinutes,

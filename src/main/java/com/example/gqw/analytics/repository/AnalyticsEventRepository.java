@@ -525,7 +525,7 @@ public interface AnalyticsEventRepository extends JpaRepository<AnalyticsEvent, 
             """,
         nativeQuery = true
     )
-    Page<AnalyticsEvent> searchEventsScoped(
+    List<AnalyticsEvent> searchEventsScoped(
         @Param("from") Instant from,
         @Param("to") Instant to,
         @Param("eventTypeFilterEnabled") boolean eventTypeFilterEnabled,

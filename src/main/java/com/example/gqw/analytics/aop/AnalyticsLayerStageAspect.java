@@ -4,6 +4,7 @@ import com.example.gqw.analytics.entity.StageType;
 import com.example.gqw.analytics.repository.StageTypeRepository;
 import com.example.gqw.analytics.service.AnalyticsInstrumentationPolicy;
 import com.example.gqw.analytics.service.AnalyticsLoggingPolicy;
+import com.example.gqw.analytics.service.AnalyticsStrictWarningEventService;
 import com.example.gqw.analytics.service.AnalyticsTrackingApi;
 import com.example.gqw.config.TraceIdFilter;
 import java.time.Instant;
@@ -33,17 +34,20 @@ public class AnalyticsLayerStageAspect {
     private final StageTypeRepository stageTypeRepository;
     private final AnalyticsInstrumentationPolicy instrumentationPolicy;
     private final AnalyticsLoggingPolicy loggingPolicy;
+    private final AnalyticsStrictWarningEventService strictWarningEventService;
 
     public AnalyticsLayerStageAspect(
         AnalyticsTrackingApi analyticsTrackingApi,
         StageTypeRepository stageTypeRepository,
         AnalyticsInstrumentationPolicy instrumentationPolicy,
-        AnalyticsLoggingPolicy loggingPolicy
+        AnalyticsLoggingPolicy loggingPolicy,
+        AnalyticsStrictWarningEventService strictWarningEventService
     ) {
         this.analyticsTrackingApi = analyticsTrackingApi;
         this.stageTypeRepository = stageTypeRepository;
         this.instrumentationPolicy = instrumentationPolicy;
         this.loggingPolicy = loggingPolicy;
+        this.strictWarningEventService = strictWarningEventService;
     }
 
     @Around("@within(com.example.gqw.analytics.aop.TrackAnalyticsLayer) || @annotation(com.example.gqw.analytics.aop.TrackAnalyticsLayer)")
@@ -81,6 +85,16 @@ public class AnalyticsLayerStageAspect {
                     safeMdc(TraceIdFilter.TRACE_ID_MDC_KEY)
                 );
             }
+            strictWarningEventService.record(
+                "stage",
+                annotation.code(),
+                "Blank stage type code",
+                joinPoint.getSignature().getDeclaringTypeName(),
+                joinPoint.getSignature().getName(),
+                null,
+                String.valueOf(context.eventUid()),
+                null
+            );
             return joinPoint.proceed();
         }
 
@@ -96,6 +110,16 @@ public class AnalyticsLayerStageAspect {
                     safeMdc(TraceIdFilter.TRACE_ID_MDC_KEY)
                 );
             }
+            strictWarningEventService.record(
+                "stage",
+                stageTypeCode,
+                "Unknown stage type",
+                joinPoint.getSignature().getDeclaringTypeName(),
+                joinPoint.getSignature().getName(),
+                null,
+                String.valueOf(context.eventUid()),
+                null
+            );
             return joinPoint.proceed();
         }
         if (!Boolean.TRUE.equals(stageType.getIsActive())) {
@@ -109,6 +133,16 @@ public class AnalyticsLayerStageAspect {
                     safeMdc(TraceIdFilter.TRACE_ID_MDC_KEY)
                 );
             }
+            strictWarningEventService.record(
+                "stage",
+                stageTypeCode,
+                "Inactive stage type",
+                joinPoint.getSignature().getDeclaringTypeName(),
+                joinPoint.getSignature().getName(),
+                null,
+                String.valueOf(context.eventUid()),
+                null
+            );
             return joinPoint.proceed();
         }
 
@@ -128,6 +162,16 @@ public class AnalyticsLayerStageAspect {
                     exception
                 );
             }
+            strictWarningEventService.record(
+                "stage",
+                stageTypeCode,
+                exception.getMessage(),
+                joinPoint.getSignature().getDeclaringTypeName(),
+                joinPoint.getSignature().getName(),
+                null,
+                String.valueOf(context.eventUid()),
+                null
+            );
             return joinPoint.proceed();
         }
 

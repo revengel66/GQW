@@ -6,6 +6,10 @@ import java.util.UUID;
 
 public interface AnalyticsTrackingApi {
 
+    default boolean isSnapshotEnabled() {
+        return false;
+    }
+
     UUID startEvent(String eventTypeCode, Long userId, String sessionId, String requestPath, String httpMethod, String traceId);
     void setEventStartedAtIfEarlier(UUID eventUid, Instant startedAt);
     void extendEventDurationIfLater(UUID eventUid, Instant endedAtCandidate);

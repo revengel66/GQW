@@ -48,7 +48,7 @@ public class AnalyticsEventController {
         @RequestParam(required = false) String sortDir,
         @RequestParam(required = false, defaultValue = "false") Boolean systemEventsOnly,
         @RequestParam(required = false, defaultValue = "0") Integer page,
-        @RequestParam(required = false, defaultValue = "20") Integer size
+        @RequestParam(required = false, defaultValue = "50") Integer size
     ) {
         AnalyticsTimeRangeResolver.TimeRange range = AnalyticsTimeRangeResolver.resolveRange(from, to, Duration.ofHours(24));
         return analyticsInsightsService.events(
