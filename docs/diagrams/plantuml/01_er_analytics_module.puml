@@ -1,0 +1,241 @@
+@startuml
+title ER-диаграмма модуля объединённой аналитики пользовательских событий
+
+hide circle
+skinparam linetype ortho
+skinparam shadowing false
+skinparam entity {
+  BackgroundColor #F8FAFC
+  BorderColor #334155
+}
+
+entity "analytics.event" as event {
+  * id : bigint
+  --
+  event_uid : uuid
+  event_type_code : varchar(64)
+  module_code : varchar(64)
+  user_id : bigint
+  request_path : varchar(1024)
+  http_method : varchar(16)
+  trace_id : varchar(64)
+  status_code : int
+  is_error : boolean
+  started_at : timestamp
+  duration_ms : int
+}
+
+entity "analytics.stage" as stage {
+  * id : bigint
+  --
+  event_id : bigint
+  stage_type_code : varchar(64)
+  stage_order : int
+  started_at : timestamp
+  duration_ms : int
+  is_error : boolean
+}
+
+entity "analytics.stage_metric" as stage_metric {
+  * id : bigint
+  --
+  stage_id : bigint
+  metric_type_code : varchar(64)
+  metric_value_num : numeric
+  metric_value_text : varchar(1024)
+  unit : varchar(32)
+}
+
+entity "analytics.event_attribute" as event_attribute {
+  * id : bigint
+  --
+  event_id : bigint
+  attribute_type_code : varchar(64)
+  attr_value : varchar(2048)
+  attr_value_json : varchar(4000)
+}
+
+entity "analytics.event_type" as event_type {
+  * code : varchar(64)
+  --
+  module_code : varchar(64)
+  name : varchar
+  active : boolean
+}
+
+entity "analytics.module_type" as module_type {
+  * code : varchar(64)
+  --
+  name : varchar
+  active : boolean
+}
+
+entity "analytics.stage_type" as stage_type {
+  * code : varchar(64)
+  --
+  name : varchar
+  active : boolean
+}
+
+entity "analytics.stage_metric_type" as metric_type {
+  * code : varchar(64)
+  --
+  name : varchar
+  value_kind : enum
+  unit : varchar
+  active : boolean
+}
+
+entity "analytics.event_attribute_type" as attr_type {
+  * code : varchar(64)
+  --
+  name : varchar
+  active : boolean
+}
+
+entity "analytics.aggregation_run" as aggregation_run {
+  * id : bigint
+  --
+  run_type : enum
+  granularity : enum
+  period_start : timestamp
+  period_end : timestamp
+  status : enum
+  rows_written : int
+}
+
+entity "analytics.aggregated_metric" as aggregated_metric {
+  * id : bigint
+  --
+  aggregation_run_id : bigint
+  event_type_code : varchar(64)
+  stage_type_code : varchar(64)
+  sample_count : bigint
+  avg_ms : numeric
+  p95_ms : numeric
+  p99_ms : numeric
+  error_rate : numeric
+}
+
+entity "analytics.event_rollup_bucket" as event_rollup {
+  * bucket_start : timestamp
+  * granularity_minutes : int
+  * module_code : varchar
+  * event_type_code : varchar
+  --
+  count : bigint
+  error_count : bigint
+  duration_sum_ms : bigint
+  p95_ms : numeric
+  p99_ms : numeric
+}
+
+entity "analytics.stage_rollup_bucket" as stage_rollup {
+  * bucket_start : timestamp
+  * granularity_minutes : int
+  * stage_type_code : varchar
+  --
+  module_code : varchar
+  event_type_code : varchar
+  count : bigint
+  duration_sum_ms : bigint
+}
+
+entity "analytics.stage_metric_rollup_bucket" as metric_rollup {
+  * bucket_start : timestamp
+  * granularity_minutes : int
+  * metric_type_code : varchar
+  --
+  stage_type_code : varchar
+  numeric_count : bigint
+  numeric_sum : numeric
+  p95_value : numeric
+}
+
+entity "analytics.filter_event_type_day" as filter_event_day {
+  * day : date
+  * event_type_code : varchar
+  --
+  module_code : varchar
+  count : bigint
+}
+
+entity "analytics.filter_attr_value_day" as filter_attr_day {
+  * day : date
+  * attribute_type_code : varchar
+  * attr_value : varchar
+  --
+  count : bigint
+}
+
+entity "analytics.log_file_index" as log_file {
+  * id : bigint
+  --
+  file_name : varchar
+  file_path : varchar
+  module_code : varchar
+  archived : boolean
+  indexed_at : timestamp
+}
+
+entity "analytics.log_trace_index" as log_trace {
+  * id : bigint
+  --
+  trace_id : varchar
+  event_uid : uuid
+  file_index_id : bigint
+  module_code : varchar
+  line_count : int
+}
+
+entity "analytics.log_problem_excerpt" as log_excerpt {
+  * id : bigint
+  --
+  trace_id : varchar
+  file_index_id : bigint
+  module_code : varchar
+  level : varchar
+  excerpt : text
+}
+
+entity "analytics.admin_user" as admin_user {
+  * id : bigint
+  --
+  username : varchar
+  password_hash : varchar
+  role : varchar
+  enabled : boolean
+}
+
+entity "analytics.code_alias" as code_alias {
+  * id : bigint
+  --
+  alias_type : enum
+  old_code : varchar
+  new_code : varchar
+}
+
+event ||--o{ stage : event_id
+stage ||--o{ stage_metric : stage_id
+event ||--o{ event_attribute : event_id
+module_type ||--o{ event_type : module_code
+event_type ||--o{ event : event_type_code
+module_type ||--o{ event : module_code
+stage_type ||--o{ stage : stage_type_code
+metric_type ||--o{ stage_metric : metric_type_code
+attr_type ||--o{ event_attribute : attribute_type_code
+aggregation_run ||--o{ aggregated_metric : aggregation_run_id
+event_type ||..o{ event_rollup : event_type_code
+stage_type ||..o{ stage_rollup : stage_type_code
+metric_type ||..o{ metric_rollup : metric_type_code
+event_type ||..o{ filter_event_day : event_type_code
+attr_type ||..o{ filter_attr_day : attribute_type_code
+log_file ||--o{ log_trace : file_index_id
+log_file ||--o{ log_excerpt : file_index_id
+event ||..o{ log_trace : trace_id/event_uid
+code_alias ..> event_type : переименование кодов
+code_alias ..> module_type : переименование кодов
+code_alias ..> stage_type : переименование кодов
+code_alias ..> metric_type : переименование кодов
+code_alias ..> attr_type : переименование кодов
+@enduml

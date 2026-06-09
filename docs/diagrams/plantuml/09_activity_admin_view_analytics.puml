@@ -1,0 +1,37 @@
+@startuml
+title Диаграмма деятельности «Просмотр аналитики администратором»
+
+skinparam shadowing false
+
+start
+partition "Администратор" {
+  :Открывает Analytics Admin;
+}
+partition "Analytics Module" {
+  :AnalyticsAdminAuthInterceptor\nпроверяет доступ;
+}
+partition "UI" {
+  :Запрашивает overview,\nevents, filter-options,\nstages или compare;
+}
+partition "Analytics Module" {
+  :Backend определяет период\nи фильтры;
+  if (Период длинный?) then (да)
+    :Используются rollup-агрегаты\nи быстрые фильтры;
+  else (нет)
+    :Возможно чтение raw-данных;
+  endif
+}
+partition "БД gqw_analytics" {
+  :Возвращает raw/rollup/dictionary data;
+}
+partition "Analytics Module" {
+  :Формируются DTO\nдля графиков и таблиц;
+}
+partition "UI" {
+  :Отображается дашборд,\nжурнал, детали или сравнение;
+  if (Запрос долгий или ошибочный?) then (да)
+    :Показывается уведомление\nили понятное сообщение;
+  endif
+}
+stop
+@enduml

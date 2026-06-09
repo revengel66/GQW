@@ -1,0 +1,39 @@
+@startuml
+title Диаграмма деятельности «Фиксация пользовательского события»
+
+skinparam shadowing false
+
+start
+partition "Пользователь" {
+  :Выполняет действие\nв интернет-магазине;
+}
+partition "Приложение-носитель" {
+  :HTTP-запрос попадает\nв controller;
+}
+partition "Analytics Module" {
+  :AnalyticsEventAspect обнаруживает\n@TrackAnalyticsEvent;
+  :Создаётся AnalyticsEventContext;
+  :Определяются event type,\nmodule, user, URL, traceId;
+  :Проверяются AnalyticsInstrumentationPolicy\nи strict-модель;
+  if (Событие разрешено?) then (да)
+    :Формируется AnalyticsEventSnapshot;
+    :Snapshot помещается в\nAnalyticsEventSnapshotBuffer\nили AnalyticsAsyncWriteBuffer;
+  else (нет)
+    :Фиксируется strict warning;
+  endif
+}
+partition "Приложение-носитель" {
+  :Бизнес-запрос продолжает\nвыполнение;
+}
+partition "БД gqw_analytics" {
+  if (Есть корректный snapshot?) then (да)
+    :Сохраняются event,\nattributes, stages, metrics;
+  else (нет)
+    :Пользовательская статистика\nне искажается;
+  endif
+}
+partition "Analytics Module" {
+  :При ошибке инструментирования\nсоздаётся служебная диагностика;
+}
+stop
+@enduml

@@ -1,0 +1,62 @@
+@startuml
+title Диаграмма классов «Агрегация и фоновые задания»
+
+left to right direction
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+
+package "com.example.gqw.analytics.service" {
+  class AggregationScheduler {
+    +runHourlyAggregation()
+    +runDailyAggregation()
+    +runMonthlyAggregation()
+  }
+  class AggregationService {
+    +runAggregation(...)
+  }
+  class AnalyticsTimeRollupService {
+    +refreshRecentBuckets()
+    +backfill(...)
+  }
+  class AnalyticsTimeRollupLifecycle
+  class AnalyticsFilterRollupService
+  class AnalyticsFilterRollupLifecycle
+  class AnalyticsStageMetricRollupService
+  class AnalyticsStageMetricRollupLifecycle
+  class AnalyticsDataLifecycleService
+  class AnalyticsScheduledJobsPolicy
+  class AnalyticsSeriesTime
+}
+
+package "com.example.gqw.analytics.entity" {
+  class AggregatedMetric
+  class AggregationRun
+  enum AggregationGranularity
+  enum AggregationRunType
+  enum AggregationStatus
+}
+
+package "com.example.gqw.analytics.repository" {
+  interface AggregatedMetricRepository
+  interface AggregationRunRepository
+}
+
+AggregationScheduler --> AnalyticsScheduledJobsPolicy : enabled?
+AggregationScheduler --> AggregationService : legacy aggregation
+AggregationScheduler --> AnalyticsTimeRollupService : event/stage rollup
+AggregationScheduler --> AnalyticsStageMetricRollupService : metric rollup
+AggregationScheduler --> AnalyticsFilterRollupService : fast filters
+AnalyticsTimeRollupLifecycle --> AnalyticsTimeRollupService : initialize
+AnalyticsFilterRollupLifecycle --> AnalyticsFilterRollupService : initialize
+AnalyticsStageMetricRollupLifecycle --> AnalyticsStageMetricRollupService : initialize
+AnalyticsDataLifecycleService --> AnalyticsTimeRollupService : retention
+AnalyticsDataLifecycleService --> AnalyticsStageMetricRollupService : retention
+AggregationService --> AggregationRunRepository
+AggregationService --> AggregatedMetricRepository
+AggregationRunRepository --> AggregationRun
+AggregatedMetricRepository --> AggregatedMetric
+AggregationRun --> AggregationGranularity
+AggregationRun --> AggregationRunType
+AggregationRun --> AggregationStatus
+AnalyticsTimeRollupService --> AnalyticsSeriesTime : display bucket time
+@enduml

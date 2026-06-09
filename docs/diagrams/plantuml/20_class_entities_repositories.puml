@@ -1,0 +1,82 @@
+@startuml
+title Диаграмма классов «Модель данных и репозитории»
+
+left to right direction
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+
+package "com.example.gqw.analytics.entity" {
+  class AnalyticsEvent {
+    id
+    eventUid
+    eventTypeCode
+    moduleCode
+    traceId
+  }
+  class AnalyticsStage {
+    id
+    eventId
+    stageTypeCode
+    durationMs
+  }
+  class AnalyticsStageMetric {
+    id
+    stageId
+    metricTypeCode
+  }
+  class AnalyticsEventAttribute {
+    id
+    eventId
+    attributeTypeCode
+  }
+  class EventType
+  class ModuleType
+  class StageType
+  class StageMetricType
+  class EventAttributeType
+  class AnalyticsAdminUser
+  class AnalyticsCodeAlias
+  class AggregatedMetric
+  class AggregationRun
+}
+
+package "com.example.gqw.analytics.repository" {
+  interface AnalyticsEventRepository
+  interface AnalyticsStageRepository
+  interface AnalyticsStageMetricRepository
+  interface AnalyticsEventAttributeRepository
+  interface EventTypeRepository
+  interface ModuleTypeRepository
+  interface StageTypeRepository
+  interface StageMetricTypeRepository
+  interface EventAttributeTypeRepository
+  interface AnalyticsAdminUserRepository
+  interface AnalyticsCodeAliasRepository
+  interface AggregatedMetricRepository
+  interface AggregationRunRepository
+}
+
+AnalyticsEvent "1" --> "0..*" AnalyticsStage : eventId
+AnalyticsStage "1" --> "0..*" AnalyticsStageMetric : stageId
+AnalyticsEvent "1" --> "0..*" AnalyticsEventAttribute : eventId
+ModuleType "1" --> "0..*" EventType : moduleCode
+EventType "1" ..> "0..*" AnalyticsEvent : eventTypeCode
+StageType "1" ..> "0..*" AnalyticsStage : stageTypeCode
+StageMetricType "1" ..> "0..*" AnalyticsStageMetric : metricTypeCode
+EventAttributeType "1" ..> "0..*" AnalyticsEventAttribute : attributeTypeCode
+AggregationRun "1" --> "0..*" AggregatedMetric : aggregationRunId
+
+AnalyticsEventRepository --> AnalyticsEvent
+AnalyticsStageRepository --> AnalyticsStage
+AnalyticsStageMetricRepository --> AnalyticsStageMetric
+AnalyticsEventAttributeRepository --> AnalyticsEventAttribute
+EventTypeRepository --> EventType
+ModuleTypeRepository --> ModuleType
+StageTypeRepository --> StageType
+StageMetricTypeRepository --> StageMetricType
+EventAttributeTypeRepository --> EventAttributeType
+AnalyticsAdminUserRepository --> AnalyticsAdminUser
+AnalyticsCodeAliasRepository --> AnalyticsCodeAlias
+AggregatedMetricRepository --> AggregatedMetric
+AggregationRunRepository --> AggregationRun
+@enduml

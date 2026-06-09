@@ -1,0 +1,74 @@
+@startuml
+title Диаграмма классов «Слой записи аналитических событий»
+
+left to right direction
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+
+package "com.example.gqw.analytics.service" {
+  class AnalyticsTrackerFacade {
+    +startEvent(...)
+    +finishEvent(...)
+    +recordStageMetric(...)
+  }
+
+  class AnalyticsEventService {
+    +createEvent(...)
+    +finishEvent(...)
+  }
+
+  class AnalyticsStageService {
+    +startStage(...)
+    +finishStage(...)
+  }
+
+  class AnalyticsStageMetricService {
+    +recordMetric(...)
+  }
+
+  class AnalyticsEventAttributeService {
+    +recordAttribute(...)
+  }
+
+  class AnalyticsEventSnapshot
+  class AnalyticsEventSnapshotBuffer
+  class AnalyticsEventSnapshotPersistenceService
+  class AnalyticsAsyncWriteBuffer
+
+  interface AnalyticsCurrentUserProvider {
+    +currentUserId()
+    +currentUsername()
+    +currentUserRole()
+  }
+
+  class NoopAnalyticsCurrentUserProvider
+  class AnalyticsInstrumentationPolicy
+}
+
+package "com.example.gqw.analytics.entity" {
+  class AnalyticsEvent
+  class AnalyticsStage
+  class AnalyticsStageMetric
+  class AnalyticsEventAttribute
+}
+
+AnalyticsTrackerFacade --> AnalyticsEventSnapshotBuffer : snapshot mode
+AnalyticsTrackerFacade --> AnalyticsAsyncWriteBuffer : async mode
+AnalyticsTrackerFacade --> AnalyticsEventService : direct mode
+AnalyticsEventSnapshotBuffer --> AnalyticsEventSnapshot : хранит
+AnalyticsEventSnapshotBuffer --> AnalyticsEventSnapshotPersistenceService : flush
+AnalyticsAsyncWriteBuffer --> AnalyticsEventService
+AnalyticsAsyncWriteBuffer --> AnalyticsStageService
+AnalyticsAsyncWriteBuffer --> AnalyticsStageMetricService
+AnalyticsAsyncWriteBuffer --> AnalyticsEventAttributeService
+AnalyticsEventSnapshotPersistenceService --> AnalyticsEvent : save
+AnalyticsEventSnapshotPersistenceService --> AnalyticsStage : save
+AnalyticsEventSnapshotPersistenceService --> AnalyticsStageMetric : save
+AnalyticsEventSnapshotPersistenceService --> AnalyticsEventAttribute : save
+AnalyticsEventService --> AnalyticsEvent : creates
+AnalyticsStageService --> AnalyticsStage : creates
+AnalyticsStageMetricService --> AnalyticsStageMetric : creates
+AnalyticsEventAttributeService --> AnalyticsEventAttribute : creates
+NoopAnalyticsCurrentUserProvider ..|> AnalyticsCurrentUserProvider
+AnalyticsTrackerFacade --> AnalyticsInstrumentationPolicy : policy
+@enduml

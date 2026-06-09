@@ -1,0 +1,80 @@
+@startuml
+title Диаграмма классов «Аннотации и AOP-инструментирование»
+
+left to right direction
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+
+package "com.example.gqw.analytics.aop" {
+  annotation TrackAnalyticsEvent
+  annotation TrackAnalyticsLayer
+  annotation TrackAnalyticsMetric
+  annotation TrackAnalyticsAttribute
+  annotation TrackAnalyticsStageMetric
+
+  class AnalyticsEventAspect {
+    +trackAnalyticsEvent(...)
+    -resolveTraceId(...)
+    -recordStrictWarning(...)
+  }
+
+  class AnalyticsServiceStageAspect {
+    +trackServiceStage(...)
+  }
+
+  class AnalyticsRepositoryStageAspect {
+    +trackRepositoryStage(...)
+  }
+
+  class AnalyticsLayerStageAspect {
+    +trackLayerStage(...)
+  }
+
+  class AnalyticsStageMetricAspect {
+    +trackStageMetric(...)
+  }
+
+  class AutoCrudAnalyticsEventAspect {
+    +trackCrudEvent(...)
+  }
+
+  class AnalyticsEventContext {
+    +eventUid()
+    +traceId()
+    +addStage(...)
+  }
+
+  class AnalyticsEventContextHolder {
+    +set(context)
+    +get()
+    +clear()
+  }
+
+  class AnalyticsValueEstimator {
+    +estimate(...)
+  }
+}
+
+package "Сервисы модуля" {
+  class AnalyticsTrackerFacade
+  class AnalyticsInstrumentationPolicy
+  class AnalyticsStrictWarningEventService
+}
+
+TrackAnalyticsEvent ..> AnalyticsEventAspect : используется
+TrackAnalyticsAttribute ..> AnalyticsEventAspect : attributes
+TrackAnalyticsMetric ..> AnalyticsEventAspect : metrics
+TrackAnalyticsLayer ..> AnalyticsLayerStageAspect : custom layer
+TrackAnalyticsStageMetric ..> AnalyticsStageMetricAspect : stage metric
+
+AnalyticsEventAspect --> AnalyticsEventContext : создаёт
+AnalyticsEventAspect --> AnalyticsEventContextHolder : хранит текущий context
+AnalyticsServiceStageAspect --> AnalyticsEventContextHolder : получает context
+AnalyticsRepositoryStageAspect --> AnalyticsEventContextHolder : получает context
+AnalyticsLayerStageAspect --> AnalyticsEventContextHolder : получает context
+AnalyticsStageMetricAspect --> AnalyticsEventContextHolder : добавляет metrics
+AutoCrudAnalyticsEventAspect --> AnalyticsTrackerFacade : создаёт auto CRUD events
+AnalyticsEventAspect --> AnalyticsInstrumentationPolicy : проверка правил
+AnalyticsEventAspect --> AnalyticsStrictWarningEventService : strict warnings
+AnalyticsEventAspect --> AnalyticsValueEstimator : payload/size metrics
+@enduml

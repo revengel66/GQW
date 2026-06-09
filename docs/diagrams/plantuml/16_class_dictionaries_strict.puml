@@ -1,0 +1,78 @@
+@startuml
+title Диаграмма классов «Справочники и strict-модель»
+
+left to right direction
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+
+package "com.example.gqw.analytics.source" {
+  interface EventTypeSource
+  interface ModuleTypeSource
+  interface StageTypeSource
+  interface StageMetricTypeSource
+  interface EventAttributeTypeSource
+  class DemoEventTypeSource
+  class DemoModuleTypeSource
+  class DemoStageTypeSource
+  class DemoStageMetricTypeSource
+  class DemoEventAttributeTypeSource
+}
+
+package "com.example.gqw.analytics.service" {
+  class AnalyticsEventTypeMaintenanceService
+  class AnalyticsDictionaryAdminService
+  class AnalyticsStrictWarningEventService
+  class DictionarySyncService
+  class AnalyticsCodeResolverService
+}
+
+package "com.example.gqw.analytics.entity" {
+  class EventType
+  class ModuleType
+  class StageType
+  class StageMetricType
+  class EventAttributeType
+  class AnalyticsCodeAlias
+}
+
+package "com.example.gqw.analytics.repository" {
+  interface EventTypeRepository
+  interface ModuleTypeRepository
+  interface StageTypeRepository
+  interface StageMetricTypeRepository
+  interface EventAttributeTypeRepository
+  interface AnalyticsCodeAliasRepository
+}
+
+DemoEventTypeSource ..|> EventTypeSource
+DemoModuleTypeSource ..|> ModuleTypeSource
+DemoStageTypeSource ..|> StageTypeSource
+DemoStageMetricTypeSource ..|> StageMetricTypeSource
+DemoEventAttributeTypeSource ..|> EventAttributeTypeSource
+
+DictionarySyncService --> EventTypeSource
+DictionarySyncService --> ModuleTypeSource
+DictionarySyncService --> StageTypeSource
+DictionarySyncService --> StageMetricTypeSource
+DictionarySyncService --> EventAttributeTypeSource
+DictionarySyncService --> EventTypeRepository
+DictionarySyncService --> ModuleTypeRepository
+DictionarySyncService --> StageTypeRepository
+DictionarySyncService --> StageMetricTypeRepository
+DictionarySyncService --> EventAttributeTypeRepository
+AnalyticsDictionaryAdminService --> AnalyticsCodeAliasRepository
+AnalyticsDictionaryAdminService --> EventTypeRepository
+AnalyticsDictionaryAdminService --> ModuleTypeRepository
+AnalyticsDictionaryAdminService --> StageTypeRepository
+AnalyticsDictionaryAdminService --> StageMetricTypeRepository
+AnalyticsDictionaryAdminService --> EventAttributeTypeRepository
+AnalyticsCodeResolverService --> AnalyticsCodeAliasRepository
+AnalyticsStrictWarningEventService --> EventTypeRepository : SYSTEM events
+AnalyticsEventTypeMaintenanceService --> EventTypeRepository
+EventTypeRepository --> EventType
+ModuleTypeRepository --> ModuleType
+StageTypeRepository --> StageType
+StageMetricTypeRepository --> StageMetricType
+EventAttributeTypeRepository --> EventAttributeType
+AnalyticsCodeAliasRepository --> AnalyticsCodeAlias
+@enduml

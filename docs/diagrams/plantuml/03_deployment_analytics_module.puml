@@ -1,0 +1,35 @@
+@startuml
+title Диаграмма развертывания модуля объединённой аналитики пользовательских событий
+
+skinparam shadowing false
+skinparam linetype ortho
+
+node "Браузер пользователя\nмагазина" as user_browser
+node "Браузер администратора" as admin_browser
+node "k6 / тестовый стенд" as k6
+
+node "Сервер приложения" as server {
+  artifact "Spring Boot приложение\nинтернет-магазина" as app
+  artifact "gqw-analytics-module\nclasspath dependency" as module
+  component "AOP внутри JVM" as aop
+  component "Analytics Admin\n/templates/static/API" as ui
+}
+
+database "PostgreSQL\ngqw" as gqw
+database "PostgreSQL\ngqw_analytics" as analytics_db
+node "Файловая система логов" as fs {
+  artifact "текущие .log" as log
+  artifact "архивы .log.gz" as gz
+}
+
+user_browser --> app : HTTP/HTTPS\nстраницы магазина
+admin_browser --> ui : HTTP/HTTPS\n/analytics-admin
+k6 --> app : HTTP нагрузка
+app --> gqw : JDBC\nбизнес-данные
+module --> analytics_db : JDBC\nсобытия и агрегаты
+module --> log : чтение логов
+module --> gz : чтение архивов
+app --> aop : вызовы controller/service/repository
+aop --> module : сбор событий,\nэтапов и метрик
+ui --> module : Analytics Admin API
+@enduml

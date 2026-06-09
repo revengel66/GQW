@@ -1,0 +1,30 @@
+@startuml
+title Диаграмма деятельности «Фиксация этапов и метрик»
+
+skinparam shadowing false
+
+start
+partition "Приложение-носитель" {
+  :Внутри активного события\nвыполняются методы controller/service/repository/layer;
+}
+partition "Analytics Module" {
+  :AnalyticsServiceStageAspect,\nAnalyticsRepositoryStageAspect,\nAnalyticsLayerStageAspect создают stage;
+  :Замеряется время выполнения;
+  if (Метод завершился ошибкой?) then (да)
+    :Фиксируется error status\nи сообщение ошибки;
+  else (нет)
+    :Фиксируется успешный status;
+  endif
+  :AnalyticsStageMetricAspect\nи сервисы метрик фиксируют stage metrics;
+  :Коды метрик нормализуются\nчерез справочники;
+  if (Тип метрики известен и активен?) then (да)
+    :Stage/metric добавляются\nк активному context/snapshot;
+  else (нет)
+    :Создаётся strict warning;\nбизнес-вызов продолжается;
+  endif
+}
+partition "БД gqw_analytics" {
+  :После завершения события\nсохраняются stage и stage_metric;
+}
+stop
+@enduml

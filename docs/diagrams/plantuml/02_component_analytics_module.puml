@@ -1,0 +1,46 @@
+@startuml
+title Диаграмма компонентов модуля объединённой аналитики пользовательских событий
+
+left to right direction
+skinparam shadowing false
+skinparam componentStyle rectangle
+
+actor "Пользователь магазина" as user
+actor "Администратор / аналитик" as admin
+
+database "PostgreSQL\nБД магазина gqw" as shopdb
+database "PostgreSQL\nБД аналитики gqw_analytics" as adb
+folder "Файловая система логов\n.log / .log.gz" as logs
+
+node "Spring Boot приложение\nинтернет-магазина" as app {
+  component "Shop/Admin code\nконтроллеры и сервисы" as shop
+  component "Аннотации\n@TrackAnalyticsEvent\n@TrackAnalyticsLayer\n@TrackAnalyticsMetric" as annotations
+
+  package "Gradle submodule\ngqw-analytics-module" as module {
+    component "AOP-инструментирование" as aop
+    component "Слой записи событий" as write
+    component "Snapshot/async pipeline" as snapshot
+    component "Analytics Admin UI/API" as adminapi
+    component "Справочники и strict-модель" as dict
+    component "Агрегация и rollup" as rollup
+    component "Индекс логов трассировки" as logindex
+    component "Runtime settings" as settings
+  }
+}
+
+user --> shop : HTTP/HTTPS
+admin --> adminapi : /analytics-admin
+shop --> shopdb : бизнес-данные
+shop --> annotations : использует
+annotations --> aop : pointcuts
+aop --> write : event/stage/metric/attribute
+write --> snapshot : snapshot или async write
+snapshot --> adb : insert raw data
+adminapi --> adb : чтение raw/rollup/справочников
+dict --> adb : sync dictionaries
+rollup --> adb : event/stage/metric buckets
+logindex --> logs : читает файлы
+logindex --> adb : log_file_index\nlog_trace_index\nlog_problem_excerpt
+settings --> rollup : включает jobs
+settings --> logindex : включает индексацию
+@enduml

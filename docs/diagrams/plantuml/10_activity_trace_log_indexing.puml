@@ -1,0 +1,39 @@
+@startuml
+title Диаграмма деятельности «Индексация логов трассировки»
+
+skinparam shadowing false
+
+start
+partition "Планировщик" {
+  :Запускается log-index job;
+}
+partition "Analytics Module" {
+  :AnalyticsLogArchiveIndexService\nпроверяет настройки;
+  if (Индексация логов включена?) then (да)
+    :Определяется папка логов;
+  else (нет)
+    stop
+  endif
+}
+partition "Файловая система / логи" {
+  :Находятся текущие .log;
+  if (Индексация архивов включена?) then (да)
+    :Добавляются архивные .log.gz;
+  endif
+}
+partition "Analytics Module" {
+  :Проверяется размер файла\nи статус прочитанного файла;
+  :Файл читается построчно;
+  :Извлекаются traceId, eventUid,\nWARN/ERROR/FATAL/SLOW,\nвремя и фрагменты;
+}
+partition "БД gqw_analytics" {
+  :Сохраняется log_file_index;
+  :Сохраняется log_trace_index;
+  :Сохраняется log_problem_excerpt;
+  :Старый индекс очищается\nпо retention;
+}
+partition "Analytics Admin" {
+  :Если полный архив недоступен,\nUI может показать ARCHIVE_INDEX_ONLY;
+}
+stop
+@enduml

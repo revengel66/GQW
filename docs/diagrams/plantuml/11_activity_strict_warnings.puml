@@ -1,0 +1,38 @@
+@startuml
+title Диаграмма деятельности «Обработка служебных предупреждений»
+
+skinparam shadowing false
+
+start
+partition "Analytics Module" {
+  :Во время инструментирования\nобнаруживается проблема;
+  note right
+    unknown event/module/stage/metric/attribute,
+    inactive справочник,
+    некорректный custom layer
+  end note
+  :Проверяется strict warning policy;
+  if (Предупреждения включены?) then (да)
+    :Формируется описание проблемы;
+  else (нет)
+    :Некорректная часть пропускается;
+  endif
+}
+partition "Приложение-носитель" {
+  :Бизнес-запрос продолжает\nвыполнение;
+}
+partition "Analytics Module" {
+  :В лог пишется WARN;
+  if (Создание служебных событий включено?) then (да)
+    :AnalyticsStrictWarningEventService\nсоздаёт служебное событие;
+  endif
+}
+partition "БД gqw_analytics" {
+  :Сохраняется diagnostics/system event;
+}
+partition "Analytics Admin" {
+  :Запись отображается\nво вкладке служебных событий;
+  :Пользовательская статистика\nне искажается;
+}
+stop
+@enduml

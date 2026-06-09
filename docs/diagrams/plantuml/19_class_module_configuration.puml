@@ -1,0 +1,48 @@
+@startuml
+title Диаграмма классов «Конфигурация модуля»
+
+left to right direction
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+
+package "com.example.gqw.analytics.config" {
+  class AnalyticsPersistenceConfig
+  class AnalyticsDataSourceProperties
+  class AnalyticsAdminWebConfig
+  class AnalyticsAdminAuthInterceptor
+  class AnalyticsUiTemplateConfig
+  class AnalyticsBootstrap
+  class AnalyticsScanProperties
+  class AnalyticsEventCodesMigrationConfig
+  class AnalyticsMetricNamesPatchConfig
+  class FrontendAnalyticsDictionaryConfig
+  class SystemAnalyticsAttributeDictionaryConfig
+  class SystemAnalyticsMetricReadingGuideConfig
+  class AnalyticsStrictWarningDictionaryConfig
+}
+
+package "Runtime services" {
+  class DictionarySyncService
+  class AnalyticsAdminAuthService
+  class AnalyticsRuntimeSettingsService
+}
+
+database "analytics datasource" as analytics_ds
+database "business datasource" as business_ds
+folder "META-INF/gqw-analytics\n/templates / static" as resources
+
+AnalyticsPersistenceConfig --> AnalyticsDataSourceProperties : properties
+AnalyticsPersistenceConfig --> analytics_ds : analytics JPA
+AnalyticsPersistenceConfig --> business_ds : host JPA
+AnalyticsAdminWebConfig --> AnalyticsAdminAuthInterceptor : registers
+AnalyticsAdminAuthInterceptor --> AnalyticsAdminAuthService
+AnalyticsUiTemplateConfig --> resources : template resolver
+AnalyticsBootstrap --> DictionarySyncService : seed dictionaries
+AnalyticsScanProperties --> AnalyticsEventCodesMigrationConfig : scan packages
+AnalyticsEventCodesMigrationConfig --> DictionarySyncService : event codes
+FrontendAnalyticsDictionaryConfig --> DictionarySyncService : frontend dictionaries
+SystemAnalyticsAttributeDictionaryConfig --> DictionarySyncService : system attributes
+SystemAnalyticsMetricReadingGuideConfig --> AnalyticsRuntimeSettingsService : reading guides
+AnalyticsStrictWarningDictionaryConfig --> DictionarySyncService : strict warning types
+AnalyticsMetricNamesPatchConfig --> DictionarySyncService : metric names patch
+@enduml

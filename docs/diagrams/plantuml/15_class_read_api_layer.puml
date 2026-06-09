@@ -1,0 +1,57 @@
+@startuml
+title Диаграмма классов «Слой чтения и API Analytics Admin»
+
+left to right direction
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+
+package "com.example.gqw.analytics.controller" {
+  class AnalyticsOverviewController
+  class AnalyticsEventController
+  class AnalyticsStageController
+  class AnalyticsFilterOptionsController
+  class AnalyticsCompareController
+  class AnalyticsDictionaryController
+  class AnalyticsRuntimeSettingsController
+  class AnalyticsAdminController
+  class AnalyticsUniversalController
+}
+
+package "com.example.gqw.analytics.service" {
+  class AnalyticsInsightsService {
+    +dashboard(...)
+    +events(...)
+    +eventDetails(...)
+  }
+  class AnalyticsQueryService
+  class AnalyticsRuntimeSettingsService
+  class AnalyticsDictionaryAdminService
+  class AnalyticsTraceLogLookupService
+}
+
+package "com.example.gqw.analytics.service.dto" {
+  class DashboardResponseDto
+  class EventListResponseDto
+  class EventDetailsResponseDto
+  class EventDashboardResponseDto
+  class ChartPointDto
+}
+
+AnalyticsOverviewController --> AnalyticsInsightsService
+AnalyticsEventController --> AnalyticsInsightsService
+AnalyticsStageController --> AnalyticsQueryService
+AnalyticsFilterOptionsController --> AnalyticsQueryService
+AnalyticsCompareController --> AnalyticsInsightsService
+AnalyticsDictionaryController --> AnalyticsDictionaryAdminService
+AnalyticsRuntimeSettingsController --> AnalyticsRuntimeSettingsService
+AnalyticsAdminController --> AnalyticsRuntimeSettingsService
+AnalyticsUniversalController --> AnalyticsQueryService
+
+AnalyticsInsightsService --> DashboardResponseDto
+AnalyticsInsightsService --> EventListResponseDto
+AnalyticsInsightsService --> EventDetailsResponseDto
+AnalyticsInsightsService --> EventDashboardResponseDto
+AnalyticsInsightsService --> ChartPointDto
+AnalyticsInsightsService --> AnalyticsTraceLogLookupService : trace logs fallback
+AnalyticsQueryService --> ChartPointDto
+@enduml

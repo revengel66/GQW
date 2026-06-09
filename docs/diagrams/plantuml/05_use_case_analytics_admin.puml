@@ -1,0 +1,58 @@
+@startuml
+title Диаграмма вариантов использования подсистемы аналитики для администратора интернет-магазина
+
+left to right direction
+skinparam shadowing false
+
+actor "Администратор\nинтернет-магазина" as admin
+actor "Аналитик" as analyst
+actor "Система аналитики" as system
+
+rectangle "Analytics Admin" {
+  usecase "Войти в\nAnalytics Admin" as login
+  usecase "Просмотреть\nдашборд" as dashboard
+  usecase "Просмотреть\nдиагностику" as diagnostics
+  usecase "Просмотреть\nжурнал событий" as events
+  usecase "Отфильтровать\nсобытия" as filter
+  usecase "Открыть\nдетали события" as details
+  usecase "Просмотреть этапы,\nметрики и атрибуты" as parts
+  usecase "Просмотреть\nлоги трассировки" as logs
+  usecase "Просмотреть\nслужебные события" as system_events
+  usecase "Сравнить\nпериоды" as compare
+  usecase "Управлять\nсправочниками" as dictionaries
+  usecase "Изменить конфигурацию\nаналитики" as settings
+  usecase "Открыть\nинструкцию" as instruction
+
+  usecase "Загрузить данные\nдля графиков" as load_charts
+  usecase "Применить\nагрегаты" as apply_rollup
+  usecase "Применить\nбыстрые фильтры" as fast_filters
+  usecase "Обработать\nотсутствие логов" as no_logs
+  usecase "Показать\nARCHIVE_INDEX_ONLY" as archive_only
+}
+
+admin --> login
+admin --> dashboard
+admin --> diagnostics
+admin --> events
+admin --> details
+admin --> system_events
+admin --> compare
+admin --> dictionaries
+admin --> settings
+admin --> instruction
+analyst --> dashboard
+analyst --> diagnostics
+analyst --> events
+analyst --> compare
+
+events .> filter : <<include>>
+details .> parts : <<include>>
+details <. logs : <<extend>>
+system --> load_charts
+system --> apply_rollup
+system --> fast_filters
+system --> no_logs
+no_logs <. archive_only : <<extend>>
+dashboard .> load_charts : <<include>>
+diagnostics .> fast_filters : <<include>>
+@enduml
