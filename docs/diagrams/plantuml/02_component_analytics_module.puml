@@ -6,279 +6,92 @@ skinparam shadowing false
 skinparam componentStyle rectangle
 skinparam packageStyle rectangle
 
-actor "Покупатель" as buyer
-actor "Администратор /\nаналитик" as admin
-
-database "PostgreSQL\nосновная БД gqw" as shopdb
-database "PostgreSQL\nБД аналитики gqw_analytics" as analyticsdb
-folder "Файловая система логов\n*.log / *.log.gz" as logfs
-
-package "Внешние зависимости" as deps {
-  component "Spring Web MVC" as springWeb <<library>>
-  component "Spring Data JPA" as springData <<library>>
-  component "Spring Security" as springSecurity <<library>>
-  component "Thymeleaf" as thymeleaf <<library>>
-  component "Bootstrap / Bootstrap Icons" as bootstrap <<library>>
-  component "Chart.js" as chartjs <<library>>
-  component "Logback / MDC" as logback <<library>>
-  component "PostgreSQL Driver" as pgdriver <<library>>
+skinparam component {
+  BackgroundColor #FFFFFF
+  BorderColor #2F3A4A
+  FontColor #111827
+}
+skinparam package {
+  BackgroundColor #F4F6F8
+  BorderColor #B8C2CC
+  FontColor #111827
+}
+skinparam database {
+  BackgroundColor #FFFFFF
+  BorderColor #2F3A4A
 }
 
-node "Spring Boot приложение\nинтернет-магазина" as app {
-  package "Shop / host application" as host {
-    component "FrontendShop\nHTML/CSS/JS магазина" as frontendShop
-    component "AdminPanelShop\nадминка магазина" as adminPanelShop
-    component "BackendShop\ncontrollers / services" as backendShop
-    component "Business JPA\nentities / repositories" as businessJpa
-    component "TraceIdFilter" as traceFilter
-    component "ShopAnalyticsCurrentUserProvider" as shopUserProvider
+actor "Покупатель" as Buyer
+actor "Администратор" as Admin
+
+node "Spring Boot приложение интернет-магазина" as App {
+  package "Shop Application" as ShopApplication {
+    component "Frontend Shop" as FrontendShop
+    component "Admin Panel" as AdminPanel
+    component "Backend Shop" as BackendShop
   }
 
-  package "gqw-analytics-module" as module {
-    package "UI Dashboards" as ui {
-      component "Thymeleaf templates\nadmin-dashboard\nadmin-settings\nadmin-instruction" as adminTemplates
-      component "Static UI assets\napp.css\nanalytics-dashboard.js\nanalytics-settings.js" as staticAssets
-      component "Admin header fragment" as adminHeader
-    }
-
-    package "Controllers / API layer" as api {
-      component "AnalyticsAdminController" as adminController
-      component "AnalyticsOverviewController" as overviewController
-      component "AnalyticsEventController" as eventController
-      component "AnalyticsStageController" as stageController
-      component "AnalyticsCompareController" as compareController
-      component "AnalyticsDictionaryController" as dictionaryController
-      component "AnalyticsRuntimeSettingsController" as settingsController
-      component "AnalyticsUniversalController" as universalController
-      component "FrontendAnalyticsIngestController" as frontendIngestController
-    }
-
-    package "AOP instrumentation" as aop {
-      component "TrackAnalyticsEvent\nTrackAnalyticsLayer\nTrackAnalyticsMetric\nTrackAnalyticsAttribute" as annotations
-      component "AnalyticsEventAspect" as eventAspect
-      component "AnalyticsServiceStageAspect" as serviceAspect
-      component "AnalyticsRepositoryStageAspect" as repositoryAspect
-      component "AnalyticsLayerStageAspect" as layerAspect
-      component "AnalyticsStageMetricAspect" as metricAspect
-      component "AutoCrudAnalyticsEventAspect" as autoCrudAspect
-      component "AnalyticsMethodLoggingAspect" as methodLoggingAspect
-      component "AnalyticsEventContextHolder" as contextHolder
-    }
-
-    package "Write layer" as writeLayer {
-      component "AnalyticsTrackerFacade\nAnalyticsTrackingApi" as trackerFacade
-      component "AnalyticsEventService" as eventService
-      component "AnalyticsStageService" as stageService
-      component "AnalyticsStageMetricService" as stageMetricService
-      component "AnalyticsEventAttributeService" as attributeService
-      component "FrontendAnalyticsIngestService" as frontendIngestService
-      component "AnalyticsHttpErrorTrackingService" as httpErrorService
-      component "AnalyticsEventSnapshotBuffer" as snapshotBuffer
-      component "AnalyticsAsyncWriteBuffer" as asyncBuffer
-      component "AnalyticsEventSnapshotPersistenceService" as snapshotPersistence
-    }
-
-    package "Read / query services" as readLayer {
-      component "AnalyticsInsightsService" as insightsService
-      component "AnalyticsQueryService" as queryService
-      component "AnalyticsUniversalRootCauseService" as rootCauseService
-      component "AnalyticsUniversalAttributeBreakdownService" as attributeBreakdownService
-      component "AnalyticsUniversalErrorBreakdownService" as errorBreakdownService
-      component "AnalyticsUniversalModuleBreakdownService" as moduleBreakdownService
-      component "AnalyticsRuntimeDiagnosticsService" as diagnosticsService
-    }
-
-    package "Dictionaries / strict model" as dictionaryLayer {
-      component "DictionarySyncService" as dictionarySync
-      component "AnalyticsDictionaryAdminService" as dictionaryAdmin
-      component "AnalyticsCodeResolverService" as codeResolver
-      component "AnalyticsEventTypeMaintenanceService" as eventTypeMaintenance
-      component "AnalyticsStrictWarningEventService" as strictWarningService
-      component "System dictionary configs" as systemDictionaryConfigs
-    }
-
-    package "Aggregation / lifecycle jobs" as aggregationLayer {
-      component "AggregationScheduler" as aggregationScheduler
-      component "AggregationService" as aggregationService
-      component "AnalyticsTimeRollupService" as timeRollupService
-      component "AnalyticsFilterRollupService" as filterRollupService
-      component "AnalyticsStageMetricRollupService" as stageMetricRollupService
-      component "AnalyticsDataLifecycleService" as lifecycleService
-      component "AnalyticsRuntimeOperationsService" as runtimeOperations
-      component "AnalyticsScheduledJobsPolicy" as scheduledJobsPolicy
-    }
-
-    package "Trace logs / archive index" as logLayer {
-      component "AnalyticsTraceContext" as traceContext
-      component "AppModuleMdcFilter" as appModuleMdcFilter
-      component "AnalyticsLoggingPolicy" as loggingPolicy
-      component "AnalyticsLogArchiveIndexService" as logArchiveIndexService
-      component "AnalyticsTraceLogLookupService" as traceLogLookupService
-      component "AnalyticsLogViewService" as logViewService
-    }
-
-    package "JPA / repositories" as jpaLayer {
-      component "Analytics entities\nevent / stage / metric / attribute" as analyticsEntities
-      component "Dictionary entities\nmodule / event / attribute / stage / metric" as dictionaryEntities
-      component "Rollup entities\nbuckets / aggregation runs" as rollupEntities
-      component "Log index entities\nfile / trace / excerpts" as logIndexEntities
-      component "Analytics repositories" as analyticsRepositories
-      component "Dictionary repositories" as dictionaryRepositories
-      component "Rollup repositories" as rollupRepositories
-      component "Log index repositories" as logIndexRepositories
-    }
-
-    package "Configuration / SPI" as configLayer {
-      component "AnalyticsPersistenceConfig" as persistenceConfig
-      component "AnalyticsDataSourceProperties" as datasourceProperties
-      component "AnalyticsScanProperties" as scanProperties
-      component "AnalyticsAdminWebConfig" as adminWebConfig
-      component "AnalyticsUiTemplateConfig" as uiTemplateConfig
-      component "AnalyticsBootstrap" as analyticsBootstrap
-      component "AnalyticsAdminAuthInterceptor" as adminAuthInterceptor
-      component "AnalyticsCurrentUserProvider\nSPI" as currentUserProvider
-      component "NoopAnalyticsCurrentUserProvider" as noopUserProvider
-      component "Runtime settings\napp.analytics.*" as runtimeSettings
-    }
+  package "gqw-analytics-module" as AnalyticsModule {
+    component "AOP Instrumentation" as AopInstrumentation
+    component "Event Capture Layer" as EventCapture
+    component "Snapshot / Async Pipeline" as SnapshotPipeline
+    component "Analytics Admin API" as AdminApi
+    component "Analytics Admin UI" as AdminUi
+    component "Dictionary & Strict Model" as DictionaryStrict
+    component "Aggregation & Rollup" as AggregationRollup
+    component "Trace Log Index" as TraceLogIndex
+    component "Diagnostics & Runtime Settings" as RuntimeSettings
   }
 }
 
-buyer ..> frontendShop : HTTP/HTTPS
-frontendShop ..> backendShop : requests
-admin ..> adminTemplates : /analytics-admin
+package "Infrastructure" as Infrastructure {
+  database "PostgreSQL gqw" as PgShop
+  database "PostgreSQL gqw_analytics" as PgAnalytics
+  component "Log Files" as LogFiles
+}
 
-backendShop ..> annotations : uses
-adminPanelShop ..> annotations : uses
-annotations ..> eventAspect : pointcuts
-backendShop ..> serviceAspect : service calls
-backendShop ..> repositoryAspect : repository calls
-backendShop ..> layerAspect : custom layers
-backendShop ..> metricAspect : metric annotations
-backendShop ..> autoCrudAspect : CRUD fallback
+package "External Dependencies" as Dependencies {
+  component "Spring Web" as SpringWeb
+  component "Spring Data JPA" as SpringDataJpa
+  component "Spring Security" as SpringSecurity
+  component "Thymeleaf" as Thymeleaf
+}
 
-eventAspect ..> contextHolder : opens event context
-eventAspect ..> trackerFacade : writes event
-serviceAspect ..> stageService : writes stage
-repositoryAspect ..> stageService : writes stage
-layerAspect ..> stageService : writes stage
-metricAspect ..> stageMetricService : writes metric
-methodLoggingAspect ..> logback : writes log lines
-trackerFacade ..> eventService
-trackerFacade ..> stageService
-trackerFacade ..> stageMetricService
-trackerFacade ..> attributeService
-eventService ..> snapshotBuffer
-stageService ..> snapshotBuffer
-stageMetricService ..> snapshotBuffer
-attributeService ..> snapshotBuffer
-snapshotBuffer ..> asyncBuffer
-asyncBuffer ..> snapshotPersistence
-snapshotPersistence ..> analyticsRepositories
-frontendIngestController ..> frontendIngestService
-frontendIngestService ..> eventService
-httpErrorService ..> trackerFacade
+Buyer --> FrontendShop
+Admin --> AdminPanel
+Admin --> AdminUi
 
-adminTemplates ..> adminHeader
-adminTemplates ..> staticAssets
-staticAssets ..> overviewController : fetch API
-staticAssets ..> eventController : fetch API
-staticAssets ..> stageController : fetch API
-staticAssets ..> compareController : fetch API
-staticAssets ..> dictionaryController : fetch API
-staticAssets ..> settingsController : fetch API
-staticAssets ..> universalController : fetch API
+FrontendShop --> BackendShop
+AdminPanel --> BackendShop
+BackendShop --> AopInstrumentation
 
-adminController ..> adminTemplates
-overviewController ..> insightsService
-eventController ..> insightsService
-stageController ..> queryService
-compareController ..> queryService
-dictionaryController ..> dictionaryAdmin
-settingsController ..> diagnosticsService
-settingsController ..> runtimeOperations
-universalController ..> rootCauseService
-universalController ..> attributeBreakdownService
-universalController ..> errorBreakdownService
-universalController ..> moduleBreakdownService
+AopInstrumentation --> EventCapture
+EventCapture --> SnapshotPipeline
+SnapshotPipeline --> PgAnalytics
 
-insightsService ..> analyticsRepositories
-insightsService ..> rollupRepositories
-insightsService ..> traceLogLookupService
-queryService ..> analyticsRepositories
-queryService ..> rollupRepositories
-rootCauseService ..> analyticsRepositories
-attributeBreakdownService ..> analyticsRepositories
-errorBreakdownService ..> analyticsRepositories
-moduleBreakdownService ..> analyticsRepositories
-diagnosticsService ..> analyticsdb : table statistics
+AdminUi --> AdminApi
+AdminApi --> PgAnalytics
+AdminApi --> AggregationRollup
+AdminApi --> DictionaryStrict
+AdminApi --> TraceLogIndex
 
-dictionarySync ..> systemDictionaryConfigs
-dictionarySync ..> dictionaryRepositories
-dictionaryAdmin ..> dictionaryRepositories
-codeResolver ..> dictionaryRepositories
-eventTypeMaintenance ..> scanProperties
-strictWarningService ..> trackerFacade
+DictionaryStrict --> PgAnalytics
+AggregationRollup --> PgAnalytics
+TraceLogIndex --> LogFiles
+TraceLogIndex --> PgAnalytics
+RuntimeSettings --> PgAnalytics
 
-aggregationScheduler ..> aggregationService
-aggregationScheduler ..> timeRollupService
-aggregationScheduler ..> filterRollupService
-aggregationScheduler ..> stageMetricRollupService
-aggregationScheduler ..> lifecycleService
-scheduledJobsPolicy ..> aggregationScheduler
-runtimeSettings ..> scheduledJobsPolicy
-runtimeOperations ..> aggregationService
-runtimeOperations ..> logArchiveIndexService
-aggregationService ..> analyticsRepositories
-aggregationService ..> rollupRepositories
-timeRollupService ..> analyticsRepositories
-timeRollupService ..> rollupRepositories
-filterRollupService ..> analyticsRepositories
-filterRollupService ..> rollupRepositories
-stageMetricRollupService ..> analyticsRepositories
-stageMetricRollupService ..> rollupRepositories
-lifecycleService ..> analyticsRepositories
-lifecycleService ..> rollupRepositories
+BackendShop --> PgShop
 
-traceFilter ..> traceContext : MDC keys
-appModuleMdcFilter ..> traceContext
-loggingPolicy ..> runtimeSettings
-logArchiveIndexService ..> loggingPolicy
-logArchiveIndexService ..> logfs : reads current logs and archives
-logArchiveIndexService ..> logIndexRepositories
-traceLogLookupService ..> logIndexRepositories
-traceLogLookupService ..> logfs : reads archive when allowed
-logViewService ..> traceLogLookupService
-insightsService ..> logViewService
-
-businessJpa ..> shopdb : business data
-analyticsRepositories ..> analyticsEntities
-dictionaryRepositories ..> dictionaryEntities
-rollupRepositories ..> rollupEntities
-logIndexRepositories ..> logIndexEntities
-analyticsRepositories ..> analyticsdb : raw events
-dictionaryRepositories ..> analyticsdb : dictionaries
-rollupRepositories ..> analyticsdb : rollup buckets
-logIndexRepositories ..> analyticsdb : trace log index
-
-shopUserProvider ..> currentUserProvider : implements
-noopUserProvider ..> currentUserProvider : fallback
-eventAspect ..> currentUserProvider : user id/name/role
-
-persistenceConfig ..> datasourceProperties
-persistenceConfig ..> analyticsRepositories
-persistenceConfig ..> businessJpa
-adminWebConfig ..> adminAuthInterceptor
-adminWebConfig ..> springWeb
-uiTemplateConfig ..> thymeleaf
-analyticsBootstrap ..> dictionarySync
-
-adminTemplates ..> thymeleaf
-staticAssets ..> bootstrap
-staticAssets ..> chartjs
-api ..> springWeb
-adminAuthInterceptor ..> springSecurity
-jpaLayer ..> springData
-jpaLayer ..> pgdriver
-logLayer ..> logback
+FrontendShop ..> SpringWeb
+BackendShop ..> SpringWeb
+BackendShop ..> SpringDataJpa
+AdminApi ..> SpringWeb
+AdminApi ..> SpringSecurity
+AdminUi ..> Thymeleaf
+SnapshotPipeline ..> SpringDataJpa
+AggregationRollup ..> SpringDataJpa
+DictionaryStrict ..> SpringDataJpa
+TraceLogIndex ..> SpringDataJpa
 
 @enduml
