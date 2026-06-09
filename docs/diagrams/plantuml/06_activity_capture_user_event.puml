@@ -1,39 +1,71 @@
 @startuml
-title Диаграмма деятельности «Фиксация пользовательского события»
+title Диаграмма деятельности "Фиксация пользовательского события"
 
 skinparam shadowing false
+skinparam activity {
+  BackgroundColor #FFFFFF
+  BorderColor #2F3A4A
+  FontColor #111827
+}
+skinparam swimlane {
+  BackgroundColor #F4F6F8
+  BorderColor #B8C2CC
+  FontColor #111827
+}
 
 start
-partition "Пользователь" {
-  :Выполняет действие\nв интернет-магазине;
-}
-partition "Приложение-носитель" {
-  :HTTP-запрос попадает\nв controller;
-}
-partition "Analytics Module" {
-  :AnalyticsEventAspect обнаруживает\n@TrackAnalyticsEvent;
-  :Создаётся AnalyticsEventContext;
-  :Определяются event type,\nmodule, user, URL, traceId;
-  :Проверяются AnalyticsInstrumentationPolicy\nи strict-модель;
-  if (Событие разрешено?) then (да)
-    :Формируется AnalyticsEventSnapshot;
-    :Snapshot помещается в\nAnalyticsEventSnapshotBuffer\nили AnalyticsAsyncWriteBuffer;
+
+|Пользователь|
+:Выполняет действие\nв интернет-магазине;
+
+|Приложение-носитель|
+:HTTP-запрос поступает\nв контроллер приложения;
+
+|Analytics Module|
+:Перехват вызова метода,\nотмеченного аналитической аннотацией;
+:Формирование контекста\nаналитического события;
+:Определение типа события,\nмодуля, пользователя, URL и traceId;
+:Проверка политики\nинструментирования и strict-модели;
+
+if (Событие разрешено?) then (да)
+  :Формирование снимка\nаналитического события;
+  :Проверка корректности снимка;
+
+  if (Снимок корректен?) then (да)
+    :Помещение снимка\nв буфер записи;
+
+    fork
+      |Приложение-носитель|
+      :Бизнес-запрос\nпродолжает выполнение;
+    fork again
+      |Analytics Module|
+      :Асинхронная обработка\nбуфера записи;
+      note right
+        Запись выполняется в фоне
+        и не прерывает бизнес-запрос.
+      end note
+
+      |БД gqw_analytics|
+      :Сохранение события,\nатрибутов, этапов и метрик;
+    end fork
+
   else (нет)
-    :Фиксируется strict warning;
+    |Analytics Module|
+    :Фиксация служебной диагностики;
+
+    |Приложение-носитель|
+    :Бизнес-запрос\nпродолжает выполнение;
   endif
-}
-partition "Приложение-носитель" {
-  :Бизнес-запрос продолжает\nвыполнение;
-}
-partition "БД gqw_analytics" {
-  if (Есть корректный snapshot?) then (да)
-    :Сохраняются event,\nattributes, stages, metrics;
-  else (нет)
-    :Пользовательская статистика\nне искажается;
-  endif
-}
-partition "Analytics Module" {
-  :При ошибке инструментирования\nсоздаётся служебная диагностика;
-}
+
+else (нет)
+  |Analytics Module|
+  :Фиксация служебного\nпредупреждения;
+  :При включённой диагностике\nсоздаётся служебная запись;
+  :Пользовательская статистика\nне изменяется;
+
+  |Приложение-носитель|
+  :Бизнес-запрос\nпродолжает выполнение;
+endif
+
 stop
 @enduml
