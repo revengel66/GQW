@@ -1,0 +1,38 @@
+2026-06-09T10:47:39.977+04:00  INFO 34016 --- [gqw] [restartedMain] com.example.gqw.GqwApplication           : Starting GqwApplication using Java 21.0.8 with PID 34016 (C:\Users\Natalia\.gqw-build\gqw\classes\java\main started by Natalia in C:\Users\Natalia\Desktop\ДИПЛОМ\GQW)
+2026-06-09T10:47:39.980+04:00  INFO 34016 --- [gqw] [restartedMain] com.example.gqw.GqwApplication           : No active profile set, falling back to 1 default profile: "default"
+2026-06-09T10:47:40.011+04:00  INFO 34016 --- [gqw] [restartedMain] .e.DevToolsPropertyDefaultsPostProcessor : Devtools property defaults active! Set 'spring.devtools.add-properties' to 'false' to disable
+2026-06-09T10:47:40.011+04:00  INFO 34016 --- [gqw] [restartedMain] .e.DevToolsPropertyDefaultsPostProcessor : For additional web related logging consider setting the 'logging.level.web' property to 'DEBUG'
+2026-06-09T10:47:40.486+04:00  INFO 34016 --- [gqw] [restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-06-09T10:47:40.543+04:00  INFO 34016 --- [gqw] [restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 48 ms. Found 17 JPA repository interfaces.
+2026-06-09T10:47:40.990+04:00  INFO 34016 --- [gqw] [restartedMain] o.s.boot.tomcat.TomcatWebServer          : Tomcat initialized with port 8080 (http)
+2026-06-09T10:47:40.999+04:00  INFO 34016 --- [gqw] [restartedMain] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-06-09T10:47:40.999+04:00  INFO 34016 --- [gqw] [restartedMain] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/11.0.18]
+2026-06-09T10:47:41.031+04:00  INFO 34016 --- [gqw] [restartedMain] b.w.c.s.WebApplicationContextInitializer : Root WebApplicationContext: initialization completed in 1019 ms
+2026-06-09T10:47:41.262+04:00  INFO 34016 --- [gqw] [restartedMain] org.hibernate.orm.jpa                    : HHH008540: Processing PersistenceUnitInfo [name: default]
+2026-06-09T10:47:41.320+04:00  INFO 34016 --- [gqw] [restartedMain] org.hibernate.orm.core                   : HHH000001: Hibernate ORM core version 7.2.7.Final
+2026-06-09T10:47:41.693+04:00  INFO 34016 --- [gqw] [restartedMain] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-06-09T10:47:41.718+04:00  INFO 34016 --- [gqw] [restartedMain] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-06-09T10:47:41.750+04:00  INFO 34016 --- [gqw] [restartedMain] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@11eedc4d
+2026-06-09T10:47:41.751+04:00  INFO 34016 --- [gqw] [restartedMain] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-06-09T10:47:41.829+04:00  INFO 34016 --- [gqw] [restartedMain] org.hibernate.orm.connections.pooling    : HHH10001005: Database info:
+	Database JDBC URL [jdbc:postgresql://localhost:5432/gqw]
+	Database driver: PostgreSQL JDBC Driver
+	Database dialect: PostgreSQLDialect
+	Database version: 18.0
+	Default catalog/schema: gqw/public
+	Autocommit mode: undefined/unknown
+	Isolation level: READ_COMMITTED [default READ_COMMITTED]
+	JDBC fetch size: none
+	Pool: DataSourceConnectionProvider
+	Minimum pool size: undefined/unknown
+	Maximum pool size: undefined/unknown
+2026-06-09T10:47:42.788+04:00  INFO 34016 --- [gqw] [restartedMain] org.hibernate.orm.core                   : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-06-09T10:47:42.918+04:00  INFO 34016 --- [gqw] [restartedMain] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-06-09T10:47:42.969+04:00  INFO 34016 --- [gqw] [restartedMain] o.s.d.j.r.query.QueryEnhancerFactories   : Hibernate is in classpath; If applicable, HQL parser will be used.
+2026-06-09T10:47:43.744+04:00  INFO 34016 --- [gqw] [restartedMain] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with UserDetailsService bean with name customUserDetailsService
+2026-06-09T10:47:44.001+04:00  WARN 34016 --- [gqw] [restartedMain] ion$DefaultTemplateResolverConfiguration : Cannot find template location: classpath:/templates/ (please add some templates, check your Thymeleaf configuration, or set spring.thymeleaf.check-template-location=false)
+2026-06-09T10:47:44.108+04:00  INFO 34016 --- [gqw] [restartedMain] o.s.boot.tomcat.TomcatWebServer          : Tomcat started on port 8080 (http) with context path '/'
+2026-06-09T10:47:44.108+04:00  INFO 34016 --- [gqw] [restartedMain] com.example.gqw.GqwApplication           : Started GqwApplication in 4.428 seconds (process running for 4.755)
+2026-06-09T10:47:48.570+04:00  INFO 34016 --- [gqw] [http-nio-8080-exec-2] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-06-09T10:47:48.571+04:00  INFO 34016 --- [gqw] [http-nio-8080-exec-2] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2026-06-09T10:47:48.572+04:00  INFO 34016 --- [gqw] [http-nio-8080-exec-2] o.s.web.servlet.DispatcherServlet        : Completed initialization in 1 ms
