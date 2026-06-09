@@ -45,6 +45,7 @@ dependencies {
     testImplementation 'org.junit.platform:junit-platform-suite-api'
     testRuntimeOnly 'org.junit.platform:junit-platform-suite-engine'
     testRuntimeOnly 'com.h2database:h2'
+    implementation project(':gqw-analytics-module')
 }
 
 tasks.named('test') {
