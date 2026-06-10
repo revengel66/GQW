@@ -36,3 +36,91 @@
 2026-06-09T10:47:48.570+04:00  INFO 34016 --- [gqw] [http-nio-8080-exec-2] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
 2026-06-09T10:47:48.571+04:00  INFO 34016 --- [gqw] [http-nio-8080-exec-2] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
 2026-06-09T10:47:48.572+04:00  INFO 34016 --- [gqw] [http-nio-8080-exec-2] o.s.web.servlet.DispatcherServlet        : Completed initialization in 1 ms
+2026-06-11T03:44:17.795+04:00  INFO 15280 --- [gqw] [restartedMain] com.example.gqw.GqwApplication           : Starting GqwApplication using Java 21.0.8 with PID 15280 (C:\Users\Natalia\.gqw-build\gqw\classes\java\main started by Natalia in C:\Users\Natalia\Desktop\ДИПЛОМ\GQW)
+2026-06-11T03:44:17.798+04:00  INFO 15280 --- [gqw] [restartedMain] com.example.gqw.GqwApplication           : No active profile set, falling back to 1 default profile: "default"
+2026-06-11T03:44:17.834+04:00  INFO 15280 --- [gqw] [restartedMain] .e.DevToolsPropertyDefaultsPostProcessor : Devtools property defaults active! Set 'spring.devtools.add-properties' to 'false' to disable
+2026-06-11T03:44:17.834+04:00  INFO 15280 --- [gqw] [restartedMain] .e.DevToolsPropertyDefaultsPostProcessor : For additional web related logging consider setting the 'logging.level.web' property to 'DEBUG'
+2026-06-11T03:44:18.330+04:00  INFO 15280 --- [gqw] [restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-06-11T03:44:18.374+04:00  INFO 15280 --- [gqw] [restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 37 ms. Found 13 JPA repository interfaces.
+2026-06-11T03:44:18.376+04:00  INFO 15280 --- [gqw] [restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-06-11T03:44:18.378+04:00  INFO 15280 --- [gqw] [restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 0 ms. Found 0 JPA repository interfaces.
+2026-06-11T03:44:19.187+04:00  INFO 15280 --- [gqw] [restartedMain] o.s.boot.tomcat.TomcatWebServer          : Tomcat initialized with port 8080 (http)
+2026-06-11T03:44:19.198+04:00  INFO 15280 --- [gqw] [restartedMain] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-06-11T03:44:19.199+04:00  INFO 15280 --- [gqw] [restartedMain] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/11.0.18]
+2026-06-11T03:44:19.235+04:00  INFO 15280 --- [gqw] [restartedMain] b.w.c.s.WebApplicationContextInitializer : Root WebApplicationContext: initialization completed in 1399 ms
+2026-06-11T03:44:19.452+04:00  INFO 15280 --- [gqw] [restartedMain] org.hibernate.orm.jpa                    : HHH008540: Processing PersistenceUnitInfo [name: analytics]
+2026-06-11T03:44:19.518+04:00  INFO 15280 --- [gqw] [restartedMain] org.hibernate.orm.core                   : HHH000001: Hibernate ORM core version 7.2.7.Final
+2026-06-11T03:44:19.922+04:00  INFO 15280 --- [gqw] [restartedMain] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-06-11T03:44:19.954+04:00  INFO 15280 --- [gqw] [restartedMain] com.zaxxer.hikari.HikariDataSource       : analyticsDataSource - Starting...
+2026-06-11T03:44:19.986+04:00  INFO 15280 --- [gqw] [restartedMain] com.zaxxer.hikari.pool.HikariPool        : analyticsDataSource - Added connection org.postgresql.jdbc.PgConnection@259a6c6f
+2026-06-11T03:44:19.987+04:00  INFO 15280 --- [gqw] [restartedMain] com.zaxxer.hikari.HikariDataSource       : analyticsDataSource - Start completed.
+2026-06-11T03:44:20.058+04:00  INFO 15280 --- [gqw] [restartedMain] org.hibernate.orm.connections.pooling    : HHH10001005: Database info:
+	Database JDBC URL [jdbc:postgresql://localhost:5432/analytics-new]
+	Database driver: PostgreSQL JDBC Driver
+	Database dialect: PostgreSQLDialect
+	Database version: 18.0
+	Default catalog/schema: analytics-new/public
+	Autocommit mode: undefined/unknown
+	Isolation level: READ_COMMITTED [default READ_COMMITTED]
+	JDBC fetch size: none
+	Pool: DataSourceConnectionProvider
+	Minimum pool size: undefined/unknown
+	Maximum pool size: undefined/unknown
+2026-06-11T03:44:20.908+04:00  INFO 15280 --- [gqw] [restartedMain] org.hibernate.orm.core                   : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-06-11T03:44:21.100+04:00  WARN 15280 --- [gqw] [restartedMain] org.hibernate.orm.jdbc.warn              : HHH000247: ErrorCode: 0, SQLState: 00000
+2026-06-11T03:44:21.101+04:00  WARN 15280 --- [gqw] [restartedMain] org.hibernate.orm.jdbc.warn              : constraint "uklvod9bfm438ex1071ku1glb70" of relation "admin_user" does not exist, skipping
+2026-06-11T03:44:21.110+04:00  WARN 15280 --- [gqw] [restartedMain] org.hibernate.orm.jdbc.warn              : HHH000247: ErrorCode: 0, SQLState: 00000
+2026-06-11T03:44:21.110+04:00  WARN 15280 --- [gqw] [restartedMain] org.hibernate.orm.jdbc.warn              : constraint "uq_analytics_code_alias_type_source" of relation "code_alias" does not exist, skipping
+2026-06-11T03:44:21.115+04:00  WARN 15280 --- [gqw] [restartedMain] org.hibernate.orm.jdbc.warn              : HHH000247: ErrorCode: 0, SQLState: 00000
+2026-06-11T03:44:21.115+04:00  WARN 15280 --- [gqw] [restartedMain] org.hibernate.orm.jdbc.warn              : constraint "uk6qo1g0bf7vy8pswo2kmj52mqn" of relation "event" does not exist, skipping
+2026-06-11T03:44:21.121+04:00  WARN 15280 --- [gqw] [restartedMain] org.hibernate.orm.jdbc.warn              : HHH000247: ErrorCode: 0, SQLState: 00000
+2026-06-11T03:44:21.121+04:00  WARN 15280 --- [gqw] [restartedMain] org.hibernate.orm.jdbc.warn              : constraint "uq_analytics_stage_event_order" of relation "stage" does not exist, skipping
+2026-06-11T03:44:21.125+04:00  WARN 15280 --- [gqw] [restartedMain] org.hibernate.orm.jdbc.warn              : HHH000247: ErrorCode: 0, SQLState: 00000
+2026-06-11T03:44:21.125+04:00  WARN 15280 --- [gqw] [restartedMain] org.hibernate.orm.jdbc.warn              : constraint "uq_analytics_stage_metric_stage_type" of relation "stage_metric" does not exist, skipping
+2026-06-11T03:44:21.129+04:00  INFO 15280 --- [gqw] [restartedMain] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'analytics'
+2026-06-11T03:44:21.193+04:00  INFO 15280 --- [gqw] [restartedMain] org.hibernate.orm.jpa                    : HHH008540: Processing PersistenceUnitInfo [name: business]
+2026-06-11T03:44:21.207+04:00  INFO 15280 --- [gqw] [restartedMain] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-06-11T03:44:21.208+04:00  INFO 15280 --- [gqw] [restartedMain] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-06-11T03:44:21.236+04:00  INFO 15280 --- [gqw] [restartedMain] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@5d1f600a
+2026-06-11T03:44:21.236+04:00  INFO 15280 --- [gqw] [restartedMain] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-06-11T03:44:21.253+04:00  INFO 15280 --- [gqw] [restartedMain] org.hibernate.orm.connections.pooling    : HHH10001005: Database info:
+	Database JDBC URL [jdbc:postgresql://localhost:5432/gqw]
+	Database driver: PostgreSQL JDBC Driver
+	Database dialect: PostgreSQLDialect
+	Database version: 18.0
+	Default catalog/schema: gqw/public
+	Autocommit mode: undefined/unknown
+	Isolation level: READ_COMMITTED [default READ_COMMITTED]
+	JDBC fetch size: none
+	Pool: DataSourceConnectionProvider
+	Minimum pool size: undefined/unknown
+	Maximum pool size: undefined/unknown
+2026-06-11T03:44:21.517+04:00  INFO 15280 --- [gqw] [restartedMain] org.hibernate.orm.core                   : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-06-11T03:44:21.569+04:00  INFO 15280 --- [gqw] [restartedMain] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'business'
+2026-06-11T03:44:21.608+04:00  INFO 15280 --- [gqw] [restartedMain] o.s.d.j.r.query.QueryEnhancerFactories   : Hibernate is in classpath; If applicable, HQL parser will be used.
+2026-06-11T03:44:21.873+04:00  WARN 15280 --- [gqw] [restartedMain] ConfigServletWebServerApplicationContext : Exception encountered during context initialization - cancelling refresh attempt: org.springframework.beans.factory.UnsatisfiedDependencyException: Error creating bean with name 'adminCategoriesController' defined in file [C:\Users\Natalia\.gqw-build\gqw\classes\java\main\com\example\gqw\admin\controller\AdminCategoriesController.class]: Unsatisfied dependency expressed through constructor parameter 0: Error creating bean with name 'adminService' defined in file [C:\Users\Natalia\.gqw-build\gqw\classes\java\main\com\example\gqw\admin\service\AdminService.class]: Unsatisfied dependency expressed through constructor parameter 0: No qualifying bean of type 'com.example.gqw.shop.repository.ProductRepository' available: expected at least 1 bean which qualifies as autowire candidate. Dependency annotations: {}
+2026-06-11T03:44:21.873+04:00  INFO 15280 --- [gqw] [restartedMain] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'business'
+2026-06-11T03:44:21.874+04:00  INFO 15280 --- [gqw] [restartedMain] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'analytics'
+2026-06-11T03:44:21.874+04:00  INFO 15280 --- [gqw] [restartedMain] com.zaxxer.hikari.HikariDataSource       : analyticsDataSource - Shutdown initiated...
+2026-06-11T03:44:21.877+04:00  INFO 15280 --- [gqw] [restartedMain] com.zaxxer.hikari.HikariDataSource       : analyticsDataSource - Shutdown completed.
+2026-06-11T03:44:21.877+04:00  INFO 15280 --- [gqw] [restartedMain] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2026-06-11T03:44:21.985+04:00  INFO 15280 --- [gqw] [restartedMain] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
+2026-06-11T03:44:21.988+04:00  INFO 15280 --- [gqw] [restartedMain] o.apache.catalina.core.StandardService   : Stopping service [Tomcat]
+2026-06-11T03:44:21.994+04:00  INFO 15280 --- [gqw] [restartedMain] .s.b.a.l.ConditionEvaluationReportLogger : 
+
+Error starting ApplicationContext. To display the condition evaluation report re-run your application with 'debug' enabled.
+2026-06-11T03:44:22.009+04:00 ERROR 15280 --- [gqw] [restartedMain] o.s.b.d.LoggingFailureAnalysisReporter   : 
+
+***************************
+APPLICATION FAILED TO START
+***************************
+
+Description:
+
+Parameter 0 of constructor in com.example.gqw.admin.service.AdminService required a bean of type 'com.example.gqw.shop.repository.ProductRepository' that could not be found.
+
+
+Action:
+
+Consider defining a bean of type 'com.example.gqw.shop.repository.ProductRepository' in your configuration.
+
