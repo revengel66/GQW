@@ -104,7 +104,7 @@ public class AnalyticsUniversalController {
             Boolean.TRUE.equals(systemEventsOnly),
             isError
         );
-        log.info(
+        log.debug(
             "[UNIVERSAL_PERF] controller endpoint=/api/universal totalMs={} from={} to={} module={} eventTypes={} stage={} attr={} includeEventStageBreakdown={} counts series={} stages={} events={} eventSeries={} eventStageBreakdown={}",
             elapsedMs(started),
             range.from(),
@@ -203,7 +203,7 @@ public class AnalyticsUniversalController {
             Boolean.TRUE.equals(systemEventsOnly),
             isError
         );
-        log.info(
+        log.debug(
             "[UNIVERSAL_PERF] controller endpoint=/api/universal/compare totalMs={} beforeFrom={} beforeTo={} afterFrom={} afterTo={} module={} eventTypes={} includeEventStageBreakdown={}",
             elapsedMs(started),
             beforeRange.from(),
@@ -255,7 +255,7 @@ public class AnalyticsUniversalController {
             sortBy,
             sortDir
         );
-        log.info(
+        log.debug(
             "[UNIVERSAL_PERF] controller endpoint=/api/universal/attribute-breakdown totalMs={} from={} to={} eventCodes={} stageCodes={} attr={} limit={} offset={} sortBy={} sortDir={} rows={} total={}",
             elapsedMs(started),
             range.from(),
@@ -307,7 +307,7 @@ public class AnalyticsUniversalController {
             attributeValue,
             limit
         );
-        log.info(
+        log.debug(
             "[UNIVERSAL_PERF] controller endpoint=/api/universal/root-cause totalMs={} from={} to={} eventCodes={} stageCodes={} attr={} value={} factors={} problemEvents={}",
             elapsedMs(started),
             range.from(),
@@ -352,7 +352,7 @@ public class AnalyticsUniversalController {
             moduleCode,
             limit
         );
-        log.info(
+        log.debug(
             "[UNIVERSAL_PERF] controller endpoint=/api/universal/event-root-cause totalMs={} from={} to={} eventCodes={} stageCodes={} factors={} problemEvents={}",
             elapsedMs(started),
             range.from(),
@@ -401,7 +401,7 @@ public class AnalyticsUniversalController {
             sortBy,
             sortDir
         );
-        log.info(
+        log.debug(
             "[UNIVERSAL_PERF] controller endpoint=/api/universal/error-breakdown totalMs={} from={} to={} eventCodes={} stageCodes={} limit={} offset={} sortBy={} sortDir={} rows={} total={}",
             elapsedMs(started),
             range.from(),
@@ -452,7 +452,7 @@ public class AnalyticsUniversalController {
             systemEventsOnly,
             limit
         );
-        log.info(
+        log.debug(
             "[UNIVERSAL_PERF] controller endpoint=/api/universal/error-root-cause totalMs={} from={} to={} eventCodes={} stageCodes={} errorKey={} factors={} problemEvents={}",
             elapsedMs(started),
             range.from(),
@@ -482,20 +482,38 @@ public class AnalyticsUniversalController {
         @RequestParam(required = false) String sortBy,
         @RequestParam(required = false) String sortDir
     ) {
+        long started = System.nanoTime();
         AnalyticsTimeRangeResolver.TimeRange range = Boolean.TRUE.equals(allTime)
             ? new AnalyticsTimeRangeResolver.TimeRange(Instant.EPOCH, Instant.now())
             : AnalyticsTimeRangeResolver.resolveRange(from, to, Duration.ofHours(24));
-        return moduleBreakdownService.breakdown(
+        List<String> resolvedEventCodes = merge(eventCodes, eventCode, eventTypeCode);
+        List<String> resolvedStageCodes = merge(stageTypeCodes, stageTypeCode);
+        UniversalModuleBreakdownResponse response = moduleBreakdownService.breakdown(
             range.from(),
             range.to(),
-            merge(eventCodes, eventCode, eventTypeCode),
-            merge(stageTypeCodes, stageTypeCode),
+            resolvedEventCodes,
+            resolvedStageCodes,
             moduleCode,
             limit,
             offset,
             sortBy,
             sortDir
         );
+        log.debug(
+            "[UNIVERSAL_PERF] controller endpoint=/api/universal/module-breakdown totalMs={} from={} to={} eventCodes={} stageCodes={} module={} limit={} offset={} rows={} total={} problemEvents={}",
+            elapsedMs(started),
+            range.from(),
+            range.to(),
+            resolvedEventCodes.size(),
+            resolvedStageCodes.size(),
+            moduleCode,
+            limit,
+            offset,
+            size(response.rows()),
+            response.total(),
+            response.problemEventCount()
+        );
+        return response;
     }
 
     @GetMapping("/module-root-cause")
@@ -513,19 +531,36 @@ public class AnalyticsUniversalController {
         @RequestParam(required = false) Boolean systemEventsOnly,
         @RequestParam(required = false) Integer limit
     ) {
+        long started = System.nanoTime();
         AnalyticsTimeRangeResolver.TimeRange range = Boolean.TRUE.equals(allTime)
             ? new AnalyticsTimeRangeResolver.TimeRange(Instant.EPOCH, Instant.now())
             : AnalyticsTimeRangeResolver.resolveRange(from, to, Duration.ofHours(24));
-        return moduleBreakdownService.rootCause(
+        List<String> resolvedEventCodes = merge(eventCodes, eventCode, eventTypeCode);
+        List<String> resolvedStageCodes = merge(stageTypeCodes, stageTypeCode);
+        UniversalRootCauseResponse response = moduleBreakdownService.rootCause(
             range.from(),
             range.to(),
-            merge(eventCodes, eventCode, eventTypeCode),
-            merge(stageTypeCodes, stageTypeCode),
+            resolvedEventCodes,
+            resolvedStageCodes,
             moduleCode,
             selectedStageTypeCode,
             systemEventsOnly,
             limit
         );
+        log.debug(
+            "[UNIVERSAL_PERF] controller endpoint=/api/universal/module-root-cause totalMs={} from={} to={} eventCodes={} stageCodes={} module={} selectedStage={} systemEventsOnly={} factors={} problemEvents={}",
+            elapsedMs(started),
+            range.from(),
+            range.to(),
+            resolvedEventCodes.size(),
+            resolvedStageCodes.size(),
+            moduleCode,
+            selectedStageTypeCode,
+            systemEventsOnly,
+            size(response.factors()),
+            response.problemEventCount()
+        );
+        return response;
     }
 
     private static AnalyticsTimeRangeResolver.TimeRange resolveBeforeRange(

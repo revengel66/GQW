@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.MDC;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -43,20 +44,26 @@ public class FrontendAnalyticsIngestService {
     private final AnalyticsEventRepository analyticsEventRepository;
     private final AnalyticsStageRepository analyticsStageRepository;
     private final AnalyticsStrictWarningEventService strictWarningEventService;
+    private final boolean enabled;
 
     public FrontendAnalyticsIngestService(
         AnalyticsTrackingApi analyticsTrackingApi,
         AnalyticsEventRepository analyticsEventRepository,
         AnalyticsStageRepository analyticsStageRepository,
-        AnalyticsStrictWarningEventService strictWarningEventService
+        AnalyticsStrictWarningEventService strictWarningEventService,
+        @Value("${app.analytics.frontend.ingest.enabled:true}") boolean enabled
     ) {
         this.analyticsTrackingApi = analyticsTrackingApi;
         this.analyticsEventRepository = analyticsEventRepository;
         this.analyticsStageRepository = analyticsStageRepository;
         this.strictWarningEventService = strictWarningEventService;
+        this.enabled = enabled;
     }
 
     public void ingest(FrontendAnalyticsIngestRequest request, HttpServletRequest httpRequest) {
+        if (!enabled) {
+            return;
+        }
         if (request == null || request.events() == null || request.events().isEmpty()) {
             return;
         }

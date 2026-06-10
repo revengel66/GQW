@@ -4,6 +4,8 @@ import com.example.gqw.analytics.service.AnalyticsInsightsService;
 import com.example.gqw.analytics.web.dto.AnalyticsApiDto.CompareResponse;
 import java.time.Duration;
 import java.time.Instant;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -13,6 +15,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping({"/analytics/api/compare", "/analytics-admin/api/compare"})
 public class AnalyticsCompareController {
+
+    private static final Logger log = LoggerFactory.getLogger(AnalyticsCompareController.class);
 
     private final AnalyticsInsightsService analyticsInsightsService;
 
@@ -52,7 +56,8 @@ public class AnalyticsCompareController {
             targetDuration
         );
 
-        return analyticsInsightsService.compare(
+        long started = System.nanoTime();
+        CompareResponse response = analyticsInsightsService.compare(
             baselineRange.from(),
             baselineRange.to(),
             targetRange.from(),
@@ -61,5 +66,22 @@ public class AnalyticsCompareController {
             eventTypeCode,
             requestPath
         );
+        log.debug(
+            "[COMPARE_PERF] controller endpoint=/api/compare totalMs={} baselineFrom={} baselineTo={} targetFrom={} targetTo={} module={} eventType={} requestPath={} rows={}",
+            elapsedMs(started),
+            baselineRange.from(),
+            baselineRange.to(),
+            targetRange.from(),
+            targetRange.to(),
+            moduleCode,
+            eventTypeCode,
+            requestPath,
+            response.events() == null ? 0 : response.events().size()
+        );
+        return response;
+    }
+
+    private static long elapsedMs(long started) {
+        return (System.nanoTime() - started) / 1_000_000L;
     }
 }

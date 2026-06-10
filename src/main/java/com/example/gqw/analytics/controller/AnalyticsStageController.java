@@ -45,8 +45,9 @@ public class AnalyticsStageController {
         @RequestParam(required = false) BigDecimal filterAttributeMaxValue,
         @RequestParam(required = false) Integer bucketMinutes
     ) {
+        long started = System.nanoTime();
         AnalyticsTimeRangeResolver.TimeRange range = AnalyticsTimeRangeResolver.resolveRange(from, to, Duration.ofHours(24));
-        return analyticsInsightsService.stageBreakdown(
+        StageBreakdownResponse response = analyticsInsightsService.stageBreakdown(
             range.from(),
             range.to(),
             moduleCode,
@@ -62,6 +63,20 @@ public class AnalyticsStageController {
             filterAttributeMaxValue,
             bucketMinutes
         );
+        log.debug(
+            "[STAGE_BREAKDOWN_PERF] controller endpoint=/api/stages totalMs={} from={} to={} module={} eventType={} requestPath={} bucket={} stages={} series={} partial={}",
+            elapsedMs(started),
+            range.from(),
+            range.to(),
+            moduleCode,
+            eventTypeCode,
+            requestPath,
+            bucketMinutes,
+            response.stages() == null ? 0 : response.stages().size(),
+            response.series() == null ? 0 : response.series().size(),
+            response.partial()
+        );
+        return response;
     }
 
     @GetMapping("/stages/compare")
@@ -83,6 +98,7 @@ public class AnalyticsStageController {
         @RequestParam(required = false) BigDecimal filterAttributeMaxValue,
         @RequestParam(required = false) Integer bucketMinutes
     ) {
+        long started = System.nanoTime();
         AnalyticsTimeRangeResolver.TimeRange afterRange = AnalyticsTimeRangeResolver.resolveRange(afterFrom, afterTo, Duration.ofHours(24));
         AnalyticsTimeRangeResolver.TimeRange beforeRange = resolveBeforeRange(beforeFrom, beforeTo, afterRange);
 
@@ -118,7 +134,22 @@ public class AnalyticsStageController {
             filterAttributeMaxValue,
             bucketMinutes
         );
-        return new StageBreakdownCompareResponse(before, after);
+        StageBreakdownCompareResponse response = new StageBreakdownCompareResponse(before, after);
+        log.debug(
+            "[STAGE_BREAKDOWN_PERF] controller endpoint=/api/stages/compare totalMs={} beforeFrom={} beforeTo={} afterFrom={} afterTo={} module={} eventType={} requestPath={} bucket={} beforeStages={} afterStages={}",
+            elapsedMs(started),
+            beforeRange.from(),
+            beforeRange.to(),
+            afterRange.from(),
+            afterRange.to(),
+            moduleCode,
+            eventTypeCode,
+            requestPath,
+            bucketMinutes,
+            before.stages() == null ? 0 : before.stages().size(),
+            after.stages() == null ? 0 : after.stages().size()
+        );
+        return response;
     }
 
     @GetMapping("/stage-metrics")
@@ -166,7 +197,7 @@ public class AnalyticsStageController {
             includeTopValues,
             includeSeries
         );
-        log.info(
+        log.debug(
             "[STAGE_METRICS_PERF] controller endpoint=/api/stage-metrics totalMs={} from={} to={} module={} eventType={} stage={} metric={} bucket={} includeSummaries={} includeTopValues={} counts summaries={} series={} topValues={}",
             elapsedMs(started),
             range.from(),
@@ -256,7 +287,7 @@ public class AnalyticsStageController {
             includeSeries
         );
         StageMetricCompareResponse response = new StageMetricCompareResponse(before, after);
-        log.info(
+        log.debug(
             "[STAGE_METRICS_PERF] controller endpoint=/api/stage-metrics/compare totalMs={} beforeFrom={} beforeTo={} afterFrom={} afterTo={} module={} eventType={} stage={} metric={} bucket={} includeSummaries={} includeTopValues={}",
             elapsedMs(started),
             beforeRange.from(),

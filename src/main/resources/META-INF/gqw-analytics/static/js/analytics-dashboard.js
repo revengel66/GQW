@@ -3,6 +3,7 @@
         ? "/analytics-admin/api"
         : "/analytics/api";
     const API_BASE = (window.analyticsApiBase || inferredBase).replace(/\/+$/, "");
+    const EXPANDED_FOCUSED_CHART_STORAGE_KEY = "gqw.analytics.expandedFocusedChart";
     const state = {
         charts: {},
         chartConfigs: {},
@@ -84,6 +85,10 @@
         metricHelpByCode: {},
         expandedIntervalSelectionEnabledBySource: {},
         expandedIntervalSelectionBySource: {},
+        expandedEventFilterBySource: {},
+        expandedFocusedChartSnapshot: null,
+        preserveExpandedFocusedChartOnNextCollapse: false,
+        restoringExpandedFocusedChart: false,
         activeAnalysisInterval: null,
         analysisIntervalHistory: [],
         submitMainFilters: null,
@@ -97,6 +102,7 @@
         analyticsApiSuccessPending: false,
         analyticsApiToastTimer: null,
         panelLoadingDepthByElement: new WeakMap(),
+        expandedLoadingDepthBySource: {},
         sectionLocalLoadingDepthByElement: new WeakMap(),
         mainFiltersSubmitting: false,
         mainFiltersSubmitPending: false,
@@ -185,6 +191,8 @@
         universalAllTime: false,
         allTimeRange: null,
         expandedEventOptionsBySource: {},
+        expandedEventOptionsRequestIdBySource: {},
+        rawEventTypeOptionsRequestId: 0,
         eventsPage: 0,
         eventsSize: 15,
         eventsHasMore: false,
@@ -207,6 +215,8 @@
         systemActiveInterval: null,
         systemChartLocalDirty: false,
         syncingSystemChartFromMain: false,
+        compareRequestId: 0,
+        compareAbortController: null,
         compareFilterDirty: false,
         compareLoaded: false,
         currentDashboardTab: "overview",
@@ -2040,6 +2050,9 @@
             if (!preserveChartUiState) {
                 state.expandedBucketBySource = {};
             }
+            if (!preserveChartUiState) {
+                syncOpenedExpandedChartRangeFromTopFilter();
+            }
             syncStageMetricQuickRangeFromMain();
             syncStageMetricRangesFromMain(true);
             syncStageTextQuickRangeFromMain();
@@ -2050,11 +2063,11 @@
             await refreshScopedOptionsSafe();
             applyGlobalMetricToEventsFilter();
             state.eventsPage = 0;
+            const compareSynced = syncCompareRangeFromMain();
             await reloadAll();
             if (state.currentDashboardTab === "system") {
                 await loadSystemEventsChart();
             }
-            const compareSynced = syncCompareRangeFromMain();
             if (shouldRefreshCompareAfterMainSync(compareSynced)) {
                 await loadCompare();
             }
@@ -3494,9 +3507,7 @@
                 await syncSystemChartFiltersFromMain({force: true, refreshOptions: true});
             }
             await reloadAll();
-            if (state.currentDashboardTab === "compare") {
-                await loadCompare();
-            }
+            await restoreExpandedFocusedChartSnapshotIfNeeded();
             applyUniversalChartZoom("chart-universal-timeline", refs.universalTimelineZoomX?.value, refs.universalTimelineZoomY?.value);
             applyUniversalChartZoom("chart-universal-stages", refs.universalStagesZoomX?.value, refs.universalStagesZoomY?.value);
             applyUniversalChartZoom("chart-universal-event-kpi", refs.universalEventKpiZoomX?.value, refs.universalEventKpiZoomY?.value);
@@ -3882,7 +3893,9 @@
 
         const expandedCanvasId = state.expandedChart.sourceCanvasId || "";
         if (expandedCanvasId && getChartOwningTab(expandedCanvasId) !== normalized) {
-            collapseExpandedChart();
+            collapseExpandedChart({
+                preserveFocusedSnapshot: state.preserveExpandedFocusedChartOnNextCollapse === true
+            });
         }
 
         refs.analyticsTabOverview?.classList.toggle("active", normalized === "overview");
@@ -3901,12 +3914,10 @@
         } else if (normalized === "system") {
             void loadSystemEventsChart();
         }
-        if (normalized === "compare") {
-            void loadCompare();
-        }
         if (shouldPushState) {
             if (normalized === "overview") {
                 void reloadActiveDashboardTab(nextMainReloadRequestId())
+                    .then(() => restoreExpandedFocusedChartSnapshotIfNeeded())
                     .catch((error) => console.error("Overview tab lazy load failed", error));
             } else if (normalized === "universal") {
                 void withUniversalChartLoaders(() => loadUniversal())
@@ -3916,8 +3927,12 @@
                     .catch((error) => console.error("Metrics tab lazy load failed", error));
             } else if (normalized === "raw") {
                 state.eventsPage = 0;
-                void loadEvents(true)
+                void refreshRawEventTypeOptionsForMode(selectedRawEventTypeCodes())
+                    .then(() => loadEvents(true))
                     .catch((error) => console.error("Events tab lazy load failed", error));
+            } else if (normalized === "compare") {
+                void loadCompare()
+                    .catch((error) => console.error("Compare tab lazy load failed", error));
             }
         }
 
@@ -3961,8 +3976,9 @@
 
     async function refreshEventsScopeForMode() {
         try {
+            syncEventsRangeFromMain(true);
             await refreshScopedOptionsSafe();
-            await refreshRawEventTypeOptionsForMode(selectedRawEventTypeCodes());
+            await refreshRawEventTypeOptionsForMode(selectedRawEventTypeCodes(), {useMainRange: true});
             state.eventsPage = 0;
             const tasks = [loadEvents(true)];
             if (state.eventsSystemOnly) {
@@ -4072,7 +4088,84 @@
         }
     }
 
-    async function syncExpandedGraphFiltersFromTop() {
+    function syncOpenedExpandedChartRangeFromTopFilter() {
+        const canvasId = state.expandedChart.sourceCanvasId || "";
+        const container = state.expandedChart.containerEl;
+        if (!canvasId || !container) {
+            return;
+        }
+        const ranges = state.globalCompareEnabled ? resolveGlobalBeforeRange() : expandedRangesFromTopFilter(canvasId);
+        state.expandedRangesBySource[canvasId] = {...ranges};
+        state.expandedChart.customRangeActive = false;
+        const controls = container.querySelector(".analytics-expanded-graph-controls");
+        if (!controls) {
+            return;
+        }
+        const setValue = (selector, value) => {
+            const input = controls.querySelector(selector);
+            if (input) {
+                input.value = value || "";
+            }
+        };
+        setValue("[data-range='before-from']", ranges.beforeFrom);
+        setValue("[data-range='before-to']", ranges.beforeTo);
+        setValue("[data-range='after-from']", ranges.afterFrom);
+        setValue("[data-range='after-to']", ranges.afterTo);
+        setValue("[data-range='before-from-compare']", ranges.beforeFrom);
+        setValue("[data-range='before-to-compare']", ranges.beforeTo);
+        setValue("[data-range='after-from-compare']", ranges.afterFrom);
+        setValue("[data-range='after-to-compare']", ranges.afterTo);
+        const presetEl = controls.querySelector("[data-expanded-preset]");
+        syncQuickRangeSelectFromRange(presetEl, ranges.afterFrom, ranges.afterTo);
+    }
+
+    async function refreshOpenedExpandedEventFilterOptions(canvasId, ranges) {
+        if (!EXPANDED_EVENT_FILTER_CHART_IDS.has(canvasId)) {
+            return;
+        }
+        const controls = state.expandedChart.containerEl?.querySelector(".analytics-expanded-graph-controls");
+        const eventCodesEl = controls?.querySelector("[data-event-codes]");
+        if (!controls || !eventCodesEl) {
+            return;
+        }
+        const requestId = (state.expandedEventOptionsRequestIdBySource[canvasId] || 0) + 1;
+        state.expandedEventOptionsRequestIdBySource[canvasId] = requestId;
+        const options = await fetchAvailableEventTypesForRanges(
+            ranges,
+            resolveExpandedBucket(canvasId),
+            resolveExpandedCompareMode(canvasId) !== "off"
+        );
+        if (state.expandedEventOptionsRequestIdBySource[canvasId] !== requestId) {
+            return;
+        }
+        state.expandedEventOptionsBySource[canvasId] = options;
+        const eventState = getExpandedEventFilterState(canvasId);
+        eventState.codes = eventState.codes.filter((code) => options.some((item) => item.code === code));
+        const optionsHtml = options
+            .map((item) => `<option value="${escapeHtml(item.code)}">${escapeHtml(item.name || item.code)}</option>`)
+            .join("");
+        if (EXPANDED_SINGLE_EVENT_FILTER_CHART_IDS.has(canvasId)) {
+            eventCodesEl.innerHTML = optionsHtml;
+            const selectedValue = eventState.codes[0] || "";
+            if (selectedValue) {
+                eventCodesEl.value = selectedValue;
+            } else if (eventCodesEl.options.length > 0) {
+                eventCodesEl.selectedIndex = -1;
+            }
+        } else {
+            const selectedCount = eventState.codes.length;
+            const allSelected = options.length > 0 && selectedCount === options.length;
+            eventCodesEl.innerHTML = `<option value="__all__"${allSelected ? " selected" : ""}>Все события</option><option value="__overall__"${eventState.includeOverall ? " selected" : ""}>Общая статистика</option>${optionsHtml}`;
+            syncMultiSelectValues(eventCodesEl, [
+                ...(allSelected ? ["__all__"] : []),
+                ...(eventState.includeOverall ? ["__overall__"] : []),
+                ...eventState.codes
+            ]);
+        }
+        syncExpandedEventFilterControls(canvasId);
+    }
+
+    async function syncExpandedGraphFiltersFromTop(options = {}) {
         const canvasId = state.expandedChart.sourceCanvasId || "";
         const container = state.expandedChart.containerEl;
         if (!canvasId || !container) {
@@ -4083,12 +4176,13 @@
             return;
         }
         const preserveChartUiState = !!state.preserveChartUiStateDuringMainSubmit;
+        const preserveCurrentRanges = options.preserveCurrentRanges === true;
         const storedRanges = state.expandedRangesBySource?.[canvasId];
         const hasStoredRanges = !!storedRanges?.afterFrom && !!storedRanges?.afterTo;
-        if (!preserveChartUiState) {
+        if (!preserveChartUiState && !preserveCurrentRanges) {
             state.expandedChart.customRangeActive = false;
         }
-        const ranges = preserveChartUiState && hasStoredRanges
+        const ranges = (preserveChartUiState || preserveCurrentRanges) && hasStoredRanges
             ? normalizeCompareRangesByAfter(
                 storedRanges.afterFrom,
                 storedRanges.afterTo,
@@ -4121,6 +4215,7 @@
         if (latencyMetricEl) latencyMetricEl.value = getExpandedLatencyMetricMode(canvasId);
         if (stageLatencyMetricEl) stageLatencyMetricEl.value = getExpandedStageLatencyEventMetricMode(canvasId);
         state.expandedRangesBySource[canvasId] = {...ranges};
+        await refreshOpenedExpandedEventFilterOptions(canvasId, ranges);
         syncExpandedEventFilterControls(canvasId);
         await renderExpandedChartByRanges(canvasId, ranges, {
             ...getExpandedEventRenderOptions(canvasId),
@@ -4268,26 +4363,35 @@
         fillSelect(refs.eventsAttributeCode, data.eventAttributeTypes, "Без фильтра", true);
         fillSelect(refs.globalMetricCode, data.eventAttributeTypes, "Не выбран", true, refs.globalMetricCode?.value || "");
         fillUniversalEventSelector(data.eventTypes || []);
-        await refreshRawEventTypeOptionsForMode(selectedEventsEventTypes);
+        await refreshRawEventTypeOptionsForMode(selectedEventsEventTypes, {useMainRange: true});
         await refreshGlobalMetricBlock();
     }
 
-    async function refreshRawEventTypeOptionsForMode(selectedCodes) {
+    async function refreshRawEventTypeOptionsForMode(selectedCodes, options = {}) {
         if (!refs.eventsEventType) {
             return;
         }
+        const requestId = ++state.rawEventTypeOptionsRequestId;
         const selectedModule = refs.moduleType?.value?.trim() || "";
+        const forcedEventCodes = Array.isArray(state.eventsForcedEventCodes)
+            ? state.eventsForcedEventCodes.map((code) => String(code || "").trim()).filter(Boolean)
+            : [];
         const selectedEventsEventTypes = Array.isArray(selectedCodes)
             ? selectedCodes
             : (String(selectedCodes || "").trim()
                 ? [String(selectedCodes).trim()]
-                : selectedRawEventTypeCodes());
+                : (forcedEventCodes.length ? forcedEventCodes : selectedRawEventTypeCodes()));
+        const useMainRange = options.useMainRange === true;
         const data = await fetchPeriodFilterOptions({
-            fromValue: refs.eventsFrom?.value || refs.from?.value || "",
-            toValue: refs.eventsTo?.value || refs.to?.value || "",
+            fromValue: useMainRange ? refs.from?.value || "" : refs.eventsFrom?.value || refs.from?.value || "",
+            toValue: useMainRange ? refs.to?.value || "" : refs.eventsTo?.value || refs.to?.value || "",
             moduleCode: selectedModule,
+            includeEventType: false,
             systemEventsOnly: !!state.eventsSystemOnly
         });
+        if (requestId !== state.rawEventTypeOptionsRequestId) {
+            return;
+        }
         const available = normalizeOptionList(data?.eventTypes);
         fillSelect(
             refs.eventsEventType,
@@ -4295,8 +4399,8 @@
             "",
             false
         );
-        const availableCodes = new Set(available.map((item) => String(item.code || "").trim()));
-        restoreRawEventTypeSelection(selectedEventsEventTypes.filter((code) => availableCodes.has(code)));
+        ensureRawEventTypeOptionsForCodes(selectedEventsEventTypes);
+        restoreRawEventTypeSelection(selectedEventsEventTypes);
     }
 
     function firstLabels(items, labelResolver, limit = 5) {
@@ -5652,7 +5756,8 @@
             try {
                 const params = universalAttributeBreakdownParams(code, 1, 0, {sortBy: "riskScore", sortDir: "desc"});
                 const payload = await fetchJson(`${api("/universal/attribute-breakdown")}?${params.toString()}`, {
-                    perfLabel: "universal-attribute-card-hint"
+                    perfLabel: "universal-attribute-card-hint",
+                    silent: true
                 });
                 if (requestId !== state.universalAttributeHintRequestId) {
                     return;
@@ -5717,7 +5822,8 @@
             const params = universalAttributeBreakdownParams(attributeCode, limit, offset);
             const payload = await fetchJson(`${api("/universal/attribute-breakdown")}?${params.toString()}`, {
                 perfLabel: "universal-attribute-breakdown",
-                signal: controller.signal
+                signal: controller.signal,
+                silent: true
             });
             if (requestId !== state.universalAttributeRequestId) {
                 return {stale: true, rows: [], total: 0};
@@ -6007,7 +6113,8 @@
             const params = universalEventRootCauseParams(code);
             const payload = await fetchJson(`${api("/universal/event-root-cause")}?${params.toString()}`, {
                 perfLabel: "universal-event-root-cause",
-                signal: controller.signal
+                signal: controller.signal,
+                silent: true
             });
             if (requestId !== state.universalEventRootCauseRequestId || String(state.universalTopEventSelectedCode || "") !== code) {
                 return;
@@ -6303,7 +6410,8 @@
             const params = universalErrorRootCauseParams(key, systemEvent);
             const payload = await fetchJson(`${api("/universal/error-root-cause")}?${params.toString()}`, {
                 perfLabel: "universal-error-root-cause",
-                signal: controller.signal
+                signal: controller.signal,
+                silent: true
             });
             if (requestId !== state.universalErrorRootCauseRequestId
                 || String(state.universalErrorSelectedKey || "") !== key
@@ -6523,7 +6631,8 @@
             const need = Math.max(UNIVERSAL_TABLE_PAGE_SIZE, targetVisible - currentRows.length);
             const offset = reset ? 0 : currentRows.length;
             const payload = await fetchJson(`${api("/universal/module-breakdown")}?${universalModuleParams(need, offset).toString()}`, {
-                perfLabel: "universal-module-breakdown"
+                perfLabel: "universal-module-breakdown",
+                silent: true
             });
             if (requestId !== state.universalModuleRequestId) {
                 return;
@@ -6610,7 +6719,8 @@
         try {
             const payload = await fetchJson(`${api("/universal/module-root-cause")}?${universalModuleRootCauseParams(key).toString()}`, {
                 perfLabel: "universal-module-root-cause",
-                signal: controller.signal
+                signal: controller.signal,
+                silent: true
             });
             if (requestId !== state.universalModuleRootCauseRequestId
                 || String(state.universalModuleSelectedKey || "") !== key) {
@@ -6711,7 +6821,8 @@
             const params = universalRootCauseParams(code, value);
             const payload = await fetchJson(`${api("/universal/root-cause")}?${params.toString()}`, {
                 perfLabel: "universal-root-cause",
-                signal: controller.signal
+                signal: controller.signal,
+                silent: true
             });
             if (requestId !== state.universalRootCauseRequestId) {
                 return;
@@ -6782,7 +6893,8 @@
             try {
                 const params = universalAttributeBreakdownParams(code, 20, 0, {sortBy: "count", sortDir: "desc"});
                 const payload = await fetchJson(`${api("/universal/attribute-breakdown")}?${params.toString()}`, {
-                    perfLabel: "universal-attribute-value-search"
+                    perfLabel: "universal-attribute-value-search",
+                    silent: true
                 });
                 if (found || requestId !== state.universalAttributeRequestId) {
                     return;
@@ -12072,7 +12184,8 @@
         const traceLogs = data.traceLogs || [];
         const traceLogStatus = data.traceLogStatus || {};
         const uidSafe = String(data.eventUid || "event").replace(/[^a-zA-Z0-9_-]/g, "");
-        const displayDurationMs = resolveEventDurationForDisplay(data, stages);
+        const durationBreakdown = resolveEventDurationBreakdown(data, data.stages || []);
+        const displayDurationMs = durationBreakdown.eventDurationMs;
 
         const attrsHtml = (data.attributes || []).map((attr) => {
             const code = String(attr.attributeTypeCode || "").trim().toUpperCase();
@@ -12129,6 +12242,7 @@
                 </tr>
             `).join("");
 
+        const durationBreakdownHtml = renderEventDurationBreakdownReadable(durationBreakdown, data.stages || []);
         const stageGroups = buildStageGroups(stages);
         const stagesHtml = stageGroups.map((group, groupIndex) => {
             if (!group || !group.items || group.items.length === 0) {
@@ -12176,6 +12290,7 @@
             </ul>
             <div class="tab-content pt-3">
                 <div class="tab-pane fade show active" id="${overviewTabId}" role="tabpanel">
+                    ${durationBreakdownHtml}
                     <div class="${detailsGridClass}">
                         <section class="glass-card p-3">
                             <div class="fw-semibold mb-2">Атрибуты</div>
@@ -12462,38 +12577,485 @@
         `;
     }
 
-    function resolveEventDurationForDisplay(eventData, stages) {
-        const byStages = durationByStages(stages);
-        if (byStages != null) {
-            return byStages;
+    function resolveEventDurationBreakdown(eventData, stages) {
+        const eventDurationMs = resolveEventDurationMs(eventData);
+        const rawBreakdown = eventData?.durationBreakdown;
+        const stageBreakdown = breakdownFromStages(eventData, stages);
+        if (rawBreakdown) {
+            return {
+                eventDurationMs: normalizeDuration(rawBreakdown.eventDurationMs ?? eventDurationMs),
+                sumStageDurationMs: normalizeDuration(rawBreakdown.sumStageDurationMs ?? stageBreakdown.sumStageDurationMs),
+                coveredStageDurationMs: normalizeDuration(rawBreakdown.coveredStageDurationMs ?? stageBreakdown.coveredStageDurationMs),
+                unaccountedDurationMs: normalizeDuration(rawBreakdown.unaccountedDurationMs ?? Math.max(0, eventDurationMs - stageBreakdown.coveredStageDurationMs)),
+                firstStageOffsetMs: normalizeDuration(rawBreakdown.firstStageOffsetMs ?? stageBreakdown.firstStageOffsetMs),
+                betweenStagesMs: normalizeDuration(rawBreakdown.betweenStagesMs ?? stageBreakdown.betweenStagesMs),
+                tailAfterLastStageMs: normalizeDuration(rawBreakdown.tailAfterLastStageMs ?? stageBreakdown.tailAfterLastStageMs),
+                timestampWindowDurationMs: normalizeDuration(rawBreakdown.timestampWindowDurationMs ?? stageBreakdown.timestampWindowDurationMs),
+                durationOutsideTimestampWindowMs: normalizeDuration(rawBreakdown.durationOutsideTimestampWindowMs ?? stageBreakdown.durationOutsideTimestampWindowMs),
+                stageIntervals: Array.isArray(rawBreakdown.stageIntervals) ? rawBreakdown.stageIntervals : stageBreakdown.stageIntervals,
+                unaccountedIntervals: Array.isArray(rawBreakdown.unaccountedIntervals)
+                    ? rawBreakdown.unaccountedIntervals
+                    : stageBreakdown.unaccountedIntervals
+            };
         }
-        const raw = Number(eventData?.durationMs || 0);
-        if (!Number.isFinite(raw) || raw < 0) {
-            return 0;
-        }
-        return Math.round(raw);
+        return {
+            eventDurationMs,
+            sumStageDurationMs: stageBreakdown.sumStageDurationMs,
+            coveredStageDurationMs: stageBreakdown.coveredStageDurationMs,
+            unaccountedDurationMs: Math.max(0, eventDurationMs - stageBreakdown.coveredStageDurationMs),
+            firstStageOffsetMs: stageBreakdown.firstStageOffsetMs,
+            betweenStagesMs: stageBreakdown.betweenStagesMs,
+            tailAfterLastStageMs: stageBreakdown.tailAfterLastStageMs,
+            timestampWindowDurationMs: stageBreakdown.timestampWindowDurationMs,
+            durationOutsideTimestampWindowMs: stageBreakdown.durationOutsideTimestampWindowMs,
+            stageIntervals: stageBreakdown.stageIntervals,
+            unaccountedIntervals: stageBreakdown.unaccountedIntervals
+        };
     }
 
-    function durationByStages(stages) {
+    function renderEventDurationBreakdown(breakdown) {
+        if (!breakdown) {
+            return "";
+        }
+        const unaccountedClass = Number(breakdown.unaccountedDurationMs || 0) > 0 ? "text-warning" : "text-muted";
+        return `
+            <section class="glass-card p-3 mb-3">
+                <div class="fw-semibold mb-2">Разбор времени</div>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle analytics-table mb-0">
+                        <tbody>
+                            <tr><td>Общая длительность события</td><td class="text-end">${formatInt(breakdown.eventDurationMs || 0)} ms</td></tr>
+                            <tr><td>Покрыто этапами</td><td class="text-end">${formatInt(breakdown.coveredStageDurationMs || 0)} ms</td></tr>
+                            <tr><td>Нераспределённое время</td><td class="text-end ${unaccountedClass}">${formatInt(breakdown.unaccountedDurationMs || 0)} ms</td></tr>
+                            <tr><td>До первого этапа</td><td class="text-end">${formatInt(breakdown.firstStageOffsetMs || 0)} ms</td></tr>
+                            <tr><td>Между этапами</td><td class="text-end">${formatInt(breakdown.betweenStagesMs || 0)} ms</td></tr>
+                            <tr><td>После последнего этапа</td><td class="text-end">${formatInt(breakdown.tailAfterLastStageMs || 0)} ms</td></tr>
+                            <tr><td>Сумма stage-длительностей</td><td class="text-end">${formatInt(breakdown.sumStageDurationMs || 0)} ms</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        `;
+    }
+
+    function renderEventDurationBreakdownDetailed(breakdown) {
+        if (!breakdown) {
+            return "";
+        }
+        const unaccountedClass = Number(breakdown.unaccountedDurationMs || 0) > 0 ? "text-warning" : "text-muted";
+        const stageIntervals = Array.isArray(breakdown.stageIntervals) ? breakdown.stageIntervals : [];
+        const unaccountedIntervals = Array.isArray(breakdown.unaccountedIntervals) ? breakdown.unaccountedIntervals : [];
+        const stageIntervalsHtml = stageIntervals.map((interval) => `
+            <tr>
+                <td>
+                    ${escapeHtml(interval.stageTypeName || interval.stageTypeCode || "Этап")}
+                    ${interval.nested ? `<span class="badge text-bg-light ms-1" title="Интервал вложен в этап #${escapeHtml(String(interval.parentStageOrder ?? "-"))}">вложен</span>` : ""}
+                </td>
+                <td class="text-end">#${formatInt(interval.stageOrder || 0)}</td>
+                <td>${escapeHtml(formatDateTime(interval.startedAt))}</td>
+                <td>${escapeHtml(formatDateTime(interval.endedAt))}</td>
+                <td class="text-end">${formatInt(interval.durationMs || 0)} ms</td>
+                <td class="text-end">+${formatInt(interval.offsetFromEventStartMs || 0)} ms</td>
+            </tr>
+        `).join("");
+        const unaccountedIntervalsHtml = unaccountedIntervals.map((interval) => `
+            <tr>
+                <td>${escapeHtml(interval.label || interval.type || "Время вне инструментированных этапов")}</td>
+                <td>${interval.startedAt ? escapeHtml(formatDateTime(interval.startedAt)) : "—"}</td>
+                <td>${interval.endedAt ? escapeHtml(formatDateTime(interval.endedAt)) : "—"}</td>
+                <td class="text-end">${formatInt(interval.durationMs || 0)} ms</td>
+                <td class="text-end">+${formatInt(interval.offsetFromEventStartMs || 0)} ms</td>
+            </tr>
+        `).join("");
+        return `
+            <section class="glass-card p-3 mb-3">
+                <div class="fw-semibold mb-2">Разбор времени</div>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle analytics-table mb-0">
+                        <tbody>
+                            <tr><td><strong>Общая длительность события</strong></td><td class="text-end"><strong>${formatInt(breakdown.eventDurationMs || 0)} ms</strong></td></tr>
+                            <tr><td><strong>Покрыто этапами</strong></td><td class="text-end"><strong>${formatInt(breakdown.coveredStageDurationMs || 0)} ms</strong></td></tr>
+                            <tr><td><strong>Нераспределённое время</strong></td><td class="text-end ${unaccountedClass}"><strong>${formatInt(breakdown.unaccountedDurationMs || 0)} ms</strong></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="small text-muted mt-2">
+                    Этапы могут быть вложены друг в друга, поэтому их простая сумма может превышать общую длительность события.
+                    Для расчёта покрытия используется объединение временных интервалов.
+                </div>
+                <div class="fw-semibold mt-3 mb-1">Справочные показатели</div>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle analytics-table mb-0">
+                        <tbody>
+                            <tr><td>До первого этапа</td><td class="text-end">${formatInt(breakdown.firstStageOffsetMs || 0)} ms</td></tr>
+                            <tr><td>Между объединёнными stage intervals</td><td class="text-end">${formatInt(breakdown.betweenStagesMs || 0)} ms</td></tr>
+                            <tr><td>После последнего этапа</td><td class="text-end">${formatInt(breakdown.tailAfterLastStageMs || 0)} ms</td></tr>
+                            <tr><td>Сумма длительностей этапов без учёта вложенности</td><td class="text-end">${formatInt(breakdown.sumStageDurationMs || 0)} ms</td></tr>
+                            ${Number(breakdown.durationOutsideTimestampWindowMs || 0) > 0
+                                ? `<tr><td>Разница duration и timestamp-окна</td><td class="text-end text-warning">${formatInt(breakdown.durationOutsideTimestampWindowMs)} ms</td></tr>`
+                                : ""}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="fw-semibold mt-3 mb-1">Интервалы этапов</div>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle analytics-table mb-0">
+                        <thead><tr><th>Этап</th><th class="text-end">Порядок</th><th>Начало</th><th>Окончание</th><th class="text-end">Длительность</th><th class="text-end">Offset</th></tr></thead>
+                        <tbody>${stageIntervalsHtml || "<tr><td colspan='6' class='text-muted'>Интервалы этапов отсутствуют</td></tr>"}</tbody>
+                    </table>
+                </div>
+                <div class="fw-semibold mt-3 mb-1">Время вне инструментированных этапов</div>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle analytics-table mb-0">
+                        <thead><tr><th>Источник</th><th>Начало</th><th>Окончание</th><th class="text-end">Длительность</th><th class="text-end">Offset</th></tr></thead>
+                        <tbody>${unaccountedIntervalsHtml || "<tr><td colspan='5' class='text-muted'>Промежутков вне этапов нет</td></tr>"}</tbody>
+                    </table>
+                </div>
+            </section>
+        `;
+    }
+
+    function renderEventDurationBreakdownReadable(breakdown, stages = []) {
+        if (!breakdown) {
+            return "";
+        }
+        const unaccountedClass = Number(breakdown.unaccountedDurationMs || 0) > 0 ? "text-warning" : "text-muted";
+        const intervals = Array.isArray(breakdown.unaccountedIntervals) ? breakdown.unaccountedIntervals : [];
+        const frontendEvidence = findFrontendTimingEvidence(breakdown, stages);
+        const intervalsHtml = intervals.map((interval) => {
+            const reason = explainUnaccountedInterval(interval, frontendEvidence);
+            return `
+                <tr>
+                    <td>${escapeHtml(interval.label || interval.type || "Время вне инструментированных этапов")}</td>
+                    <td>${interval.startedAt ? escapeHtml(formatDateTime(interval.startedAt)) : "—"}</td>
+                    <td>${interval.endedAt ? escapeHtml(formatDateTime(interval.endedAt)) : "—"}</td>
+                    <td class="text-end">${formatInt(interval.durationMs || 0)} ms</td>
+                    <td class="text-end">+${formatInt(interval.offsetFromEventStartMs || 0)} ms</td>
+                    <td class="small">${escapeHtml(reason)}</td>
+                </tr>
+            `;
+        }).join("");
+        return `
+            <section class="glass-card p-3 mb-3">
+                <div class="fw-semibold mb-2">Разбор времени</div>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle analytics-table mb-0">
+                        <tbody>
+                            <tr><td><strong>Общая длительность события</strong></td><td class="text-end"><strong>${formatInt(breakdown.eventDurationMs || 0)} ms</strong></td></tr>
+                            <tr><td><strong>Покрыто этапами</strong></td><td class="text-end"><strong>${formatInt(breakdown.coveredStageDurationMs || 0)} ms</strong></td></tr>
+                            <tr><td><strong>Нераспределённое время</strong></td><td class="text-end ${unaccountedClass}"><strong>${formatInt(breakdown.unaccountedDurationMs || 0)} ms</strong></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="small text-muted mt-2">
+                    Этапы могут быть вложены друг в друга, поэтому их простая сумма может превышать общую длительность события.
+                    Для расчёта покрытия используется объединение временных интервалов.
+                </div>
+                <div class="table-responsive mt-2">
+                    <table class="table table-sm align-middle analytics-table mb-0">
+                        <tbody>
+                            <tr>
+                                <td>Сумма длительностей этапов без учёта вложенности</td>
+                                <td class="text-end">${formatInt(breakdown.sumStageDurationMs || 0)} ms</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="fw-semibold mt-3 mb-1">Время вне инструментированных этапов</div>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle analytics-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Источник</th>
+                                <th>Начало</th>
+                                <th>Окончание</th>
+                                <th class="text-end">Длительность</th>
+                                <th class="text-end">Offset</th>
+                                <th>Причина</th>
+                            </tr>
+                        </thead>
+                        <tbody>${intervalsHtml || "<tr><td colspan='6' class='text-muted'>Промежутков вне этапов нет</td></tr>"}</tbody>
+                    </table>
+                </div>
+            </section>
+        `;
+    }
+
+    function findFrontendTimingEvidence(breakdown, stages) {
+        const stageIntervals = Array.isArray(breakdown?.stageIntervals) ? breakdown.stageIntervals : [];
+        const allStages = [
+            ...stageIntervals,
+            ...(Array.isArray(stages) ? stages : [])
+        ];
+        const metricCodes = new Set();
+        const matchedStages = [];
+        allStages.forEach((stage) => {
+            const code = String(stage?.stageTypeCode || "").trim().toUpperCase();
+            const name = String(stage?.stageTypeName || "").trim();
+            const normalizedName = name.toUpperCase();
+            const metrics = Array.isArray(stage?.metrics) ? stage.metrics : [];
+            metrics.forEach((metric) => {
+                const metricCode = String(metric?.metricTypeCode || "").trim().toUpperCase();
+                if (metricCode) {
+                    metricCodes.add(metricCode);
+                }
+            });
+            const isFrontend = code.includes("FRONTEND")
+                || normalizedName.includes("ФРОНТЕНД")
+                || normalizedName.includes("RENDER AFTER RESPONSE")
+                || normalizedName.includes("РЕНДЕР ПОСЛЕ ОТВЕТА");
+            if (isFrontend) {
+                matchedStages.push(stage);
+            }
+        });
+        const metricEvidence = [
+            ["FRONTEND_TTFB_MS", "TTFB"],
+            ["TTFB_MS", "TTFB"],
+            ["FRONTEND_DOM_INTERACTIVE_MS", "DOM Interactive"],
+            ["DOM_INTERACTIVE_MS", "DOM Interactive"],
+            ["FRONTEND_DOM_CONTENT_LOADED_MS", "DOMContentLoaded"],
+            ["DOM_CONTENT_LOADED_MS", "DOMContentLoaded"],
+            ["FRONTEND_RENDER_AFTER_API_MS", "рендер после ответа"]
+        ]
+            .filter(([code]) => metricCodes.has(code))
+            .map(([, label]) => label);
+        return {
+            present: matchedStages.length > 0 || metricEvidence.length > 0,
+            labels: Array.from(new Set(metricEvidence)),
+            stages: matchedStages
+        };
+    }
+
+    function explainUnaccountedInterval(interval, frontendEvidence) {
+        const type = String(interval?.type || "").trim().toUpperCase();
+        let reason;
+        if (type === "BEFORE_FIRST_STAGE") {
+            reason = "Время до входа в первый инструментированный этап: фильтры, security, маршрутизация Spring MVC, подготовка контекста запроса.";
+        } else if (type === "BETWEEN_STAGE_INTERVALS") {
+            reason = "Промежуток между инструментированными этапами: код не покрыт AOP-инструментированием или ожидание между слоями.";
+        } else if (type === "AFTER_LAST_STAGE") {
+            reason = "Время после последнего инструментированного этапа: завершение HTTP-ответа, передача данных, обработка в браузере или frontend-телеметрия.";
+        } else if (type === "OUTSIDE_TIMESTAMP_WINDOW") {
+            reason = "Сохранённая duration больше интервала startedAt/finishedAt; это время нельзя привязать к точным timestamp-границам stage.";
+        } else {
+            reason = "Время выполнения не покрыто зарегистрированными stage intervals.";
+        }
+        if (frontendEvidence?.present && (type === "AFTER_LAST_STAGE" || type === "OUTSIDE_TIMESTAMP_WINDOW")) {
+            const labels = frontendEvidence.labels?.length
+                ? frontendEvidence.labels.join(" / ")
+                : "frontend render after response";
+            reason += ` Подтверждается frontend-метриками: ${labels}.`;
+        }
+        return reason;
+    }
+
+    function breakdownFromStages(eventData, stages) {
         if (!Array.isArray(stages) || stages.length === 0) {
-            return null;
+            return {
+                sumStageDurationMs: 0,
+                coveredStageDurationMs: 0,
+                firstStageOffsetMs: 0,
+                betweenStagesMs: 0,
+                tailAfterLastStageMs: 0,
+                timestampWindowDurationMs: 0,
+                durationOutsideTimestampWindowMs: 0,
+                stageIntervals: [],
+                unaccountedIntervals: []
+            };
         }
-        let minStartedAt = null;
-        let maxEndedAt = null;
+        const intervals = [];
+        let sumStageDurationMs = 0;
+        let minStartedAtMs = null;
+        let maxEndedAtMs = null;
         for (const stage of stages) {
-            const startedAtMs = toEpochMs(stage?.startedAt);
-            const endedAtMs = toEpochMs(stage?.endedAt);
-            if (startedAtMs != null) {
-                minStartedAt = minStartedAt == null ? startedAtMs : Math.min(minStartedAt, startedAtMs);
+            const interval = toStageInterval(stage);
+            if (!interval) {
+                continue;
             }
-            if (endedAtMs != null) {
-                maxEndedAt = maxEndedAt == null ? endedAtMs : Math.max(maxEndedAt, endedAtMs);
-            }
+            intervals.push({...interval, stage});
+            sumStageDurationMs += interval.durationMs;
+            minStartedAtMs = minStartedAtMs == null ? interval.startedAtMs : Math.min(minStartedAtMs, interval.startedAtMs);
+            maxEndedAtMs = maxEndedAtMs == null ? interval.endedAtMs : Math.max(maxEndedAtMs, interval.endedAtMs);
         }
-        if (minStartedAt == null || maxEndedAt == null || maxEndedAt < minStartedAt) {
+        const merged = mergeIntervalRanges(intervals);
+        const coveredStageDurationMs = merged.reduce((sum, interval) => sum + Math.max(0, interval.endedAtMs - interval.startedAtMs), 0);
+        const eventStartedAtMs = toEpochMs(eventData?.startedAt);
+        const eventEndedAtMs = toEpochMs(eventData?.endedAt);
+        const firstStageOffsetMs = eventStartedAtMs != null && minStartedAtMs != null
+            ? Math.max(0, minStartedAtMs - eventStartedAtMs)
+            : 0;
+        const tailAfterLastStageMs = eventEndedAtMs != null && maxEndedAtMs != null
+            ? Math.max(0, eventEndedAtMs - maxEndedAtMs)
+            : 0;
+        const eventDurationMs = resolveEventDurationMs(eventData);
+        const timestampWindowDurationMs = eventStartedAtMs != null && eventEndedAtMs != null
+            ? Math.max(0, eventEndedAtMs - eventStartedAtMs)
+            : eventDurationMs;
+        const durationOutsideTimestampWindowMs = Math.max(0, eventDurationMs - timestampWindowDurationMs);
+        const unaccountedDurationMs = Math.max(0, eventDurationMs - coveredStageDurationMs);
+        const unaccountedIntervals = buildClientUnaccountedIntervals(eventStartedAtMs, eventEndedAtMs, merged);
+        if (durationOutsideTimestampWindowMs > 0) {
+            unaccountedIntervals.push({
+                type: "OUTSIDE_TIMESTAMP_WINDOW",
+                label: "Разница между сохранённой duration и границами startedAt/finishedAt",
+                startedAt: null,
+                endedAt: null,
+                durationMs: durationOutsideTimestampWindowMs,
+                offsetFromEventStartMs: timestampWindowDurationMs
+            });
+        }
+        const betweenStagesMs = unaccountedIntervals
+            .filter((interval) => interval.type === "BETWEEN_STAGE_INTERVALS")
+            .reduce((sum, interval) => sum + Number(interval.durationMs || 0), 0);
+        const stageIntervals = intervals.map((interval) => {
+            const parent = intervals
+                .filter((candidate) => candidate !== interval)
+                .filter((candidate) => candidate.startedAtMs <= interval.startedAtMs
+                    && candidate.endedAtMs >= interval.endedAtMs
+                    && candidate.durationMs > interval.durationMs)
+                .sort((left, right) => left.durationMs - right.durationMs)[0];
+            return {
+                stageTypeCode: interval.stage?.stageTypeCode,
+                stageTypeName: interval.stage?.stageTypeName,
+                stageOrder: interval.stage?.stageOrder,
+                startedAt: interval.stage?.startedAt,
+                endedAt: interval.stage?.endedAt,
+                durationMs: interval.durationMs,
+                offsetFromEventStartMs: eventStartedAtMs == null ? 0 : Math.max(0, interval.startedAtMs - eventStartedAtMs),
+                nested: !!parent,
+                parentStageOrder: parent?.stage?.stageOrder ?? null
+            };
+        });
+        return {
+            sumStageDurationMs: normalizeDuration(sumStageDurationMs),
+            coveredStageDurationMs: normalizeDuration(coveredStageDurationMs),
+            firstStageOffsetMs: normalizeDuration(firstStageOffsetMs),
+            betweenStagesMs: normalizeDuration(betweenStagesMs),
+            tailAfterLastStageMs: normalizeDuration(tailAfterLastStageMs),
+            timestampWindowDurationMs: normalizeDuration(timestampWindowDurationMs),
+            durationOutsideTimestampWindowMs: normalizeDuration(durationOutsideTimestampWindowMs),
+            stageIntervals,
+            unaccountedIntervals,
+            minStartedAtMs,
+            maxEndedAtMs
+        };
+    }
+
+    function toStageInterval(stage) {
+        const startedAtMs = toEpochMs(stage?.startedAt);
+        let endedAtMs = toEpochMs(stage?.endedAt);
+        if (startedAtMs == null && endedAtMs == null) {
             return null;
         }
-        return Math.max(0, Math.round(maxEndedAt - minStartedAt));
+        const safeStartedAtMs = startedAtMs != null ? startedAtMs : endedAtMs;
+        if (endedAtMs == null) {
+            const durationMs = normalizeDuration(stage?.durationMs);
+            endedAtMs = safeStartedAtMs + durationMs;
+        }
+        if (!Number.isFinite(safeStartedAtMs) || !Number.isFinite(endedAtMs)) {
+            return null;
+        }
+        return {
+            startedAtMs: safeStartedAtMs,
+            endedAtMs: Math.max(safeStartedAtMs, endedAtMs),
+            durationMs: Math.max(0, normalizeDuration(stage?.durationMs) || Math.max(0, endedAtMs - safeStartedAtMs))
+        };
+    }
+
+    function mergeIntervals(intervals) {
+        return mergeIntervalRanges(intervals)
+            .reduce((covered, interval) => covered + Math.max(0, interval.endedAtMs - interval.startedAtMs), 0);
+    }
+
+    function mergeIntervalRanges(intervals) {
+        if (!Array.isArray(intervals) || intervals.length === 0) {
+            return [];
+        }
+        const sorted = intervals
+            .filter((interval) => interval && Number.isFinite(interval.startedAtMs) && Number.isFinite(interval.endedAtMs))
+            .sort((a, b) => a.startedAtMs - b.startedAtMs || a.endedAtMs - b.endedAtMs);
+        if (sorted.length === 0) {
+            return [];
+        }
+        const merged = [];
+        let currentStart = sorted[0].startedAtMs;
+        let currentEnd = sorted[0].endedAtMs;
+        for (let i = 1; i < sorted.length; i++) {
+            const interval = sorted[i];
+            if (interval.startedAtMs <= currentEnd) {
+                currentEnd = Math.max(currentEnd, interval.endedAtMs);
+                continue;
+            }
+            merged.push({startedAtMs: currentStart, endedAtMs: currentEnd});
+            currentStart = interval.startedAtMs;
+            currentEnd = interval.endedAtMs;
+        }
+        merged.push({startedAtMs: currentStart, endedAtMs: currentEnd});
+        return merged;
+    }
+
+    function buildClientUnaccountedIntervals(eventStartedAtMs, eventEndedAtMs, mergedIntervals) {
+        if (!Number.isFinite(eventStartedAtMs) || !Number.isFinite(eventEndedAtMs) || eventEndedAtMs < eventStartedAtMs) {
+            return [];
+        }
+        const merged = Array.isArray(mergedIntervals) ? mergedIntervals : [];
+        if (!merged.length) {
+            return [{
+                type: "OUTSIDE_INSTRUMENTED_STAGES",
+                label: "Время вне инструментированных этапов",
+                startedAt: new Date(eventStartedAtMs).toISOString(),
+                endedAt: new Date(eventEndedAtMs).toISOString(),
+                durationMs: Math.max(0, eventEndedAtMs - eventStartedAtMs),
+                offsetFromEventStartMs: 0
+            }];
+        }
+        const result = [];
+        let cursor = eventStartedAtMs;
+        merged.forEach((interval, index) => {
+            if (interval.startedAtMs > cursor) {
+                result.push({
+                    type: index === 0 ? "BEFORE_FIRST_STAGE" : "BETWEEN_STAGE_INTERVALS",
+                    label: index === 0 ? "До первого stage" : "Между stage intervals",
+                    startedAt: new Date(cursor).toISOString(),
+                    endedAt: new Date(interval.startedAtMs).toISOString(),
+                    durationMs: interval.startedAtMs - cursor,
+                    offsetFromEventStartMs: cursor - eventStartedAtMs
+                });
+            }
+            cursor = Math.max(cursor, interval.endedAtMs);
+        });
+        if (eventEndedAtMs > cursor) {
+            result.push({
+                type: "AFTER_LAST_STAGE",
+                label: "После последнего stage",
+                startedAt: new Date(cursor).toISOString(),
+                endedAt: new Date(eventEndedAtMs).toISOString(),
+                durationMs: eventEndedAtMs - cursor,
+                offsetFromEventStartMs: cursor - eventStartedAtMs
+            });
+        }
+        return result;
+    }
+
+    function resolveEventDurationMs(eventData) {
+        const raw = Number(eventData?.durationMs);
+        if (Number.isFinite(raw) && raw >= 0) {
+            return Math.round(raw);
+        }
+        const startedAtMs = toEpochMs(eventData?.startedAt);
+        const endedAtMs = toEpochMs(eventData?.endedAt);
+        if (startedAtMs != null && endedAtMs != null && endedAtMs >= startedAtMs) {
+            return Math.round(endedAtMs - startedAtMs);
+        }
+        return 0;
+    }
+
+    function normalizeDuration(value) {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric) || numeric < 0) {
+            return 0;
+        }
+        return Math.round(numeric);
     }
 
     function buildLinearTimelineStages(eventData, rawStages) {
@@ -12737,6 +13299,12 @@
 
     async function loadCompare() {
         state.compareLoaded = true;
+        const requestId = ++state.compareRequestId;
+        if (state.compareAbortController) {
+            state.compareAbortController.abort();
+        }
+        const controller = new AbortController();
+        state.compareAbortController = controller;
         const params = new URLSearchParams();
         const moduleCode = refs.moduleType?.value?.trim();
         if (moduleCode) {
@@ -12756,11 +13324,28 @@
         setIfPresent(params, "targetFrom", toIso(refs.compareTargetFrom.value));
         setIfPresent(params, "targetTo", toIso(refs.compareTargetTo.value));
 
-        const data = await fetchJson(`${api("/compare")}?${params.toString()}`);
-        refs.compareCards.innerHTML = renderCompareCards(data);
-        renderCompareInsights(data);
-        syncCompareResetVisibility();
-        return;
+        let data;
+        try {
+            data = await fetchJson(`${api("/compare")}?${params.toString()}`, {
+                signal: controller.signal
+            });
+            if (requestId !== state.compareRequestId) {
+                return;
+            }
+            refs.compareCards.innerHTML = renderCompareCards(data);
+            renderCompareInsights(data);
+            syncCompareResetVisibility();
+            return;
+        } catch (error) {
+            if (controller.signal.aborted || requestId !== state.compareRequestId) {
+                return;
+            }
+            throw error;
+        } finally {
+            if (state.compareAbortController === controller) {
+                state.compareAbortController = null;
+            }
+        }
 
         const delta = data.delta || {};
         upsertChart("chart-compare-delta", {
@@ -13557,7 +14142,9 @@
         syncStageMetricRangesFromMain(true);
         syncStageTextQuickRangeFromMain();
         syncStageTextRangesFromMain(true);
+        syncEventsRangeFromMain(true);
         syncUniversalRangeFromMain(true);
+        syncOpenedExpandedChartRangeFromTopFilter();
 
         // Keep sidebar dictionaries in sync with the new top period,
         // but do not block chart reload on dictionary errors/timeouts.
@@ -13566,6 +14153,7 @@
 
         state.eventsPage = 0;
         await reloadAll();
+        await syncExpandedGraphFiltersFromTop();
         if (shouldRefreshCompareAfterMainSync(compareSynced)) {
             await loadCompare();
         }
@@ -13590,7 +14178,9 @@
         syncStageMetricRangesFromMain(true);
         syncStageTextQuickRangeFromMain();
         syncStageTextRangesFromMain(true);
+        syncEventsRangeFromMain(true);
         syncUniversalRangeFromMain(true);
+        syncOpenedExpandedChartRangeFromTopFilter();
 
         // Keep sidebar dictionaries in sync with the new top period,
         // but do not block chart reload on dictionary errors/timeouts.
@@ -13599,6 +14189,7 @@
 
         state.eventsPage = 0;
         await reloadAll();
+        await syncExpandedGraphFiltersFromTop();
         if (shouldRefreshCompareAfterMainSync(compareSynced)) {
             await loadCompare();
         }
@@ -13811,7 +14402,7 @@
     }
 
     function shouldRefreshCompareAfterMainSync(compareSynced) {
-        return !!compareSynced && (state.currentDashboardTab === "compare" || state.compareLoaded);
+        return false;
     }
 
     async function resetCompareToMainRange() {
@@ -14399,9 +14990,10 @@
 
     async function fetchJson(url, options = {}) {
         const signal = options?.signal;
+        const silent = options?.silent === true || options?.background === true;
         const perfLabel = String(options?.perfLabel || "").trim();
         const perfStarted = typeof performance !== "undefined" ? performance.now() : Date.now();
-        const loadingToken = beginAnalyticsApiLoading();
+        const loadingToken = silent ? null : beginAnalyticsApiLoading();
         try {
         const response = await fetch(url, {
             headers: {
@@ -14471,15 +15063,19 @@
             });
         }
         notifyPartialAnalyticsPayload(payload);
-        state.analyticsApiSuccessPending = true;
+        if (!silent) {
+            state.analyticsApiSuccessPending = true;
+        }
         return payload;
         } catch (error) {
-            if (error?.name !== "AbortError") {
+            if (!silent && error?.name !== "AbortError") {
                 state.analyticsApiHadError = true;
             }
             throw error;
         } finally {
-            endAnalyticsApiLoading(loadingToken);
+            if (!silent) {
+                endAnalyticsApiLoading(loadingToken);
+            }
         }
     }
 
@@ -15189,6 +15785,17 @@
         if (!container || state.expandedChart.sourceCanvasId !== canvasId) {
             return;
         }
+        const previousDepth = Math.max(0, Number(state.expandedLoadingDepthBySource?.[canvasId] || 0));
+        const nextDepth = Math.max(0, previousDepth + (isLoading ? 1 : -1));
+        state.expandedLoadingDepthBySource[canvasId] = nextDepth;
+        syncExpandedChartLoaderVisibility(canvasId);
+    }
+
+    function syncExpandedChartLoaderVisibility(canvasId) {
+        const container = state.expandedChart.containerEl;
+        if (!container || state.expandedChart.sourceCanvasId !== canvasId) {
+            return;
+        }
         let loader = container.querySelector(".analytics-expanded-loader");
         if (!loader) {
             loader = document.createElement("div");
@@ -15201,7 +15808,10 @@
             `;
             container.appendChild(loader);
         }
-        loader.classList.toggle("is-visible", !!isLoading);
+        loader.classList.toggle(
+            "is-visible",
+            Math.max(0, Number(state.expandedLoadingDepthBySource?.[canvasId] || 0)) > 0
+        );
     }
 
     function setChartActionLoading(canvasId, isLoading) {
@@ -16093,6 +16703,7 @@
         }
 
         state.expandedChart.sourceCanvasId = canvasId;
+        state.expandedLoadingDepthBySource[canvasId] = 0;
         state.expandedChart.containerEl = container;
         state.expandedChart.customRangeActive = false;
         if (!UNIVERSAL_COMPARE_CHART_IDS.has(canvasId) && !METRIC_EXPANDED_CONTROLLESS_CHART_IDS.has(canvasId)) {
@@ -16100,7 +16711,9 @@
         }
         setupExpandedZoomControls(container);
         updateExpandButtonsState();
-        renderExpandedChartClone(canvasId);
+        if (!state.restoringExpandedFocusedChart) {
+            renderExpandedChartClone(canvasId);
+        }
         if (button) {
             button.blur();
         }
@@ -16129,11 +16742,14 @@
         return true;
     }
 
-    function collapseExpandedChart() {
+    function collapseExpandedChart(options = {}) {
         const sourceCanvasId = state.expandedChart.sourceCanvasId;
+        const preserveFocusedSnapshot = options.preserveFocusedSnapshot === true
+            || state.preserveExpandedFocusedChartOnNextCollapse === true;
         if (sourceCanvasId) {
             delete state.expandedIntervalSelectionBySource[sourceCanvasId];
             state.expandedIntervalSelectionEnabledBySource[sourceCanvasId] = false;
+            delete state.expandedLoadingDepthBySource[sourceCanvasId];
         }
         if (state.expandedChart.instance) {
             state.expandedChart.instance.destroy();
@@ -16158,6 +16774,10 @@
         state.expandedChart.sourceCanvasId = "";
         state.expandedChart.containerEl = null;
         state.expandedChart.customRangeActive = false;
+        if (!preserveFocusedSnapshot && sourceCanvasId) {
+            clearExpandedFocusedChartSnapshot();
+        }
+        state.preserveExpandedFocusedChartOnNextCollapse = false;
         updateExpandButtonsState();
     }
 
@@ -16165,8 +16785,13 @@
         if (!canvasId || state.expandedChart.sourceCanvasId !== canvasId || !state.expandedChart.containerEl) {
             return false;
         }
+        const loadingDepth = Math.max(0, Number(state.expandedLoadingDepthBySource?.[canvasId] || 0));
         collapseExpandedChart();
         toggleExpandedChart(canvasId);
+        if (state.expandedChart.sourceCanvasId === canvasId && loadingDepth > 0) {
+            state.expandedLoadingDepthBySource[canvasId] = loadingDepth;
+            syncExpandedChartLoaderVisibility(canvasId);
+        }
         return state.expandedChart.sourceCanvasId === canvasId;
     }
 
@@ -17174,6 +17799,162 @@
         });
     }
 
+    function ensureRawEventTypeOptionsForCodes(eventCodes = []) {
+        if (!refs.eventsEventType) {
+            return;
+        }
+        const existing = new Set(Array.from(refs.eventsEventType.options || [])
+            .map((option) => String(option.value || "").trim())
+            .filter(Boolean));
+        const eventTypes = Array.isArray(state.dictionaries?.eventTypes) ? state.dictionaries.eventTypes : [];
+        eventCodes.forEach((code) => {
+            const normalized = String(code || "").trim();
+            if (!normalized || existing.has(normalized)) {
+                return;
+            }
+            const eventType = eventTypes.find((item) => String(item?.code || "").trim() === normalized);
+            const option = document.createElement("option");
+            option.value = normalized;
+            option.textContent = String(eventType?.name || normalized).trim() || normalized;
+            refs.eventsEventType.appendChild(option);
+            existing.add(normalized);
+        });
+    }
+
+    function readExpandedZoomSnapshot(container = state.expandedChart.containerEl) {
+        return {
+            x: String(container?.querySelector(".analytics-expanded-zoom-range-x")?.value || "100"),
+            y: String(container?.querySelector(".analytics-expanded-zoom-range-y")?.value || "100")
+        };
+    }
+
+    function applyExpandedZoomSnapshot(snapshot) {
+        const container = state.expandedChart.containerEl;
+        if (!container || !snapshot) {
+            return;
+        }
+        const rangeX = container.querySelector(".analytics-expanded-zoom-range-x");
+        const rangeY = container.querySelector(".analytics-expanded-zoom-range-y");
+        if (rangeX && snapshot.x) {
+            rangeX.value = String(snapshot.x || "100");
+            rangeX.dispatchEvent(new Event("input"));
+        }
+        if (rangeY && snapshot.y) {
+            rangeY.value = String(snapshot.y || "100");
+            rangeY.dispatchEvent(new Event("input"));
+        }
+    }
+
+    function captureExpandedFocusedChartSnapshot(canvasId = state.expandedChart.sourceCanvasId || "") {
+        const sourceCanvasId = String(canvasId || "").trim();
+        if (!sourceCanvasId || !state.expandedChart.containerEl) {
+            return null;
+        }
+        captureExpandedRangesFromUi(sourceCanvasId);
+        const ranges = state.expandedRangesBySource?.[sourceCanvasId] || expandedRangesFromTopFilter(sourceCanvasId);
+        return {
+            sourceCanvasId,
+            ranges: normalizeCompareRangesByAfter(
+                ranges.afterFrom,
+                ranges.afterTo,
+                ranges.beforeFrom,
+                ranges.beforeTo
+            ),
+            bucket: state.expandedBucketBySource?.[sourceCanvasId],
+            preset: state.inlineComparePresetBySource?.[sourceCanvasId],
+            presetOverridden: !!state.inlineComparePresetOverriddenBySource?.[sourceCanvasId],
+            compareMode: resolveExpandedCompareMode(sourceCanvasId),
+            compareOverridden: !!state.inlineCompareModeOverriddenBySource?.[sourceCanvasId],
+            eventFilter: cloneExpandedEventFilterState(getExpandedEventFilterState(sourceCanvasId)),
+            latencyMetric: getExpandedLatencyMetricMode(sourceCanvasId),
+            stageLatencyEventMetric: getExpandedStageLatencyEventMetricMode(sourceCanvasId),
+            zoom: readExpandedZoomSnapshot(),
+            customRangeActive: !!state.expandedChart.customRangeActive
+        };
+    }
+
+    function storeExpandedFocusedChartSnapshot(snapshot) {
+        if (!snapshot?.sourceCanvasId) {
+            return;
+        }
+        state.expandedFocusedChartSnapshot = snapshot;
+        state.preserveExpandedFocusedChartOnNextCollapse = true;
+        try {
+            window.sessionStorage?.setItem(EXPANDED_FOCUSED_CHART_STORAGE_KEY, JSON.stringify(snapshot));
+        } catch (ignored) {
+            // Session storage is optional; in-memory state is enough for same-page tab returns.
+        }
+    }
+
+    function readStoredExpandedFocusedChartSnapshot() {
+        if (state.expandedFocusedChartSnapshot?.sourceCanvasId) {
+            return state.expandedFocusedChartSnapshot;
+        }
+        try {
+            const raw = window.sessionStorage?.getItem(EXPANDED_FOCUSED_CHART_STORAGE_KEY);
+            if (!raw) {
+                return null;
+            }
+            const parsed = JSON.parse(raw);
+            return parsed?.sourceCanvasId ? parsed : null;
+        } catch (ignored) {
+            return null;
+        }
+    }
+
+    function clearExpandedFocusedChartSnapshot() {
+        state.expandedFocusedChartSnapshot = null;
+        state.preserveExpandedFocusedChartOnNextCollapse = false;
+        try {
+            window.sessionStorage?.removeItem(EXPANDED_FOCUSED_CHART_STORAGE_KEY);
+        } catch (ignored) {
+            // Ignore storage cleanup failures.
+        }
+    }
+
+    async function restoreExpandedFocusedChartSnapshotIfNeeded() {
+        if (state.restoringExpandedFocusedChart || state.currentDashboardTab !== "overview") {
+            return;
+        }
+        const snapshot = readStoredExpandedFocusedChartSnapshot();
+        const sourceCanvasId = String(snapshot?.sourceCanvasId || "").trim();
+        if (!sourceCanvasId || getChartOwningTab(sourceCanvasId) !== "overview") {
+            return;
+        }
+        const sourceCanvas = document.getElementById(sourceCanvasId);
+        if (!sourceCanvas) {
+            clearExpandedFocusedChartSnapshot();
+            return;
+        }
+        state.restoringExpandedFocusedChart = true;
+        try {
+            restoreExpandedIntervalHistorySnapshot(snapshot);
+            if (snapshot.ranges?.afterFrom && snapshot.ranges?.afterTo) {
+                state.expandedRangesBySource[sourceCanvasId] = normalizeCompareRangesByAfter(
+                    snapshot.ranges.afterFrom,
+                    snapshot.ranges.afterTo,
+                    snapshot.ranges.beforeFrom,
+                    snapshot.ranges.beforeTo
+                );
+            }
+            if (state.expandedChart.sourceCanvasId !== sourceCanvasId) {
+                toggleExpandedChart(sourceCanvasId);
+            }
+            if (state.expandedChart.sourceCanvasId !== sourceCanvasId || !state.expandedChart.containerEl) {
+                return;
+            }
+            state.expandedChart.customRangeActive = !!snapshot.customRangeActive
+                || snapshot.eventFilter?.includeOverall === false
+                || (Array.isArray(snapshot.eventFilter?.codes) && snapshot.eventFilter.codes.length > 0);
+            syncExpandedEventFilterControls(sourceCanvasId);
+            await syncExpandedGraphFiltersFromTop({preserveCurrentRanges: true});
+            applyExpandedZoomSnapshot(snapshot.zoom);
+            clearExpandedFocusedChartSnapshot();
+        } finally {
+            state.restoringExpandedFocusedChart = false;
+        }
+    }
+
     async function openScenarioDetailDiagnostics(canvasId, eventCodes = []) {
         const codes = Array.from(new Set((eventCodes || [])
             .map((code) => String(code || "").trim())
@@ -17181,6 +17962,7 @@
         if (!codes.length || !isOverviewScenarioDetailChart(canvasId)) {
             return;
         }
+        storeExpandedFocusedChartSnapshot(captureExpandedFocusedChartSnapshot(canvasId));
         const ranges = currentScenarioDetailRanges(canvasId);
         await applyScenarioDetailRawEventsFilter(codes, ranges);
         state.universalDiagnosticsDrilldownContext = {
@@ -18738,18 +19520,30 @@
 
             if (refs.stageMetricForm) {
                 applyGlobalCompareModeToStageMetrics(globalMode);
-                secondaryTasks.push(withStageMetricLoaders("all", () => loadStageMetrics()));
+                secondaryTasks.push((async () => {
+                    try {
+                        await withStageMetricLoaders("all", () => loadStageMetrics());
+                    } catch (error) {
+                        console.error("Stage metric compare refresh failed", error);
+                    }
+                })());
             }
             if (refs.universalCompareEnabled) {
                 refs.universalCompareEnabled.checked = true;
                 if (refs.universalCompareGhost) {
                     refs.universalCompareGhost.checked = globalMode === "overlay";
                 }
-                secondaryTasks.push(withUniversalChartLoaders(() => loadUniversal()));
+                secondaryTasks.push((async () => {
+                    try {
+                        await withUniversalChartLoaders(() => loadUniversal());
+                    } catch (error) {
+                        console.error("Universal compare refresh failed", error);
+                    }
+                })());
             }
 
             if (secondaryTasks.length) {
-                await Promise.all(secondaryTasks);
+                void Promise.allSettled(secondaryTasks);
             }
         } finally {
             hideOverviewLoaders();
@@ -19543,7 +20337,7 @@
             true,
             nextMain
         );
-        await refreshRawEventTypeOptionsForMode(selectedRawEventTypeCodes());
+        await refreshRawEventTypeOptionsForMode(selectedRawEventTypeCodes(), {useMainRange: true});
     }
 
     async function fetchPeriodFilterOptions(options = {}) {

@@ -12,6 +12,8 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -22,6 +24,7 @@ public class AnalyticsUniversalRootCauseService {
 
     private static final int DEFAULT_LIMIT = 12;
     private static final int MAX_LIMIT = 30;
+    private static final Logger log = LoggerFactory.getLogger(AnalyticsUniversalRootCauseService.class);
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
 
@@ -39,6 +42,7 @@ public class AnalyticsUniversalRootCauseService {
         String attributeValue,
         Integer limit
     ) {
+        long serviceStarted = System.nanoTime();
         String safeAttributeCode = normalizeText(attributeCode);
         if (safeAttributeCode == null) {
             return new UniversalRootCauseResponse("", null, 0, 0, 0, List.of());
@@ -218,6 +222,7 @@ public class AnalyticsUniversalRootCauseService {
         final long[] problemEventCount = {0L};
         final long[] criticalValueCount = {0L};
         final long[] warningValueCount = {0L};
+        long sqlStarted = System.nanoTime();
         jdbcTemplate.query(sql, params, rs -> {
             problemEventCount[0] = rs.getLong("problem_event_count");
             criticalValueCount[0] = rs.getLong("critical_value_count");
@@ -235,7 +240,8 @@ public class AnalyticsUniversalRootCauseService {
                 ));
             }
         });
-        return new UniversalRootCauseResponse(
+        long sqlMs = elapsedMs(sqlStarted);
+        UniversalRootCauseResponse response = new UniversalRootCauseResponse(
             safeAttributeCode,
             safeAttributeValue,
             problemEventCount[0],
@@ -243,6 +249,24 @@ public class AnalyticsUniversalRootCauseService {
             warningValueCount[0],
             factors
         );
+        log.debug(
+            "[UNIVERSAL_PERF] service endpoint=/api/universal/root-cause totalMs={} sqlMs={} from={} to={} eventCodes={} stageCodes={} module={} attr={} valueSet={} limit={} factors={} problemEvents={} criticalValues={} warningValues={}",
+            elapsedMs(serviceStarted),
+            sqlMs,
+            from,
+            to,
+            safeEventCodes.size(),
+            safeStageCodes.size(),
+            safeModuleCode,
+            safeAttributeCode,
+            safeAttributeValue != null,
+            safeLimit,
+            factors.size(),
+            problemEventCount[0],
+            criticalValueCount[0],
+            warningValueCount[0]
+        );
+        return response;
     }
 
     public UniversalRootCauseResponse eventRootCause(
@@ -253,6 +277,7 @@ public class AnalyticsUniversalRootCauseService {
         String moduleCode,
         Integer limit
     ) {
+        long serviceStarted = System.nanoTime();
         List<String> safeEventCodes = normalizeList(eventCodes);
         List<String> safeStageCodes = normalizeList(stageTypeCodes);
         String safeModuleCode = normalizeText(moduleCode);
@@ -375,6 +400,7 @@ public class AnalyticsUniversalRootCauseService {
         final long[] problemEventCount = {0L};
         final long[] criticalValueCount = {0L};
         final long[] warningValueCount = {0L};
+        long sqlStarted = System.nanoTime();
         jdbcTemplate.query(sql, params, rs -> {
             problemEventCount[0] = rs.getLong("problem_event_count");
             criticalValueCount[0] = rs.getLong("critical_value_count");
@@ -392,7 +418,8 @@ public class AnalyticsUniversalRootCauseService {
                 ));
             }
         });
-        return new UniversalRootCauseResponse(
+        long sqlMs = elapsedMs(sqlStarted);
+        UniversalRootCauseResponse response = new UniversalRootCauseResponse(
             safeEventCodes.size() == 1 ? safeEventCodes.get(0) : "",
             null,
             problemEventCount[0],
@@ -400,6 +427,22 @@ public class AnalyticsUniversalRootCauseService {
             warningValueCount[0],
             factors
         );
+        log.debug(
+            "[UNIVERSAL_PERF] service endpoint=/api/universal/event-root-cause totalMs={} sqlMs={} from={} to={} eventCodes={} stageCodes={} module={} limit={} factors={} problemEvents={} criticalEvents={} warningEvents={}",
+            elapsedMs(serviceStarted),
+            sqlMs,
+            from,
+            to,
+            safeEventCodes.size(),
+            safeStageCodes.size(),
+            safeModuleCode,
+            safeLimit,
+            factors.size(),
+            problemEventCount[0],
+            criticalValueCount[0],
+            warningValueCount[0]
+        );
+        return response;
     }
 
     private static List<String> normalizeList(Collection<String> values) {
@@ -426,5 +469,9 @@ public class AnalyticsUniversalRootCauseService {
             return BigDecimal.ZERO.setScale(scale, RoundingMode.HALF_UP);
         }
         return value.setScale(scale, RoundingMode.HALF_UP);
+    }
+
+    private static long elapsedMs(long started) {
+        return (System.nanoTime() - started) / 1_000_000L;
     }
 }

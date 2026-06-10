@@ -344,6 +344,44 @@ public final class AnalyticsApiDto {
     ) {
     }
 
+    public record EventDurationBreakdownDto(
+        Long eventDurationMs,
+        Long sumStageDurationMs,
+        Long coveredStageDurationMs,
+        Long unaccountedDurationMs,
+        Long firstStageOffsetMs,
+        Long betweenStagesMs,
+        Long tailAfterLastStageMs,
+        Long timestampWindowDurationMs,
+        Long durationOutsideTimestampWindowMs,
+        List<EventStageIntervalDto> stageIntervals,
+        List<EventUnaccountedIntervalDto> unaccountedIntervals
+    ) {
+    }
+
+    public record EventStageIntervalDto(
+        String stageTypeCode,
+        String stageTypeName,
+        Integer stageOrder,
+        Instant startedAt,
+        Instant endedAt,
+        Long durationMs,
+        Long offsetFromEventStartMs,
+        Boolean nested,
+        Integer parentStageOrder
+    ) {
+    }
+
+    public record EventUnaccountedIntervalDto(
+        String type,
+        String label,
+        Instant startedAt,
+        Instant endedAt,
+        Long durationMs,
+        Long offsetFromEventStartMs
+    ) {
+    }
+
     public record EventAttributeDto(
         String attributeTypeCode,
         String attributeTypeName,
@@ -357,6 +395,7 @@ public final class AnalyticsApiDto {
         Instant startedAt,
         Instant endedAt,
         Integer durationMs,
+        EventDurationBreakdownDto durationBreakdown,
         String moduleCode,
         String moduleName,
         String eventTypeCode,

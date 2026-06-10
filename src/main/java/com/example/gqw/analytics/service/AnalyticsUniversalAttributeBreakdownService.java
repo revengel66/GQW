@@ -13,6 +13,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -25,6 +27,7 @@ public class AnalyticsUniversalAttributeBreakdownService {
     private static final int MAX_LIMIT = 100;
     private static final int DEFAULT_SOFT_LIMIT = 500;
     private static final int DEFAULT_HARD_LIMIT = 2000;
+    private static final Logger log = LoggerFactory.getLogger(AnalyticsUniversalAttributeBreakdownService.class);
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
 
@@ -44,6 +47,7 @@ public class AnalyticsUniversalAttributeBreakdownService {
         String sortBy,
         String sortDir
     ) {
+        long serviceStarted = System.nanoTime();
         String safeAttributeCode = normalizeText(attributeCode);
         if (safeAttributeCode == null) {
             return new UniversalAttributeBreakdownResponse("", 0, 0, 0, 0, 0, List.of());
@@ -203,6 +207,7 @@ public class AnalyticsUniversalAttributeBreakdownService {
         final long[] warningTotal = {0L};
         final long[] normalTotal = {0L};
         final long[] problemEventCount = {0L};
+        long sqlStarted = System.nanoTime();
         jdbcTemplate.query(sql, params, rs -> {
             if (total[0] == 0L) {
                 total[0] = rs.getLong("total_values");
@@ -221,6 +226,26 @@ public class AnalyticsUniversalAttributeBreakdownService {
                 rs.getString("severity_level")
             ));
         });
+        long sqlMs = elapsedMs(sqlStarted);
+        log.debug(
+            "[UNIVERSAL_PERF] service endpoint=/api/universal/attribute-breakdown totalMs={} sqlMs={} from={} to={} eventCodes={} stageCodes={} module={} attr={} limit={} offset={} rows={} total={} critical={} warning={} normal={} problemEvents={}",
+            elapsedMs(serviceStarted),
+            sqlMs,
+            from,
+            to,
+            safeEventCodes.size(),
+            safeStageCodes.size(),
+            safeModuleCode,
+            safeAttributeCode,
+            safeLimit,
+            safeOffset,
+            rows.size(),
+            total[0],
+            criticalTotal[0],
+            warningTotal[0],
+            normalTotal[0],
+            problemEventCount[0]
+        );
         return new UniversalAttributeBreakdownResponse(safeAttributeCode, total[0], criticalTotal[0], warningTotal[0], normalTotal[0], problemEventCount[0], rows);
     }
 
@@ -284,5 +309,9 @@ public class AnalyticsUniversalAttributeBreakdownService {
             return BigDecimal.ZERO.setScale(scale, RoundingMode.HALF_UP);
         }
         return value.setScale(scale, RoundingMode.HALF_UP);
+    }
+
+    private static long elapsedMs(long started) {
+        return (System.nanoTime() - started) / 1_000_000L;
     }
 }

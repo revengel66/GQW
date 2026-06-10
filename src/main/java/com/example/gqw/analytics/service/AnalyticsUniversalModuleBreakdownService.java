@@ -15,6 +15,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -27,11 +29,18 @@ public class AnalyticsUniversalModuleBreakdownService {
     private static final int MAX_LIMIT = 100;
     private static final int DEFAULT_RCA_LIMIT = 24;
     private static final int MAX_RCA_LIMIT = 40;
+    private static final int DEFAULT_RCA_EVENT_LIMIT = 2_000;
+    private static final Logger log = LoggerFactory.getLogger(AnalyticsUniversalModuleBreakdownService.class);
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
+    private final AnalyticsTimeRollupService timeRollupService;
 
-    public AnalyticsUniversalModuleBreakdownService(@Qualifier("analyticsNamedParameterJdbcTemplate") NamedParameterJdbcTemplate jdbcTemplate) {
+    public AnalyticsUniversalModuleBreakdownService(
+        @Qualifier("analyticsNamedParameterJdbcTemplate") NamedParameterJdbcTemplate jdbcTemplate,
+        AnalyticsTimeRollupService timeRollupService
+    ) {
         this.jdbcTemplate = jdbcTemplate;
+        this.timeRollupService = timeRollupService;
     }
 
     public UniversalModuleBreakdownResponse breakdown(
@@ -45,20 +54,150 @@ public class AnalyticsUniversalModuleBreakdownService {
         String sortBy,
         String sortDir
     ) {
+        long serviceStarted = System.nanoTime();
         List<String> safeEventCodes = normalizeList(eventCodes);
         List<String> safeStageCodes = normalizeList(stageTypeCodes);
         String safeModuleCode = normalizeText(moduleCode);
         int safeLimit = Math.max(1, Math.min(MAX_LIMIT, limit == null ? DEFAULT_LIMIT : limit));
         int safeOffset = Math.max(0, offset == null ? 0 : offset);
         String direction = "asc".equalsIgnoreCase(sortDir) ? "asc" : "desc";
+        String sortOrder = sortOrder(sortBy, direction);
 
-        MapSqlParameterSource params = baseParams(from, to, safeEventCodes, safeStageCodes)
+        if (timeRollupService.isEnabled()) {
+            int sourceGranularity = timeRollupService.chooseSourceGranularityMinutes(from, to, 60);
+            MapSqlParameterSource rollupParams = baseParams(from, to, safeEventCodes, safeStageCodes)
+                .addValue("moduleCode", safeModuleCode, Types.VARCHAR)
+                .addValue("moduleEnabled", safeModuleCode != null, Types.BOOLEAN)
+                .addValue("sourceGranularity", sourceGranularity, Types.INTEGER)
+                .addValue("limit", safeLimit, Types.INTEGER)
+                .addValue("offset", safeOffset, Types.INTEGER);
+            BreakdownQueryResult rollupResult = queryBreakdown(rollupBreakdownSql(sortOrder), rollupParams);
+            if (rollupResult.response().total() > 0 || !rollupResult.response().rows().isEmpty()) {
+                logModuleBreakdownPerf(
+                    "rollup",
+                    serviceStarted,
+                    rollupResult,
+                    from,
+                    to,
+                    safeEventCodes,
+                    safeStageCodes,
+                    safeModuleCode,
+                    safeLimit,
+                    safeOffset,
+                    sourceGranularity
+                );
+                return rollupResult.response();
+            }
+        }
+
+        MapSqlParameterSource rawParams = baseParams(from, to, safeEventCodes, safeStageCodes)
             .addValue("moduleCode", safeModuleCode, Types.VARCHAR)
             .addValue("moduleEnabled", safeModuleCode != null, Types.BOOLEAN)
             .addValue("limit", safeLimit, Types.INTEGER)
             .addValue("offset", safeOffset, Types.INTEGER);
 
-        String sql = """
+        BreakdownQueryResult rawResult = queryBreakdown(rawBreakdownSql(sortOrder), rawParams);
+        logModuleBreakdownPerf(
+            "raw",
+            serviceStarted,
+            rawResult,
+            from,
+            to,
+            safeEventCodes,
+            safeStageCodes,
+            safeModuleCode,
+            safeLimit,
+            safeOffset,
+            0
+        );
+        return rawResult.response();
+    }
+
+    private String rollupBreakdownSql(String sortOrder) {
+        return """
+            with grouped as (
+                select
+                    concat(coalesce(r.module_code, 'DEFAULT'), '|', r.stage_type_code, '|', case when coalesce(et.is_system, false) then 'SYSTEM' else 'USER' end) as module_key,
+                    coalesce(r.module_code, 'DEFAULT') as module_code,
+                    coalesce(mt.name, coalesce(r.module_code, 'DEFAULT')) as module_name,
+                    r.stage_type_code,
+                    coalesce(st.name, r.stage_type_code) as stage_type_name,
+                    coalesce(et.is_system, false) as system_event,
+                    cast(sum(r.sample_count) as bigint) as count,
+                    cast(sum(r.error_count) as bigint) as error_count,
+                    cast(case when sum(r.sample_count) = 0 then 0 else cast(sum(r.error_count) as numeric) / sum(r.sample_count) end as numeric(12, 6)) as error_rate,
+                    cast(coalesce(cast(sum(r.duration_sum) as numeric) / nullif(sum(r.sample_count), 0), 0) as numeric(12, 3)) as avg_ms,
+                    cast(coalesce(sum(r.p95_ms * r.sample_count) / nullif(sum(r.sample_count), 0), 0) as numeric(12, 3)) as p95_ms,
+                    cast(sum(r.sample_count) as bigint) as event_count
+                from analytics.stage_rollup_bucket r
+                join analytics.event_type et on et.code = r.event_type_code
+                left join analytics.module_type mt on mt.code = r.module_code
+                left join analytics.stage_type st on st.code = r.stage_type_code
+                where r.bucket_start >= :from
+                  and r.bucket_start < :to
+                  and r.granularity_minutes = :sourceGranularity
+                  and (:eventFilterEnabled = false or r.event_type_code in (:eventCodes))
+                  and (:stageFilterEnabled = false or r.stage_type_code in (:stageTypeCodes))
+                  and (:moduleEnabled = false or coalesce(r.module_code, 'DEFAULT') = :moduleCode)
+                group by coalesce(r.module_code, 'DEFAULT'), module_name, r.stage_type_code, stage_type_name, system_event
+            ),
+            context_problem_stats as (
+                select coalesce(sum(case when error_count > 0 or p95_ms >= 1000 or avg_ms >= 500 then count else 0 end), 0)::bigint as problem_event_count
+                from grouped
+            ),
+            enriched as (
+                select
+                    *,
+                    cast(case when sum(count) over() = 0 then 0 else cast(count as numeric) / sum(count) over() * 100 end as numeric(12, 4)) as share,
+                    cast(avg(count) over() as numeric(12, 3)) as avg_count_baseline
+                from grouped
+            ),
+            classified as (
+                select
+                    *,
+                    case
+                        when error_rate > 0.05 or p95_ms >= 3000 or avg_ms >= 1500
+                          or (share >= 20 and (error_rate > 0 or p95_ms >= 1000 or avg_ms >= 500))
+                        then 'critical'
+                        when error_rate > 0 or p95_ms >= 1000 or avg_ms >= 500 or share >= 5
+                          or (avg_count_baseline > 0 and count >= avg_count_baseline * 1.5)
+                        then 'warning'
+                        else 'normal'
+                    end as severity_level
+                from enriched
+            ),
+            stats as (
+                select
+                    count(*)::bigint as total_values,
+                    coalesce(sum(case when severity_level = 'critical' then 1 else 0 end), 0)::bigint as critical_total,
+                    coalesce(sum(case when severity_level = 'warning' then 1 else 0 end), 0)::bigint as warning_total,
+                    coalesce(sum(case when severity_level = 'normal' then 1 else 0 end), 0)::bigint as normal_total,
+                    coalesce(sum(count), 0)::bigint as rows_scanned,
+                    (select problem_event_count from context_problem_stats) as problem_event_count
+                from classified
+            ),
+            ranked as (
+                select
+                    c.*,
+                    stats.total_values,
+                    stats.critical_total,
+                    stats.warning_total,
+                    stats.normal_total,
+                    stats.rows_scanned,
+                    stats.problem_event_count,
+                    row_number() over (order by %s, c.module_name asc, c.stage_type_name asc) as rn
+                from classified c
+                cross join stats
+            )
+            select *
+            from ranked
+            where rn > :offset and rn <= (:offset + :limit)
+            order by rn
+            """.formatted(sortOrder);
+    }
+
+    private String rawBreakdownSql(String sortOrder) {
+        return """
             with base as (
                 select
                     e.id as event_id,
@@ -128,6 +267,7 @@ public class AnalyticsUniversalModuleBreakdownService {
                     sum(case when severity_level = 'critical' then 1 else 0 end)::bigint as critical_total,
                     sum(case when severity_level = 'warning' then 1 else 0 end)::bigint as warning_total,
                     sum(case when severity_level = 'normal' then 1 else 0 end)::bigint as normal_total,
+                    coalesce(sum(count), 0)::bigint as rows_scanned,
                     (select problem_event_count from context_problem_stats) as problem_event_count
                 from classified
             ),
@@ -138,6 +278,7 @@ public class AnalyticsUniversalModuleBreakdownService {
                     stats.critical_total,
                     stats.warning_total,
                     stats.normal_total,
+                    stats.rows_scanned,
                     stats.problem_event_count,
                     row_number() over (order by %s, c.module_name asc, c.stage_type_name asc) as rn
                 from classified c
@@ -147,11 +288,15 @@ public class AnalyticsUniversalModuleBreakdownService {
             from ranked
             where rn > :offset and rn <= (:offset + :limit)
             order by rn
-            """.formatted(sortOrder(sortBy, direction));
+            """.formatted(sortOrder);
+    }
 
+    private BreakdownQueryResult queryBreakdown(String sql, MapSqlParameterSource params) {
         List<UniversalModuleBreakdownRowDto> rows = new ArrayList<>();
         long[] totals = new long[4];
         long[] problemEventCount = new long[1];
+        long[] rowsScanned = new long[1];
+        long sqlStarted = System.nanoTime();
         jdbcTemplate.query(sql, params, rs -> {
             if (totals[0] == 0L) {
                 totals[0] = rs.getLong("total_values");
@@ -159,6 +304,7 @@ public class AnalyticsUniversalModuleBreakdownService {
                 totals[2] = rs.getLong("warning_total");
                 totals[3] = rs.getLong("normal_total");
                 problemEventCount[0] = rs.getLong("problem_event_count");
+                rowsScanned[0] = rs.getLong("rows_scanned");
             }
             rows.add(new UniversalModuleBreakdownRowDto(
                 rs.getString("module_key"),
@@ -177,7 +323,48 @@ public class AnalyticsUniversalModuleBreakdownService {
                 rs.getString("severity_level")
             ));
         });
-        return new UniversalModuleBreakdownResponse(totals[0], totals[1], totals[2], totals[3], problemEventCount[0], rows);
+        return new BreakdownQueryResult(
+            new UniversalModuleBreakdownResponse(totals[0], totals[1], totals[2], totals[3], problemEventCount[0], rows),
+            elapsedMs(sqlStarted),
+            rowsScanned[0]
+        );
+    }
+
+    private void logModuleBreakdownPerf(
+        String path,
+        long serviceStarted,
+        BreakdownQueryResult result,
+        Instant from,
+        Instant to,
+        List<String> eventCodes,
+        List<String> stageTypeCodes,
+        String moduleCode,
+        int limit,
+        int offset,
+        int sourceGranularity
+    ) {
+        UniversalModuleBreakdownResponse response = result.response();
+        log.debug(
+            "[UNIVERSAL_PERF] service endpoint=/api/universal/module-breakdown path={} totalMs={} sqlMs={} rowsScanned={} rowsReturned={} from={} to={} eventCodes={} stageCodes={} module={} limit={} offset={} sourceGranularity={} total={} critical={} warning={} normal={} problemEvents={}",
+            path,
+            elapsedMs(serviceStarted),
+            result.sqlMs(),
+            result.rowsScanned(),
+            response.rows() == null ? 0 : response.rows().size(),
+            from,
+            to,
+            eventCodes.size(),
+            stageTypeCodes.size(),
+            moduleCode,
+            limit,
+            offset,
+            sourceGranularity,
+            response.total(),
+            response.criticalTotal(),
+            response.warningTotal(),
+            response.normalTotal(),
+            response.problemEventCount()
+        );
     }
 
     public UniversalRootCauseResponse rootCause(
@@ -190,6 +377,7 @@ public class AnalyticsUniversalModuleBreakdownService {
         Boolean systemEventsOnly,
         Integer limit
     ) {
+        long serviceStarted = System.nanoTime();
         List<String> safeEventCodes = normalizeList(eventCodes);
         List<String> safeStageCodes = normalizeList(stageTypeCodes);
         String safeModuleCode = normalizeText(moduleCode);
@@ -203,6 +391,7 @@ public class AnalyticsUniversalModuleBreakdownService {
             .addValue("selectedStageEnabled", safeSelectedStage != null, Types.BOOLEAN)
             .addValue("systemEventsOnly", Boolean.TRUE.equals(systemEventsOnly), Types.BOOLEAN)
             .addValue("systemScopeEnabled", systemEventsOnly != null, Types.BOOLEAN)
+            .addValue("problemEventLimit", DEFAULT_RCA_EVENT_LIMIT, Types.INTEGER)
             .addValue("limit", safeLimit, Types.INTEGER);
 
         String sql = """
@@ -228,17 +417,23 @@ public class AnalyticsUniversalModuleBreakdownService {
                   and (:selectedStageEnabled = false or s.stage_type_code = :selectedStageTypeCode)
                   and (:systemScopeEnabled = false or coalesce(et.is_system, false) = :systemEventsOnly)
             ),
-            problem_events as (
+            problem_events_all as (
                 select distinct event_id
                 from selected_stages
                 where severity_level in ('critical', 'warning')
+            ),
+            problem_events as (
+                select event_id
+                from problem_events_all
+                order by event_id desc
+                limit :problemEventLimit
             ),
             problem_stats as (
                 select
                     count(*)::bigint as problem_event_count,
                     (select count(*) from selected_stages where severity_level = 'critical')::bigint as critical_value_count,
                     (select count(*) from selected_stages where severity_level = 'warning')::bigint as warning_value_count
-                from problem_events
+                from problem_events_all
             ),
             event_factors as (
                 select 'EVENT_TYPE' as factor_code, e.event_type_code as factor_value, 0 as priority,
@@ -308,6 +503,7 @@ public class AnalyticsUniversalModuleBreakdownService {
 
         List<UniversalRootCauseFactorDto> factors = new ArrayList<>();
         long[] stats = new long[3];
+        long sqlStarted = System.nanoTime();
         jdbcTemplate.query(sql, params, rs -> {
             stats[0] = rs.getLong("problem_event_count");
             stats[1] = rs.getLong("critical_value_count");
@@ -324,7 +520,8 @@ public class AnalyticsUniversalModuleBreakdownService {
                 ));
             }
         });
-        return new UniversalRootCauseResponse(
+        long sqlMs = elapsedMs(sqlStarted);
+        UniversalRootCauseResponse response = new UniversalRootCauseResponse(
             safeModuleCode == null ? "MODULE" : safeModuleCode,
             safeSelectedStage,
             stats[0],
@@ -332,6 +529,25 @@ public class AnalyticsUniversalModuleBreakdownService {
             stats[2],
             factors
         );
+        log.debug(
+            "[UNIVERSAL_PERF] service endpoint=/api/universal/module-root-cause totalMs={} sqlMs={} from={} to={} eventCodes={} stageCodes={} module={} selectedStage={} systemEventsOnly={} limit={} problemEventLimit={} factors={} problemEvents={} criticalValues={} warningValues={}",
+            elapsedMs(serviceStarted),
+            sqlMs,
+            from,
+            to,
+            safeEventCodes.size(),
+            safeStageCodes.size(),
+            safeModuleCode,
+            safeSelectedStage,
+            systemEventsOnly,
+            safeLimit,
+            DEFAULT_RCA_EVENT_LIMIT,
+            factors.size(),
+            stats[0],
+            stats[1],
+            stats[2]
+        );
+        return response;
     }
 
     private static MapSqlParameterSource baseParams(
@@ -384,5 +600,16 @@ public class AnalyticsUniversalModuleBreakdownService {
 
     private static BigDecimal scale(BigDecimal value, int scale) {
         return (value == null ? BigDecimal.ZERO : value).setScale(scale, RoundingMode.HALF_UP);
+    }
+
+    private static long elapsedMs(long started) {
+        return (System.nanoTime() - started) / 1_000_000L;
+    }
+
+    private record BreakdownQueryResult(
+        UniversalModuleBreakdownResponse response,
+        long sqlMs,
+        long rowsScanned
+    ) {
     }
 }

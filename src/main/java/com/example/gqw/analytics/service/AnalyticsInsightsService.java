@@ -19,14 +19,17 @@ import com.example.gqw.analytics.web.dto.AnalyticsApiDto.CompareResponse;
 import com.example.gqw.analytics.web.dto.AnalyticsApiDto.DictionariesResponse;
 import com.example.gqw.analytics.web.dto.AnalyticsApiDto.EventAttributeDto;
 import com.example.gqw.analytics.web.dto.AnalyticsApiDto.CompareEventRow;
+import com.example.gqw.analytics.web.dto.AnalyticsApiDto.EventDurationBreakdownDto;
 import com.example.gqw.analytics.web.dto.AnalyticsApiDto.EventDetailsResponse;
 import com.example.gqw.analytics.web.dto.AnalyticsApiDto.EventLogEntryDto;
+import com.example.gqw.analytics.web.dto.AnalyticsApiDto.EventStageIntervalDto;
 import com.example.gqw.analytics.web.dto.AnalyticsApiDto.EventKpiDto;
 import com.example.gqw.analytics.web.dto.AnalyticsApiDto.EventListItemDto;
 import com.example.gqw.analytics.web.dto.AnalyticsApiDto.EventListResponse;
 import com.example.gqw.analytics.web.dto.AnalyticsApiDto.EventStageBriefDto;
 import com.example.gqw.analytics.web.dto.AnalyticsApiDto.EventStageDetailsDto;
 import com.example.gqw.analytics.web.dto.AnalyticsApiDto.EventStageMetricDto;
+import com.example.gqw.analytics.web.dto.AnalyticsApiDto.EventUnaccountedIntervalDto;
 import com.example.gqw.analytics.web.dto.AnalyticsApiDto.FilterOptionsResponse;
 import com.example.gqw.analytics.web.dto.AnalyticsApiDto.KpiDelta;
 import com.example.gqw.analytics.web.dto.AnalyticsApiDto.KpiSnapshot;
@@ -226,11 +229,9 @@ public class AnalyticsInsightsService {
             .map(code -> new OptionDto(code, moduleTypeNames.getOrDefault(code, code)))
             .toList();
 
-        List<String> eventTypeCodes = useRollup
-            ? filterRollupService.findEventTypeCodes(effectiveFrom, effectiveTo, normalizedModuleCode)
-            : (normalizedRequestPath == null
-                ? eventRepository.findDistinctEventTypeCodesByScopeNoPath(effectiveFrom, effectiveTo, normalizedModuleCode)
-                : eventRepository.findDistinctEventTypeCodesByScope(effectiveFrom, effectiveTo, normalizedModuleCode, normalizedRequestPath));
+        List<String> eventTypeCodes = normalizedRequestPath == null
+            ? eventRepository.findDistinctEventTypeCodesByScopeNoPath(from, to, normalizedModuleCode)
+            : eventRepository.findDistinctEventTypeCodesByScope(from, to, normalizedModuleCode, normalizedRequestPath);
         List<OptionDto> eventTypes = eventTypeCodes
             .stream()
             .limit(FILTER_OPTION_LIMIT)
@@ -291,7 +292,24 @@ public class AnalyticsInsightsService {
                 .map(value -> new OptionDto(value, value))
                 .toList();
 
-        return new FilterOptionsResponse(modules, eventTypes, attributeTypes, attributeValues, rawWindow.partial(), rawWindow.warning());
+        FilterOptionsResponse response = new FilterOptionsResponse(modules, eventTypes, attributeTypes, attributeValues, rawWindow.partial(), rawWindow.warning());
+        log.debug(
+            "[FILTER_OPTIONS_PERF] service path={} totalMs={} from={} to={} module={} eventType={} requestPath={} attribute={} modules={} eventTypes={} attributeTypes={} attributeValues={} partial={}",
+            useRollup ? "rollup" : "raw",
+            elapsedMs(serviceStarted),
+            effectiveFrom,
+            effectiveTo,
+            normalizedModuleCode,
+            normalizedEventType,
+            normalizedRequestPath,
+            normalizedAttributeCode,
+            modules.size(),
+            eventTypes.size(),
+            attributeTypes.size(),
+            attributeValues.size(),
+            rawWindow.partial()
+        );
+        return response;
     }
 
     public OverviewResponse overview(
@@ -427,6 +445,7 @@ public class AnalyticsInsightsService {
         BigDecimal filterAttributeMaxValue,
         Integer bucketMinutes
     ) {
+        long serviceStarted = System.nanoTime();
         String normalizedModuleCode = normalizeModuleFilterCode(moduleCode);
         String normalizedEventType = normalizeCode(eventTypeCode);
         String normalizedRequestPath = normalizeText(requestPath);
@@ -448,6 +467,7 @@ public class AnalyticsInsightsService {
             filterAttributeMaxValue
         )) {
             Set<String> eventTypeFilter = normalizedEventType == null ? nonEmptyEventTypeFilter(visibleEventCodes) : Set.of(normalizedEventType);
+            long rollupQueryStarted = System.nanoTime();
             List<AnalyticsTimeRollupService.AggregatePoint> points = timeRollupService.loadStageAggregatePoints(
                 from,
                 to,
@@ -456,10 +476,26 @@ public class AnalyticsInsightsService {
                 Set.of(),
                 resolvedBucket
             );
+            long rollupQueryMs = elapsedMs(rollupQueryStarted);
             if (points.isEmpty()) {
-                return new StageBreakdownResponse(from, to, resolvedBucket, List.of(), List.of());
+                StageBreakdownResponse response = new StageBreakdownResponse(from, to, resolvedBucket, List.of(), List.of());
+                log.debug(
+            "[STAGE_BREAKDOWN_PERF] service path=rollup totalMs={} rollupQueryMs={} buildMs=0 from={} to={} module={} eventType={} requestPath={} bucket={} stages={} series={}",
+                    elapsedMs(serviceStarted),
+                    rollupQueryMs,
+                    from,
+                    to,
+                    normalizedModuleCode,
+                    normalizedEventType,
+                    normalizedRequestPath,
+                    resolvedBucket,
+                    0,
+                    0
+                );
+                return response;
             }
 
+            long buildStarted = System.nanoTime();
             Map<String, String> stageTypeNames = stageTypeNameMap();
             Map<String, AnalyticsTimeRollupService.AnalyticsAccumulator> byStage = timeRollupService.accumulateByCode(points);
             List<StageKpiDto> kpi = byStage.entrySet().stream()
@@ -499,9 +535,26 @@ public class AnalyticsInsightsService {
                 .sorted(Comparator.comparing(StageSeriesDto::stageTypeCode))
                 .toList();
 
-            return new StageBreakdownResponse(from, to, resolvedBucket, kpi, stageSeries);
+            StageBreakdownResponse response = new StageBreakdownResponse(from, to, resolvedBucket, kpi, stageSeries);
+            log.debug(
+            "[STAGE_BREAKDOWN_PERF] service path=rollup totalMs={} rollupQueryMs={} buildMs={} from={} to={} module={} eventType={} requestPath={} bucket={} points={} stages={} series={}",
+                elapsedMs(serviceStarted),
+                rollupQueryMs,
+                elapsedMs(buildStarted),
+                from,
+                to,
+                normalizedModuleCode,
+                normalizedEventType,
+                normalizedRequestPath,
+                resolvedBucket,
+                points.size(),
+                kpi.size(),
+                stageSeries.size()
+            );
+            return response;
         }
 
+        long rawQueryStarted = System.nanoTime();
         ReadWindow rawWindow = boundedRawReadWindow(from, to, "/api/stages");
         Instant effectiveFrom = rawWindow.from();
         Instant effectiveTo = rawWindow.to();
@@ -509,16 +562,35 @@ public class AnalyticsInsightsService {
             eventRepository.findAllByRangeOrdered(effectiveFrom, effectiveTo, normalizedEventType, normalizedModuleCode),
             normalizedRequestPath
         );
+        long rawQueryMs = elapsedMs(rawQueryStarted);
         events = filterEventsByScope(events, false);
         events = filterEventsByMetric(events, filterMetricTypeCode, filterMetricValue, filterMetricMinValue, filterMetricMaxValue);
         events = filterEventsByAttribute(events, filterAttributeCode, filterAttributeValue, filterAttributeMinValue, filterAttributeMaxValue);
         if (events.isEmpty()) {
-            return new StageBreakdownResponse(effectiveFrom, effectiveTo, resolvedBucket, List.of(), List.of(), rawWindow.partial(), rawWindow.warning());
+            StageBreakdownResponse response = new StageBreakdownResponse(effectiveFrom, effectiveTo, resolvedBucket, List.of(), List.of(), rawWindow.partial(), rawWindow.warning());
+            log.debug(
+            "[STAGE_BREAKDOWN_PERF] service path=raw totalMs={} rawQueryMs={} stageQueryMs=0 buildMs=0 from={} to={} module={} eventType={} requestPath={} bucket={} events={} stages={} series={}",
+                elapsedMs(serviceStarted),
+                rawQueryMs,
+                effectiveFrom,
+                effectiveTo,
+                normalizedModuleCode,
+                normalizedEventType,
+                normalizedRequestPath,
+                resolvedBucket,
+                0,
+                0,
+                0
+            );
+            return response;
         }
 
         Map<String, String> stageTypeNames = stageTypeNameMap();
+        long stageLoadStarted = System.nanoTime();
         List<AnalyticsStage> stages = findStagesByEventIds(ids(events));
+        long stageLoadMs = elapsedMs(stageLoadStarted);
 
+        long buildStarted = System.nanoTime();
         List<StageKpiDto> kpi = stages.stream()
             .collect(Collectors.groupingBy(AnalyticsStage::getStageTypeCode))
             .entrySet()
@@ -566,7 +638,24 @@ public class AnalyticsInsightsService {
             .sorted(Comparator.comparing(StageSeriesDto::stageTypeCode))
             .toList();
 
-        return new StageBreakdownResponse(effectiveFrom, effectiveTo, resolvedBucket, kpi, stageSeries, rawWindow.partial(), rawWindow.warning());
+        StageBreakdownResponse response = new StageBreakdownResponse(effectiveFrom, effectiveTo, resolvedBucket, kpi, stageSeries, rawWindow.partial(), rawWindow.warning());
+        log.debug(
+            "[STAGE_BREAKDOWN_PERF] service path=raw totalMs={} rawQueryMs={} stageQueryMs={} buildMs={} from={} to={} module={} eventType={} requestPath={} bucket={} events={} stages={} series={}",
+            elapsedMs(serviceStarted),
+            rawQueryMs,
+            stageLoadMs,
+            elapsedMs(buildStarted),
+            effectiveFrom,
+            effectiveTo,
+            normalizedModuleCode,
+            normalizedEventType,
+            normalizedRequestPath,
+            resolvedBucket,
+            events.size(),
+            stages.size(),
+            stageSeries.size()
+        );
+        return response;
     }
 
     public StageMetricResponse stageMetrics(
@@ -1758,8 +1847,8 @@ public class AnalyticsInsightsService {
                 eventStageBreakdown,
                 availableAttributeTypes
             );
-            log.info(
-                "[UNIVERSAL_PERF] service path=aggregate totalMs={} eventRollupMs={} stageRollupMs={} eventStageBreakdownMs={} attributesMs={} responseBuildMs={} includeEventStageBreakdown={} counts eventPoints={} stagePoints={} series={} stages={} events={} eventSeries={} eventStageBreakdown={} attrs={}",
+            log.debug(
+            "[UNIVERSAL_PERF] service path=aggregate totalMs={} eventRollupMs={} stageRollupMs={} eventStageBreakdownMs={} attributesMs={} responseBuildMs={} includeEventStageBreakdown={} counts eventPoints={} stagePoints={} series={} stages={} events={} eventSeries={} eventStageBreakdown={} attrs={}",
                 elapsedMs(serviceStarted),
                 eventRollupMs,
                 stageRollupMs,
@@ -1803,8 +1892,8 @@ public class AnalyticsInsightsService {
         long javaFilterMs = elapsedMs(javaFilterStarted);
         if (events.isEmpty()) {
             UniversalResponse empty = new UniversalResponse(from, to, resolvedBucket, snapshotFromEvents(List.of()), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
-            log.info(
-                "[UNIVERSAL_PERF] service path=raw totalMs={} rawQueryMs={} javaFilterMs={} stageBatchLoadMs=0 javaGroupingMs=0 attributesMs=0 responseBuildMs=0 includeEventStageBreakdown={} counts events=0 stages=0 eventStageBreakdown=0 attrs=0",
+            log.debug(
+            "[UNIVERSAL_PERF] service path=raw totalMs={} rawQueryMs={} javaFilterMs={} stageBatchLoadMs=0 javaGroupingMs=0 attributesMs=0 responseBuildMs=0 includeEventStageBreakdown={} counts events=0 stages=0 eventStageBreakdown=0 attrs=0",
                 elapsedMs(serviceStarted),
                 rawQueryMs,
                 javaFilterMs,
@@ -1831,8 +1920,8 @@ public class AnalyticsInsightsService {
 
         if (events.isEmpty()) {
             UniversalResponse empty = new UniversalResponse(from, to, resolvedBucket, snapshotFromEvents(List.of()), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
-            log.info(
-                "[UNIVERSAL_PERF] service path=raw totalMs={} rawQueryMs={} javaFilterMs={} stageBatchLoadMs={} javaGroupingMs=0 attributesMs=0 responseBuildMs=0 includeEventStageBreakdown={} counts events=0 stages={} eventStageBreakdown=0 attrs=0",
+            log.debug(
+            "[UNIVERSAL_PERF] service path=raw totalMs={} rawQueryMs={} javaFilterMs={} stageBatchLoadMs={} javaGroupingMs=0 attributesMs=0 responseBuildMs=0 includeEventStageBreakdown={} counts events=0 stages={} eventStageBreakdown=0 attrs=0",
                 elapsedMs(serviceStarted),
                 rawQueryMs,
                 javaFilterMs,
@@ -2042,7 +2131,7 @@ public class AnalyticsInsightsService {
             availableAttributeTypes
         );
         long responseBuildMs = elapsedMs(responseBuildStarted);
-        log.info(
+        log.debug(
             "[UNIVERSAL_PERF] service path=raw totalMs={} rawQueryMs={} javaFilterMs={} stageBatchLoadMs={} javaGroupingMs={} attributesMs={} responseBuildMs={} includeEventStageBreakdown={} counts events={} stages={} series={} stageRows={} eventBreakdown={} eventSeries={} eventStageBreakdown={} attrs={}",
             elapsedMs(serviceStarted),
             rawQueryMs,
@@ -2484,6 +2573,7 @@ public class AnalyticsInsightsService {
         Map<String, String> attributeTypeNames = eventAttributeTypeNameMap();
         AnalyticsLogViewService.TraceLogLookupResult traceLogLookup = traceLogLookupService.loadTraceLogsSafely(event);
         List<EventLogEntryDto> traceLogs = traceLogLookup.rows();
+        EventDurationBreakdownDto durationBreakdown = buildEventDurationBreakdown(event, stages, stageTypeNames);
 
         Map<Long, List<EventStageMetricDto>> metricsByStage = metrics.stream()
             .collect(Collectors.groupingBy(
@@ -2533,6 +2623,7 @@ public class AnalyticsInsightsService {
             event.getStartedAt(),
             event.getEndedAt(),
             event.getDurationMs(),
+            durationBreakdown,
             event.getModuleCode(),
             moduleNames.getOrDefault(event.getModuleCode(), event.getModuleCode()),
             event.getEventTypeCode(),
@@ -2549,6 +2640,265 @@ public class AnalyticsInsightsService {
             traceLogLookup.status(),
             traceLogs
         );
+    }
+
+    private EventDurationBreakdownDto buildEventDurationBreakdown(
+        AnalyticsEvent event,
+        List<AnalyticsStage> stages,
+        Map<String, String> stageTypeNames
+    ) {
+        long eventDurationMs = resolveDurationMs(event.getStartedAt(), event.getEndedAt(), event.getDurationMs());
+        List<StageInterval> stageIntervals = new ArrayList<>();
+        long sumStageDurationMs = 0L;
+
+        for (AnalyticsStage stage : stages) {
+            TimeInterval interval = toStageInterval(stage);
+            if (interval == null) {
+                continue;
+            }
+            stageIntervals.add(new StageInterval(stage, interval.startedAt(), interval.endedAt()));
+            sumStageDurationMs += interval.durationMs();
+        }
+
+        List<TimeInterval> coverageIntervals = stageIntervals.stream()
+            .map(interval -> clipToEventWindow(interval.asTimeInterval(), event.getStartedAt(), event.getEndedAt()))
+            .filter(Objects::nonNull)
+            .toList();
+        List<TimeInterval> mergedIntervals = mergeIntervalList(coverageIntervals);
+        long coveredStageDurationMs = mergedIntervals.stream().mapToLong(TimeInterval::durationMs).sum();
+        long timestampWindowDurationMs = positiveDuration(event.getStartedAt(), event.getEndedAt());
+        long durationOutsideTimestampWindowMs = Math.max(0L, eventDurationMs - timestampWindowDurationMs);
+        List<EventUnaccountedIntervalDto> unaccountedIntervals = buildUnaccountedIntervals(
+            event.getStartedAt(),
+            event.getEndedAt(),
+            mergedIntervals
+        );
+        long firstStageOffsetMs = sumUnaccounted(unaccountedIntervals, "BEFORE_FIRST_STAGE");
+        long betweenStagesMs = sumUnaccounted(unaccountedIntervals, "BETWEEN_STAGE_INTERVALS");
+        long tailAfterLastStageMs = sumUnaccounted(unaccountedIntervals, "AFTER_LAST_STAGE");
+        if (durationOutsideTimestampWindowMs > 0L) {
+            unaccountedIntervals.add(new EventUnaccountedIntervalDto(
+                "OUTSIDE_TIMESTAMP_WINDOW",
+                "Разница между сохранённой duration и границами startedAt/finishedAt",
+                null,
+                null,
+                durationOutsideTimestampWindowMs,
+                timestampWindowDurationMs
+            ));
+        }
+        long unaccountedDurationMs = Math.max(0L, eventDurationMs - coveredStageDurationMs);
+        List<EventStageIntervalDto> stageIntervalDtos = stageIntervals.stream()
+            .map(interval -> toStageIntervalDto(interval, stageIntervals, event.getStartedAt(), stageTypeNames))
+            .toList();
+        return new EventDurationBreakdownDto(
+            eventDurationMs,
+            sumStageDurationMs,
+            coveredStageDurationMs,
+            unaccountedDurationMs,
+            firstStageOffsetMs,
+            betweenStagesMs,
+            tailAfterLastStageMs,
+            timestampWindowDurationMs,
+            durationOutsideTimestampWindowMs,
+            stageIntervalDtos,
+            unaccountedIntervals
+        );
+    }
+
+    private EventStageIntervalDto toStageIntervalDto(
+        StageInterval interval,
+        List<StageInterval> intervals,
+        Instant eventStartedAt,
+        Map<String, String> stageTypeNames
+    ) {
+        StageInterval parent = intervals.stream()
+            .filter(candidate -> candidate != interval)
+            .filter(candidate -> candidate.contains(interval))
+            .filter(candidate -> candidate.durationMs() > interval.durationMs())
+            .min(Comparator.comparingLong(StageInterval::durationMs))
+            .orElse(null);
+        AnalyticsStage stage = interval.stage();
+        return new EventStageIntervalDto(
+            stage.getStageTypeCode(),
+            stageTypeNames.getOrDefault(stage.getStageTypeCode(), stage.getStageTypeCode()),
+            stage.getStageOrder(),
+            interval.startedAt(),
+            interval.endedAt(),
+            interval.durationMs(),
+            positiveDuration(eventStartedAt, interval.startedAt()),
+            parent != null,
+            parent == null ? null : parent.stage().getStageOrder()
+        );
+    }
+
+    private List<EventUnaccountedIntervalDto> buildUnaccountedIntervals(
+        Instant eventStartedAt,
+        Instant eventEndedAt,
+        List<TimeInterval> mergedIntervals
+    ) {
+        List<EventUnaccountedIntervalDto> result = new ArrayList<>();
+        if (eventStartedAt == null || eventEndedAt == null || eventEndedAt.isBefore(eventStartedAt)) {
+            return result;
+        }
+        if (mergedIntervals.isEmpty()) {
+            long durationMs = positiveDuration(eventStartedAt, eventEndedAt);
+            if (durationMs > 0L) {
+                result.add(unaccountedInterval(
+                    "OUTSIDE_INSTRUMENTED_STAGES",
+                    "Время вне инструментированных этапов",
+                    eventStartedAt,
+                    eventEndedAt,
+                    eventStartedAt
+                ));
+            }
+            return result;
+        }
+        Instant cursor = eventStartedAt;
+        boolean first = true;
+        for (TimeInterval interval : mergedIntervals) {
+            if (interval.startedAt().isAfter(cursor)) {
+                result.add(unaccountedInterval(
+                    first ? "BEFORE_FIRST_STAGE" : "BETWEEN_STAGE_INTERVALS",
+                    first ? "До первого stage" : "Между stage intervals",
+                    cursor,
+                    interval.startedAt(),
+                    eventStartedAt
+                ));
+            }
+            if (interval.endedAt().isAfter(cursor)) {
+                cursor = interval.endedAt();
+            }
+            first = false;
+        }
+        if (eventEndedAt.isAfter(cursor)) {
+            result.add(unaccountedInterval(
+                "AFTER_LAST_STAGE",
+                "После последнего stage",
+                cursor,
+                eventEndedAt,
+                eventStartedAt
+            ));
+        }
+        return result;
+    }
+
+    private EventUnaccountedIntervalDto unaccountedInterval(
+        String type,
+        String label,
+        Instant startedAt,
+        Instant endedAt,
+        Instant eventStartedAt
+    ) {
+        return new EventUnaccountedIntervalDto(
+            type,
+            label,
+            startedAt,
+            endedAt,
+            positiveDuration(startedAt, endedAt),
+            positiveDuration(eventStartedAt, startedAt)
+        );
+    }
+
+    private long sumUnaccounted(List<EventUnaccountedIntervalDto> intervals, String type) {
+        return intervals.stream()
+            .filter(interval -> Objects.equals(type, interval.type()))
+            .map(EventUnaccountedIntervalDto::durationMs)
+            .filter(Objects::nonNull)
+            .mapToLong(Long::longValue)
+            .sum();
+    }
+
+    private TimeInterval toStageInterval(AnalyticsStage stage) {
+        if (stage == null) {
+            return null;
+        }
+        Instant startedAt = stage.getStartedAt();
+        Instant endedAt = stage.getEndedAt();
+        if (startedAt == null && endedAt == null) {
+            return null;
+        }
+        if (startedAt == null) {
+            startedAt = endedAt;
+        }
+        if (endedAt == null) {
+            Integer durationMs = stage.getDurationMs();
+            if (durationMs != null && durationMs >= 0) {
+                endedAt = startedAt.plusMillis(durationMs.longValue());
+            } else {
+                endedAt = startedAt;
+            }
+        }
+        if (endedAt.isBefore(startedAt)) {
+            endedAt = startedAt;
+        }
+        return new TimeInterval(startedAt, endedAt);
+    }
+
+    private TimeInterval clipToEventWindow(TimeInterval interval, Instant eventStartedAt, Instant eventEndedAt) {
+        if (interval == null) {
+            return null;
+        }
+        if (eventStartedAt == null || eventEndedAt == null || eventEndedAt.isBefore(eventStartedAt)) {
+            return interval;
+        }
+        Instant startedAt = interval.startedAt().isBefore(eventStartedAt) ? eventStartedAt : interval.startedAt();
+        Instant endedAt = interval.endedAt().isAfter(eventEndedAt) ? eventEndedAt : interval.endedAt();
+        if (endedAt.isBefore(startedAt)) {
+            return null;
+        }
+        return new TimeInterval(startedAt, endedAt);
+    }
+
+    private List<TimeInterval> mergeIntervalList(List<TimeInterval> intervals) {
+        if (intervals.isEmpty()) {
+            return List.of();
+        }
+        List<TimeInterval> sorted = intervals.stream()
+            .sorted(Comparator.comparing(TimeInterval::startedAt).thenComparing(TimeInterval::endedAt))
+            .toList();
+        List<TimeInterval> merged = new ArrayList<>();
+        Instant currentStart = null;
+        Instant currentEnd = null;
+        for (TimeInterval interval : sorted) {
+            if (interval == null) {
+                continue;
+            }
+            if (currentStart == null) {
+                currentStart = interval.startedAt();
+                currentEnd = interval.endedAt();
+                continue;
+            }
+            if (!interval.startedAt().isAfter(currentEnd)) {
+                if (interval.endedAt().isAfter(currentEnd)) {
+                    currentEnd = interval.endedAt();
+                }
+                continue;
+            }
+            merged.add(new TimeInterval(currentStart, currentEnd));
+            currentStart = interval.startedAt();
+            currentEnd = interval.endedAt();
+        }
+        if (currentStart != null && currentEnd != null) {
+            merged.add(new TimeInterval(currentStart, currentEnd));
+        }
+        return merged;
+    }
+
+    private long resolveDurationMs(Instant startedAt, Instant endedAt, Integer storedDurationMs) {
+        if (storedDurationMs != null && storedDurationMs >= 0) {
+            return storedDurationMs.longValue();
+        }
+        if (startedAt == null || endedAt == null) {
+            return 0L;
+        }
+        return Math.max(0L, Duration.between(startedAt, endedAt).toMillis());
+    }
+
+    private long positiveDuration(Instant from, Instant to) {
+        if (from == null || to == null || to.isBefore(from)) {
+            return 0L;
+        }
+        return Duration.between(from, to).toMillis();
     }
 
     private List<EventLogEntryDto> filterLogsForStage(
@@ -2572,6 +2922,28 @@ public class AnalyticsInsightsService {
             .filter(log -> !log.timestamp().isBefore(fromInclusive) && !log.timestamp().isAfter(toInclusive))
             .filter(log -> logMatchesStage(log, normalizedStageType))
             .toList();
+    }
+
+    private record TimeInterval(Instant startedAt, Instant endedAt) {
+        long durationMs() {
+            return Math.max(0L, Duration.between(startedAt, endedAt).toMillis());
+        }
+    }
+
+    private record StageInterval(AnalyticsStage stage, Instant startedAt, Instant endedAt) {
+        long durationMs() {
+            return Math.max(0L, Duration.between(startedAt, endedAt).toMillis());
+        }
+
+        TimeInterval asTimeInterval() {
+            return new TimeInterval(startedAt, endedAt);
+        }
+
+        boolean contains(StageInterval other) {
+            return other != null
+                && !other.startedAt().isBefore(startedAt)
+                && !other.endedAt().isAfter(endedAt);
+        }
     }
 
     private boolean logMatchesStage(EventLogEntryDto log, String normalizedStageType) {
@@ -2609,6 +2981,7 @@ public class AnalyticsInsightsService {
         String eventTypeCode,
         String requestPath
     ) {
+        long serviceStarted = System.nanoTime();
         String normalizedModuleCode = normalizeModuleFilterCode(moduleCode);
         String normalizedEventType = normalizeCode(eventTypeCode);
         String normalizedRequestPath = normalizeText(requestPath);
@@ -2617,6 +2990,64 @@ public class AnalyticsInsightsService {
             normalizedEventType = "__NO_MATCH__";
         }
 
+        if (normalizedRequestPath == null) {
+            int compareBucketMinutes = resolveCompareBucketMinutes(baselineFrom, baselineTo, targetFrom, targetTo);
+            Set<String> eventTypeFilter = normalizedEventType == null
+                ? nonEmptyEventTypeFilter(visibleEventCodes)
+                : Set.of(normalizedEventType);
+
+            long baselineLoadStarted = System.nanoTime();
+            List<AnalyticsTimeRollupService.AggregatePoint> baselinePoints = timeRollupService.loadEventAggregatePoints(
+                baselineFrom,
+                baselineTo,
+                normalizedModuleCode,
+                eventTypeFilter,
+                compareBucketMinutes
+            );
+            long baselineLoadMs = elapsedMs(baselineLoadStarted);
+
+            long targetLoadStarted = System.nanoTime();
+            List<AnalyticsTimeRollupService.AggregatePoint> targetPoints = timeRollupService.loadEventAggregatePoints(
+                targetFrom,
+                targetTo,
+                normalizedModuleCode,
+                eventTypeFilter,
+                compareBucketMinutes
+            );
+            long targetLoadMs = elapsedMs(targetLoadStarted);
+
+            long buildStarted = System.nanoTime();
+            KpiSnapshot baseline = snapshotFromAccumulator(timeRollupService.accumulateAll(baselinePoints));
+            KpiSnapshot target = snapshotFromAccumulator(timeRollupService.accumulateAll(targetPoints));
+            KpiDelta delta = new KpiDelta(
+                percentChange(baseline.count(), target.count()),
+                percentChange(baseline.avgMs(), target.avgMs()),
+                percentChange(baseline.p95Ms(), target.p95Ms()),
+                percentChange(baseline.errorRate(), target.errorRate())
+            );
+            List<CompareEventRow> events = compareEventsByTypeFromPoints(baselinePoints, targetPoints);
+            CompareResponse response = new CompareResponse(baselineFrom, baselineTo, baseline, targetFrom, targetTo, target, delta, events);
+
+            log.debug(
+            "[COMPARE_PERF] service path=aggregate totalMs={} baselineLoadMs={} targetLoadMs={} buildMs={} compareBucket={} module={} eventType={} requestPath={} baselinePoints={} targetPoints={} baselineCount={} targetCount={} rows={}",
+                elapsedMs(serviceStarted),
+                baselineLoadMs,
+                targetLoadMs,
+                elapsedMs(buildStarted),
+                compareBucketMinutes,
+                normalizedModuleCode,
+                normalizedEventType,
+                normalizedRequestPath,
+                baselinePoints.size(),
+                targetPoints.size(),
+                baseline.count(),
+                target.count(),
+                events.size()
+            );
+            return response;
+        }
+
+        long baselineQueryStarted = System.nanoTime();
         List<AnalyticsEvent> baselineEvents = filterEventsByRequestPath(
             eventRepository.findAllByRangeOrdered(
                 baselineFrom,
@@ -2627,6 +3058,9 @@ public class AnalyticsInsightsService {
             normalizedRequestPath
         );
         baselineEvents = filterEventsByScope(baselineEvents, false);
+        long baselineQueryMs = elapsedMs(baselineQueryStarted);
+
+        long targetQueryStarted = System.nanoTime();
         List<AnalyticsEvent> targetEvents = filterEventsByRequestPath(
             eventRepository.findAllByRangeOrdered(
                 targetFrom,
@@ -2637,7 +3071,9 @@ public class AnalyticsInsightsService {
             normalizedRequestPath
         );
         targetEvents = filterEventsByScope(targetEvents, false);
+        long targetQueryMs = elapsedMs(targetQueryStarted);
 
+        long buildStarted = System.nanoTime();
         KpiSnapshot baseline = snapshotFromEvents(baselineEvents);
         KpiSnapshot target = snapshotFromEvents(targetEvents);
         KpiDelta delta = new KpiDelta(
@@ -2647,8 +3083,54 @@ public class AnalyticsInsightsService {
             percentChange(baseline.errorRate(), target.errorRate())
         );
         List<CompareEventRow> events = compareEventsByType(baselineEvents, targetEvents);
+        CompareResponse response = new CompareResponse(baselineFrom, baselineTo, baseline, targetFrom, targetTo, target, delta, events);
 
-        return new CompareResponse(baselineFrom, baselineTo, baseline, targetFrom, targetTo, target, delta, events);
+        log.debug(
+            "[COMPARE_PERF] service path=raw totalMs={} baselineQueryMs={} targetQueryMs={} buildMs={} module={} eventType={} requestPath={} baselineCount={} targetCount={} rows={}",
+            elapsedMs(serviceStarted),
+            baselineQueryMs,
+            targetQueryMs,
+            elapsedMs(buildStarted),
+            normalizedModuleCode,
+            normalizedEventType,
+            normalizedRequestPath,
+            baselineEvents.size(),
+            targetEvents.size(),
+            events.size()
+        );
+        return response;
+    }
+
+    private List<CompareEventRow> compareEventsByTypeFromPoints(
+        List<AnalyticsTimeRollupService.AggregatePoint> baselinePoints,
+        List<AnalyticsTimeRollupService.AggregatePoint> targetPoints
+    ) {
+        Map<String, String> eventTypeNames = eventTypeNameMap();
+        Map<String, AnalyticsTimeRollupService.AnalyticsAccumulator> baselineByCode = timeRollupService.accumulateByCode(baselinePoints);
+        Map<String, AnalyticsTimeRollupService.AnalyticsAccumulator> targetByCode = timeRollupService.accumulateByCode(targetPoints);
+        Set<String> codes = new LinkedHashSet<>();
+        codes.addAll(baselineByCode.keySet());
+        codes.addAll(targetByCode.keySet());
+        return codes.stream()
+            .map(code -> {
+                KpiSnapshot baseline = snapshotFromAccumulator(baselineByCode.get(code));
+                KpiSnapshot target = snapshotFromAccumulator(targetByCode.get(code));
+                return new CompareEventRow(
+                    code,
+                    eventTypeNames.getOrDefault(code, code),
+                    baseline,
+                    target,
+                    new KpiDelta(
+                        percentChange(baseline.count(), target.count()),
+                        percentChange(baseline.avgMs(), target.avgMs()),
+                        percentChange(baseline.p95Ms(), target.p95Ms()),
+                        percentChange(baseline.errorRate(), target.errorRate())
+                    ),
+                    target.count() - baseline.count(),
+                    target.errorCount() - baseline.errorCount()
+                );
+            })
+            .toList();
     }
 
     private List<CompareEventRow> compareEventsByType(List<AnalyticsEvent> baselineEvents, List<AnalyticsEvent> targetEvents) {
@@ -2680,6 +3162,23 @@ public class AnalyticsInsightsService {
                 );
             })
             .toList();
+    }
+
+    private int resolveCompareBucketMinutes(
+        Instant baselineFrom,
+        Instant baselineTo,
+        Instant targetFrom,
+        Instant targetTo
+    ) {
+        Duration baselineDuration = Duration.between(baselineFrom, baselineTo);
+        Duration targetDuration = Duration.between(targetFrom, targetTo);
+        Duration effectiveDuration = baselineDuration.compareTo(targetDuration) >= 0 ? baselineDuration : targetDuration;
+        if (effectiveDuration.isZero() || effectiveDuration.isNegative()) {
+            effectiveDuration = Duration.ofHours(24);
+        }
+        Instant syntheticFrom = Instant.EPOCH;
+        Instant syntheticTo = syntheticFrom.plus(effectiveDuration);
+        return resolveBucketMinutes(syntheticFrom, syntheticTo, null);
     }
 
     private Map<String, List<AnalyticsEvent>> groupEventsByType(List<AnalyticsEvent> events) {
@@ -3253,7 +3752,7 @@ public class AnalyticsInsightsService {
         int numericSeriesCount,
         int topValuesCount
     ) {
-        log.info(
+        log.debug(
             "[STAGE_METRICS_PERF] service path={} totalMs={} from={} to={} module={} eventType={} stage={} metric={} bucket={} includeSummaries={} includeTopValues={} rollupQueryMs={} rawQueryMs={} groupingMs={} buildMs={} seriesMs={} topValuesMs={} counts summaries={} series={} topValues={}",
             path,
             elapsedMs(serviceStarted),
