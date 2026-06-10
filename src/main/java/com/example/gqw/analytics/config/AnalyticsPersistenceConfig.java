@@ -102,7 +102,10 @@ public class AnalyticsPersistenceConfig {
     @Configuration
     @ConditionalOnProperty(value = "app.analytics.datasource.enabled", havingValue = "true", matchIfMissing = true)
     @EnableJpaRepositories(
-        basePackages = "${app.analytics.host.repository-packages:com.example.gqw.shop.repository,com.example.gqw.admin.repository}",
+        basePackages = {
+            "com.example.gqw.shop.repository",
+            "com.example.gqw.admin.repository"
+        },
         entityManagerFactoryRef = "entityManagerFactory",
         transactionManagerRef = "transactionManager"
     )
