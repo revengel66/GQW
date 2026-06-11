@@ -665,12 +665,7 @@ public class FrontendAnalyticsIngestService {
         if (normalized != null) {
             return normalized;
         }
-        String path = firstNonBlank(pagePath, requestPath, "");
-        String lower = path.toLowerCase(Locale.ROOT);
-        if (lower.startsWith("/admin")) {
-            return "ADMIN";
-        }
-        return "SHOP";
+        return "DEFAULT";
     }
 
     private boolean shouldSuppressFrontendEvent(String code, String traceId, String requestPath) {

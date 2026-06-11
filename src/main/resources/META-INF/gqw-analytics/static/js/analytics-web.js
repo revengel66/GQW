@@ -91,15 +91,7 @@
                 // keep fallback
             }
         }
-        const path = trimText(pathname || global.location.pathname || "") || "";
-        const lower = path.toLowerCase();
-        if (lower.startsWith("/admin")) {
-            return "ADMIN";
-        }
-        if (lower.startsWith("/analytics")) {
-            return "ANALYTICS";
-        }
-        return "SHOP";
+        return "DEFAULT";
     }
 
     function shouldSkipByPath(pathname) {

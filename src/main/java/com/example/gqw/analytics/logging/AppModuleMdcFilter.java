@@ -102,20 +102,7 @@ public class AppModuleMdcFilter extends OncePerRequestFilter {
         if (path.startsWith("/admin")
             || path.startsWith("/analytics")
             || path.startsWith("/analytics-admin")) {
-            return "ADMIN";
-        }
-        if (path.startsWith("/shop")
-            || path.startsWith("/category")
-            || path.startsWith("/product")
-            || path.startsWith("/cart")
-            || path.startsWith("/wishlist")
-            || path.startsWith("/checkout")
-            || path.startsWith("/support")
-            || path.startsWith("/reviews")
-            || path.startsWith("/login")
-            || path.startsWith("/register")
-            || path.startsWith("/account")) {
-            return "SHOP";
+            return null;
         }
         return null;
     }

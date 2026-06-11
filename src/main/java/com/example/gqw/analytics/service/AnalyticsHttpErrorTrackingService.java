@@ -476,17 +476,7 @@ public class AnalyticsHttpErrorTrackingService {
     }
 
     private String resolveModuleCodeByPath(String requestPath) {
-        String path = requestPath == null ? "" : requestPath.toLowerCase(Locale.ROOT);
-        if (path.startsWith("/admin")) {
-            return "ADMIN";
-        }
-        if (path.startsWith("/api/")) {
-            return "DEFAULT";
-        }
-        if (path.startsWith("/analytics")) {
-            return "DEFAULT";
-        }
-        return "SHOP";
+        return "DEFAULT";
     }
 
     private boolean isPageRequest(String requestPath, String requestMethod) {
