@@ -156,13 +156,14 @@ insert into tmp_event_type_target(code, name, description, module_code) values
 ('USER_VIEW','Карточка пользователя','Администратор открыл карточку пользователя.','ADMIN'),
 ('USER_UPDATE','Обновление пользователя','Администратор обновил данные/статус пользователя.','ADMIN');
 
-insert into analytics.event_type(code, name, description, module_code, is_active)
-select code, name, description, module_code, true
+insert into analytics.event_type(code, name, description, module_code, is_system, is_active)
+select code, name, description, module_code, false, true
 from tmp_event_type_target
 on conflict (code) do update
 set name = excluded.name,
     description = excluded.description,
     module_code = excluded.module_code,
+    is_system = excluded.is_system,
     is_active = true;
 
 update analytics.event e
