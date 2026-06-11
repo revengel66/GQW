@@ -1,5 +1,7 @@
 package com.example.gqw.shop.controller;
 
+import com.example.gqw.analytics.aop.TrackAnalyticsAttribute;
+import com.example.gqw.analytics.aop.TrackAnalyticsEvent;
 import com.example.gqw.shop.entity.Product;
 import com.example.gqw.shop.entity.Review;
 import com.example.gqw.shop.facade.CatalogFacade;
@@ -38,6 +40,7 @@ public class CatalogController {
     }
 
     @GetMapping("/")
+    @TrackAnalyticsEvent(code = "HOME_VIEW")
     public String home(Model model) {
         var pageData = catalogFacade.homePage();
         model.addAttribute("featuredCategories", pageData.featuredCategories());
@@ -47,12 +50,29 @@ public class CatalogController {
     }
 
     @GetMapping("/catalog")
+    @TrackAnalyticsEvent(code = "CATALOG_VIEW")
     public String catalog(Model model, HttpServletRequest request) {
         model.addAttribute("catalogCategories", catalogService.topCategories());
         return "shop/catalog";
     }
 
     @GetMapping("/category/{slug}")
+    @TrackAnalyticsEvent(
+        code = "CATEGORY_VIEW",
+        entityType = "'CATEGORY'",
+        entityId = "#p0",
+        attributes = {
+            @TrackAnalyticsAttribute(code = "CATEGORY_SLUG", value = "#p0"),
+            @TrackAnalyticsAttribute(code = "PAGE_INDEX", value = "#p1"),
+            @TrackAnalyticsAttribute(code = "PAGE_SIZE", value = "#p2"),
+            @TrackAnalyticsAttribute(code = "SORT_TYPE", value = "#p3"),
+            @TrackAnalyticsAttribute(code = "SEARCH_QUERY", value = "#p4"),
+            @TrackAnalyticsAttribute(code = "MIN_PRICE", value = "#p5"),
+            @TrackAnalyticsAttribute(code = "MAX_PRICE", value = "#p6"),
+            @TrackAnalyticsAttribute(code = "OPTION_IDS_COUNT", value = "#p7 == null ? 0 : #p7.size()"),
+            @TrackAnalyticsAttribute(code = "IN_STOCK_ONLY", value = "#p8 == null ? false : #p8")
+        }
+    )
     public String category(
         @PathVariable String slug,
         @RequestParam(defaultValue = "0") int page,
@@ -115,6 +135,15 @@ public class CatalogController {
     }
 
     @GetMapping("/product/{slug}")
+    @TrackAnalyticsEvent(
+        code = "PRODUCT_VIEW",
+        entityType = "'PRODUCT'",
+        entityId = "#p0",
+        attributes = {
+            @TrackAnalyticsAttribute(code = "ENTITY_TYPE", value = "'PRODUCT'"),
+            @TrackAnalyticsAttribute(code = "ENTITY_ID", value = "#p0")
+        }
+    )
     public String product(
         @PathVariable String slug,
         @RequestParam(required = false) String tab,
@@ -150,21 +179,25 @@ public class CatalogController {
     }
 
     @GetMapping("/contacts")
+    @TrackAnalyticsEvent(code = "CONTACTS_VIEW")
     public String contacts() {
         return "shop/contacts";
     }
 
     @GetMapping("/delivery")
+    @TrackAnalyticsEvent(code = "DELIVERY_VIEW")
     public String delivery() {
         return "shop/delivery";
     }
 
     @GetMapping("/about")
+    @TrackAnalyticsEvent(code = "ABOUT_VIEW")
     public String about() {
         return catalogFacade.staticShopPage("about");
     }
 
     @GetMapping("/reviews")
+    @TrackAnalyticsEvent(code = "REVIEWS_PAGE_VIEW")
     public String reviewsPage(Model model) {
         model.addAttribute("reviewsFeed", catalogService.latestApprovedReviews(60));
         return "shop/reviews";

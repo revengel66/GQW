@@ -1,5 +1,7 @@
 package com.example.gqw.shop.controller;
 
+import com.example.gqw.analytics.aop.TrackAnalyticsAttribute;
+import com.example.gqw.analytics.aop.TrackAnalyticsEvent;
 import com.example.gqw.shop.entity.CartItem;
 import com.example.gqw.shop.service.CartService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -29,6 +31,7 @@ public class CartController {
     }
 
     @GetMapping("/cart")
+    @TrackAnalyticsEvent(code = "CART_VIEW")
     public String cart(Model model, HttpServletRequest request) {
         List<CartItem> items = cartService.items(request.getSession().getId());
         model.addAttribute("items", items);
@@ -37,6 +40,14 @@ public class CartController {
     }
 
     @PostMapping("/cart/add")
+    @TrackAnalyticsEvent(
+        code = "ADD_TO_CART",
+        entityType = "'PRODUCT'",
+        entityId = "#p0",
+        attributes = {
+            @TrackAnalyticsAttribute(code = "QUANTITY", value = "#p1")
+        }
+    )
     public String addToCart(
         @RequestParam Long productId,
         @RequestParam(defaultValue = "1") int quantity,
@@ -53,6 +64,14 @@ public class CartController {
 
     @PostMapping("/api/cart/add")
     @ResponseBody
+    @TrackAnalyticsEvent(
+        code = "ADD_TO_CART",
+        entityType = "'PRODUCT'",
+        entityId = "#p0",
+        attributes = {
+            @TrackAnalyticsAttribute(code = "QUANTITY", value = "#p1")
+        }
+    )
     public ResponseEntity<Map<String, Object>> addToCartApi(
         @RequestParam Long productId,
         @RequestParam(defaultValue = "1") int quantity,
@@ -68,6 +87,7 @@ public class CartController {
 
     @PostMapping("/api/cart/increment")
     @ResponseBody
+    @TrackAnalyticsEvent(code = "CART_UPDATE", entityType = "'PRODUCT'", entityId = "#p0")
     public ResponseEntity<Map<String, Object>> incrementCartItemApi(
         @RequestParam Long productId,
         HttpServletRequest request
@@ -82,6 +102,7 @@ public class CartController {
 
     @PostMapping("/api/cart/decrement")
     @ResponseBody
+    @TrackAnalyticsEvent(code = "CART_UPDATE", entityType = "'PRODUCT'", entityId = "#p0")
     public ResponseEntity<Map<String, Object>> decrementCartItemApi(
         @RequestParam Long productId,
         HttpServletRequest request
@@ -96,6 +117,7 @@ public class CartController {
 
     @PostMapping("/api/cart/toggle-one")
     @ResponseBody
+    @TrackAnalyticsEvent(code = "CART_UPDATE", entityType = "'PRODUCT'", entityId = "#p0")
     public ResponseEntity<Map<String, Object>> toggleCartItemApi(
         @RequestParam Long productId,
         @RequestParam(required = false) Integer expectedQuantity,
@@ -117,6 +139,7 @@ public class CartController {
     }
 
     @PostMapping("/cart/remove")
+    @TrackAnalyticsEvent(code = "REMOVE_TO_CART", entityType = "'CART_ITEM'", entityId = "#p0")
     public String removeFromCart(@RequestParam Long itemId, HttpServletRequest request, RedirectAttributes redirectAttributes) {
         String sessionId = request.getSession().getId();
         try {
@@ -128,6 +151,14 @@ public class CartController {
     }
 
     @PostMapping("/cart/update")
+    @TrackAnalyticsEvent(
+        code = "CART_UPDATE",
+        entityType = "'CART_ITEM'",
+        entityId = "#p0",
+        attributes = {
+            @TrackAnalyticsAttribute(code = "QUANTITY", value = "#p1")
+        }
+    )
     public String updateCart(
         @RequestParam Long itemId,
         @RequestParam int quantity,

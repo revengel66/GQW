@@ -1,5 +1,7 @@
 package com.example.gqw.shop.controller;
 
+import com.example.gqw.analytics.aop.TrackAnalyticsAttribute;
+import com.example.gqw.analytics.aop.TrackAnalyticsEvent;
 import com.example.gqw.shop.dto.SupportRequestForm;
 import com.example.gqw.shop.service.SupportService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,6 +23,13 @@ public class SupportController {
     }
 
     @PostMapping("/support/request")
+    @TrackAnalyticsEvent(
+        code = "SUPPORT_REQUEST",
+        attributes = {
+            @TrackAnalyticsAttribute(code = "SUPPORT_TOPIC", value = "'SUPPORT_FORM'"),
+            @TrackAnalyticsAttribute(code = "EMAIL_DOMAIN", value = "#p0.email() == null || !#p0.email().contains('@') ? null : #p0.email().substring(#p0.email().indexOf('@') + 1)")
+        }
+    )
     public String support(
         @Valid @ModelAttribute("supportForm") SupportRequestForm supportForm,
         BindingResult bindingResult,
@@ -37,6 +46,7 @@ public class SupportController {
     }
 
     @GetMapping("/support")
+    @TrackAnalyticsEvent(code = "SUPPORT_PAGE_VIEW")
     public String supportPage() {
         return "shop/support";
     }

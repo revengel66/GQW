@@ -1,5 +1,7 @@
 package com.example.gqw.shop.controller;
 
+import com.example.gqw.analytics.aop.TrackAnalyticsAttribute;
+import com.example.gqw.analytics.aop.TrackAnalyticsEvent;
 import com.example.gqw.shop.dto.RegisterRequest;
 import com.example.gqw.shop.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,17 +24,25 @@ public class AuthController {
     }
 
     @GetMapping("/login")
+    @TrackAnalyticsEvent(code = "LOGIN_VIEW")
     public String login() {
         return "shop/login";
     }
 
     @GetMapping("/register")
+    @TrackAnalyticsEvent(code = "REGISTER_VIEW")
     public String register(Model model) {
         model.addAttribute("registerRequest", new RegisterRequest("", "", "", "", ""));
         return "shop/register";
     }
 
     @PostMapping("/register")
+    @TrackAnalyticsEvent(
+        code = "REGISTER",
+        attributes = {
+            @TrackAnalyticsAttribute(code = "EMAIL_DOMAIN", value = "#p0.email() == null || !#p0.email().contains('@') ? null : #p0.email().substring(#p0.email().indexOf('@') + 1)")
+        }
+    )
     public String registerSubmit(
         @Valid @ModelAttribute("registerRequest") RegisterRequest registerRequest,
         BindingResult bindingResult,

@@ -1,5 +1,7 @@
 package com.example.gqw.shop.controller;
 
+import com.example.gqw.analytics.aop.TrackAnalyticsAttribute;
+import com.example.gqw.analytics.aop.TrackAnalyticsEvent;
 import com.example.gqw.shop.entity.OrderItem;
 import com.example.gqw.shop.entity.OrderStatus;
 import com.example.gqw.shop.entity.OrderStatusHistory;
@@ -59,6 +61,12 @@ public class AccountController {
     }
 
     @GetMapping("/account")
+    @TrackAnalyticsEvent(
+        code = "ACCOUNT_VIEW",
+        attributes = {
+            @TrackAnalyticsAttribute(code = "SORT_TYPE", value = "#p7")
+        }
+    )
     public String account(
         @RequestParam(required = false) Boolean checkoutSuccess,
         @RequestParam(required = false) Boolean profileUpdated,
@@ -155,6 +163,12 @@ public class AccountController {
     }
 
     @PostMapping("/account/profile")
+    @TrackAnalyticsEvent(
+        code = "ACCOUNT_PROFILE_UPDATE",
+        attributes = {
+            @TrackAnalyticsAttribute(code = "EMAIL_DOMAIN", value = "#p2 == null || !#p2.contains('@') ? null : #p2.substring(#p2.indexOf('@') + 1)")
+        }
+    )
     public String updateProfile(
         @RequestParam String fullName,
         @RequestParam String phone,
@@ -177,6 +191,7 @@ public class AccountController {
     }
 
     @PostMapping("/account/address")
+    @TrackAnalyticsEvent(code = "ACCOUNT_ADDRESS_UPDATE")
     public String updateAddress(
         @RequestParam(required = false) String addressStreet,
         @RequestParam(required = false) String addressHouse,
@@ -210,6 +225,7 @@ public class AccountController {
     }
 
     @PostMapping("/account/delete")
+    @TrackAnalyticsEvent(code = "ACCOUNT_DELETE")
     public String deleteAccount(
         HttpServletRequest request,
         HttpServletResponse response,
@@ -232,6 +248,7 @@ public class AccountController {
     }
 
     @PostMapping("/account/orders/{orderId}/cancel")
+    @TrackAnalyticsEvent(code = "ACCOUNT_ORDER_CANCEL", entityType = "'ORDER'", entityId = "#p0")
     public String cancelOrderFromAccount(@PathVariable Long orderId, RedirectAttributes redirectAttributes) {
         try {
             orderService.cancelForCurrentUser(orderId);
@@ -244,6 +261,14 @@ public class AccountController {
     }
 
     @PostMapping("/account/orders/{orderId}/update")
+    @TrackAnalyticsEvent(
+        code = "ACCOUNT_ORDER_UPDATE",
+        entityType = "'ORDER'",
+        entityId = "#p0",
+        attributes = {
+            @TrackAnalyticsAttribute(code = "DELIVERY_TYPE", value = "#p4")
+        }
+    )
     public String updateOrderFromAccount(
         @PathVariable Long orderId,
         @RequestParam String customerName,
@@ -291,6 +316,14 @@ public class AccountController {
     }
 
     @PostMapping("/account/support/create")
+    @TrackAnalyticsEvent(
+        code = "ACCOUNT_SUPPORT_CREATE",
+        entityType = "'ORDER'",
+        entityId = "#p0",
+        attributes = {
+            @TrackAnalyticsAttribute(code = "SUPPORT_TOPIC", value = "'ACCOUNT_SUPPORT'")
+        }
+    )
     public String createSupportTicketFromAccount(
         @RequestParam(required = false) Long orderId,
         @RequestParam String message,

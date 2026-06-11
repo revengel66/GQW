@@ -1,5 +1,7 @@
 package com.example.gqw.shop.controller;
 
+import com.example.gqw.analytics.aop.TrackAnalyticsAttribute;
+import com.example.gqw.analytics.aop.TrackAnalyticsEvent;
 import com.example.gqw.shop.dto.CheckoutRequest;
 import com.example.gqw.shop.entity.CartItem;
 import com.example.gqw.shop.entity.ShopUser;
@@ -37,6 +39,7 @@ public class CheckoutController {
     }
 
     @GetMapping("/checkout")
+    @TrackAnalyticsEvent(code = "CHECKOUT_VIEW")
     public String checkout(Model model, HttpServletRequest request) {
         List<CartItem> items = cartService.items(request.getSession().getId());
         if (items.isEmpty()) {
@@ -65,6 +68,13 @@ public class CheckoutController {
     }
 
     @PostMapping("/checkout")
+    @TrackAnalyticsEvent(
+        code = "CHECKOUT_SUBMIT",
+        attributes = {
+            @TrackAnalyticsAttribute(code = "DELIVERY_TYPE", value = "#p0.deliveryType()"),
+            @TrackAnalyticsAttribute(code = "DEMO_FAULT", value = "#p2.getHeader('X-Demo-Fault')")
+        }
+    )
     public String checkoutSubmit(
         @Valid @ModelAttribute("checkoutRequest") CheckoutRequest checkoutRequest,
         BindingResult bindingResult,

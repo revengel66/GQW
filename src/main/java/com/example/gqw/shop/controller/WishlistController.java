@@ -1,5 +1,6 @@
 package com.example.gqw.shop.controller;
 
+import com.example.gqw.analytics.aop.TrackAnalyticsEvent;
 import com.example.gqw.shop.entity.Product;
 import com.example.gqw.shop.entity.WishlistItem;
 import com.example.gqw.shop.service.CatalogService;
@@ -31,6 +32,7 @@ public class WishlistController {
     }
 
     @GetMapping("/wishlist")
+    @TrackAnalyticsEvent(code = "WISHLIST_VIEW")
     public String wishlist(Model model, HttpServletRequest request) {
         List<WishlistItem> items = wishlistService.items(request.getSession().getId());
         List<Product> products = items.stream()
@@ -44,6 +46,7 @@ public class WishlistController {
 
     @PostMapping("/api/wishlist/toggle")
     @ResponseBody
+    @TrackAnalyticsEvent(code = "ADD_TO_WISHLIST", entityType = "'PRODUCT'", entityId = "#p0")
     public ResponseEntity<Map<String, Object>> toggleWishlistApi(
         @RequestParam Long productId,
         HttpServletRequest request
@@ -64,12 +67,14 @@ public class WishlistController {
     }
 
     @PostMapping("/wishlist/add")
+    @TrackAnalyticsEvent(code = "ADD_TO_WISHLIST", entityType = "'PRODUCT'", entityId = "#p0")
     public String addToWishlist(@RequestParam Long productId, HttpServletRequest request) {
         wishlistService.add(productId, request.getSession().getId());
         return "redirect:/wishlist";
     }
 
     @PostMapping("/wishlist/remove")
+    @TrackAnalyticsEvent(code = "WISHLIST_REMOVE", entityType = "'WISHLIST_ITEM'", entityId = "#p0")
     public String removeFromWishlist(@RequestParam Long itemId, HttpServletRequest request, RedirectAttributes redirectAttributes) {
         try {
             wishlistService.remove(itemId, request.getSession().getId());

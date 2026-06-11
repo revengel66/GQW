@@ -1,5 +1,6 @@
 package com.example.gqw.shop.persistence;
 
+import com.example.gqw.analytics.aop.TrackAnalyticsLayer;
 import com.example.gqw.shop.entity.Category;
 import com.example.gqw.shop.entity.CategoryFilter;
 import com.example.gqw.shop.entity.Product;
@@ -20,6 +21,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 
 @Component
+@TrackAnalyticsLayer(code = "PERSISTENCE")
 public class CatalogPersistence {
 
     private final CategoryRepository categoryRepository;

@@ -1,5 +1,7 @@
 package com.example.gqw.shop.controller;
 
+import com.example.gqw.analytics.aop.TrackAnalyticsAttribute;
+import com.example.gqw.analytics.aop.TrackAnalyticsEvent;
 import com.example.gqw.shop.entity.Product;
 import com.example.gqw.shop.entity.Review;
 import com.example.gqw.shop.service.CatalogService;
@@ -35,6 +37,15 @@ public class ReviewController {
     }
 
     @PostMapping("/review/add")
+    @TrackAnalyticsEvent(
+        code = "REVIEW_ADD",
+        entityType = "'PRODUCT'",
+        entityId = "#p0",
+        attributes = {
+            @TrackAnalyticsAttribute(code = "RATING", value = "#p1"),
+            @TrackAnalyticsAttribute(code = "REVIEW_IMAGES_COUNT", value = "#p8 == null ? 0 : #p8.size()")
+        }
+    )
     public String addReview(
         @RequestParam Long productId,
         @RequestParam Integer rating,
@@ -63,6 +74,7 @@ public class ReviewController {
     }
 
     @PostMapping("/review/reply")
+    @TrackAnalyticsEvent(code = "REVIEW_REPLY", entityType = "'REVIEW'", entityId = "#p0")
     public String replyReview(
         @RequestParam Long reviewId,
         @RequestParam String text,
