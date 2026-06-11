@@ -17,7 +17,7 @@ import org.springframework.jdbc.datasource.init.ScriptUtils;
 @ConditionalOnProperty(
     value = "app.analytics.event-codes-migration-enabled",
     havingValue = "true",
-    matchIfMissing = true
+    matchIfMissing = false
 )
 @ConditionalOnProperty(value = "app.startup.runners-enabled", havingValue = "true", matchIfMissing = true)
 public class AnalyticsEventCodesMigrationConfig {
