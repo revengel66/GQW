@@ -1,11 +1,7 @@
 package com.example.gqw.analytics.service;
 
 import java.util.Optional;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.stereotype.Component;
 
-@Component
-@ConditionalOnMissingBean(AnalyticsCurrentUserProvider.class)
 public class NoopAnalyticsCurrentUserProvider implements AnalyticsCurrentUserProvider {
 
     @Override
