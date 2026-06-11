@@ -1,6 +1,7 @@
 package com.example.gqw.analytics.config;
 
 import com.example.gqw.analytics.repository.StageTypeRepository;
+import com.example.gqw.analytics.entity.StageType;
 import java.util.List;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -30,6 +31,7 @@ public class SystemAnalyticsStageDictionaryConfig {
                     true
                 );
             }
+            demoteOptionalCustomStage(repository, "PERSISTENCE");
         };
     }
 
@@ -37,10 +39,18 @@ public class SystemAnalyticsStageDictionaryConfig {
         return List.of(
             new StageSeed("CONTROLLER", "Контроллер", "Обработка HTTP-запроса контроллером."),
             new StageSeed("SERVICE", "Сервис", "Бизнес-логика приложения."),
-            new StageSeed("PERSISTENCE", "Persistence Layer", "Промежуточный слой доступа к данным."),
             new StageSeed("DATABASE", "База данных", "Операции чтения и записи через репозитории."),
             new StageSeed("FRONTEND", "Фронтенд", "Клиентский рендер и браузерные метрики.")
         );
+    }
+
+    private static void demoteOptionalCustomStage(StageTypeRepository repository, String code) {
+        StageType stageType = repository.findById(code).orElse(null);
+        if (stageType == null || !Boolean.TRUE.equals(stageType.getIsSystem())) {
+            return;
+        }
+        stageType.setIsSystem(false);
+        repository.save(stageType);
     }
 
     private record StageSeed(String code, String name, String description) {

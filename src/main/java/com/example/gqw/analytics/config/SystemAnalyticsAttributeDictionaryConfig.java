@@ -24,8 +24,8 @@ public class SystemAnalyticsAttributeDictionaryConfig {
     CommandLineRunner seedSystemAnalyticsAttributes(EventAttributeTypeRepository repository) {
         return args -> {
             List<AttrSeed> system = List.of(
-                new AttrSeed("ENTITY_TYPE", "Entity type", "Тип бизнес-сущности, к которой относится событие (например, PRODUCT, CATEGORY, ORDER). Нужен для группировки и фильтрации событий по доменной области.", false),
-                new AttrSeed("ENTITY_ID", "Entity id", "Идентификатор конкретной бизнес-сущности в рамках ENTITY_TYPE. Нужен для точечного расследования одного объекта: карточки товара, категории, заказа.", false),
+                new AttrSeed("ENTITY_TYPE", "Entity type", "Тип бизнес-сущности, к которой относится событие (например, PRODUCT, CATEGORY, ORDER). Нужен для группировки и фильтрации событий по доменной области.", true),
+                new AttrSeed("ENTITY_ID", "Entity id", "Идентификатор конкретной бизнес-сущности в рамках ENTITY_TYPE. Нужен для точечного расследования одного объекта: карточки товара, категории, заказа.", true),
                 new AttrSeed("HTTP_METHOD", "HTTP-метод", "HTTP-метод запроса (GET/POST/PUT/DELETE). Помогает понять, это чтение или изменение данных, и быстро локализовать проблемный сценарий.", true),
                 new AttrSeed("HTTP_PATH", "Путь запроса", "Путь запроса без домена. Нужен для анализа конкретного экрана/endpoint и сравнения поведения одного и того же пути между периодами.", true),
                 new AttrSeed("HTTP_STATUS", "HTTP-статус", "HTTP-статус ответа (200, 404, 500 и т.д.). Используется для отделения пользовательских ошибок от серверных и для поиска аномальных всплесков по кодам.", true),
