@@ -2,9 +2,11 @@ package com.example.gqw.analytics.source;
 
 import com.example.gqw.analytics.entity.EventType;
 import java.util.List;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 @Component
+@ConditionalOnProperty(value = "app.analytics.demo-dictionary-source-enabled", havingValue = "true", matchIfMissing = false)
 public class DemoEventTypeSource implements EventTypeSource {
 
     @Override
