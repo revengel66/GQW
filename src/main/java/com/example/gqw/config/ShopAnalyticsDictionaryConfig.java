@@ -156,7 +156,7 @@ public class ShopAnalyticsDictionaryConfig {
     }
 
     private static EventSeed shop(String code, String name, String description) {
-        return new EventSeed(code, name, description, "SHOP");
+        return new EventSeed(code, name, description, "DEFAULT");
     }
 
     private static AttributeSeed attr(String code, String name, String description) {
