@@ -40,6 +40,12 @@ class AppErrorSupportTest {
     }
 
     @Test
+    void resolveViewNameReturnsAdminTemplateForAnalyticsAdminPath() {
+        assertEquals("admin/error", AppErrorSupport.resolveViewName("/analytics-admin/dashboard"));
+        assertEquals("admin/error", AppErrorSupport.resolveViewName("/analytics/dashboard"));
+    }
+
+    @Test
     void resolveViewNameReturnsShopTemplateForOtherPaths() {
         assertEquals("shop/error", AppErrorSupport.resolveViewName("/catalog/laptops"));
     }

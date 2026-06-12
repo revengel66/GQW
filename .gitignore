@@ -38,6 +38,7 @@ out/
 
 # local load-test artifacts
 logs/load/
+logs/analytics/
 reports/
 logs/
 logs/gqw.log
