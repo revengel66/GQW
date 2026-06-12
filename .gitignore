@@ -39,3 +39,5 @@ out/
 # local load-test artifacts
 logs/load/
 reports/
+logs/
+logs/gqw.log
