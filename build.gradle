@@ -82,4 +82,8 @@ tasks.register('freePort8080', Exec) {
 
 tasks.named('bootRun') {
     dependsOn tasks.named('freePort8080')
+    dependsOn project(':gqw-analytics-module').tasks.named('classes')
+    classpath = classpath.filter {
+        !it.name.startsWith('gqw-analytics-module-') || !it.name.endsWith('.jar')
+    } + project(':gqw-analytics-module').sourceSets.main.output
 }

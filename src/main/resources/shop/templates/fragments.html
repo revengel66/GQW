@@ -182,6 +182,12 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
     <script th:src="${(#httpServletRequest != null and #httpServletRequest.requestURI != null and #httpServletRequest.requestURI.startsWith('/admin') ? '/admin/js/store.js' : '/shop/js/store.js') + '?v=20260516-5'}"></script>
+    <script th:src="@{/analytics/js/analytics-web.js(v='20260611-1')}"></script>
+    <script>
+        if (window.AnalyticsWeb) {
+            window.AnalyticsWeb.init();
+        }
+    </script>
 </div>
 </body>
 </html>
