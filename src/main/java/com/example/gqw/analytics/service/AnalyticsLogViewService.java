@@ -116,19 +116,21 @@ public class AnalyticsLogViewService {
         Instant eventStartedAt,
         Instant eventEndedAt
     ) {
-        if (traceId == null || traceId.isBlank()) {
-            return TraceLogLookupResult.notFound("Trace ID is empty.");
+        boolean hasTraceId = traceId != null && !traceId.isBlank();
+        boolean hasEventUid = eventUid != null && !eventUid.isBlank();
+        if (!hasTraceId && !hasEventUid) {
+            return TraceLogLookupResult.notFound("Trace ID and event UID are empty.");
         }
         Instant from = eventStartedAt == null ? null : eventStartedAt.minusSeconds(180);
         Instant to = eventEndedAt == null ? null : eventEndedAt.plusSeconds(240);
 
-        String traceToken = "[trace:" + traceId + "]";
+        String traceToken = hasTraceId ? "[trace:" + traceId + "]" : null;
         Set<Path> candidates = resolveCandidateLogFiles(moduleCode, eventUid);
         List<ParsedLogLine> parsed = new ArrayList<>();
         for (Path path : candidates) {
             parsed.addAll(readTraceLinesFromFile(path, traceId, eventUid, traceToken, from, to));
         }
-        if (parsed.isEmpty() && eventUid != null && !eventUid.isBlank()) {
+        if (parsed.isEmpty() && hasTraceId && hasEventUid) {
             for (Path path : candidates) {
                 parsed.addAll(readTraceLinesFromFile(path, traceId, null, traceToken, from, to));
             }
@@ -153,6 +155,10 @@ public class AnalyticsLogViewService {
                     List.of()
                 )
             );
+        }
+
+        if (!hasTraceId) {
+            return TraceLogLookupResult.notFound("Logs for event UID were not found in current log files.");
         }
 
         AnalyticsLogArchiveIndexService.IndexedTraceLookup indexed = logArchiveIndexService.findIndexedTrace(traceId, eventUid, moduleCode);
@@ -360,11 +366,12 @@ public class AnalyticsLogViewService {
                         lines.add(current);
                         current = null;
                     }
-                    if (!line.contains(traceToken)) {
+                    if (traceToken != null && !line.contains(traceToken)) {
                         continue;
                     }
                     String traceId = trim(matcher.group("trace"));
-                    if (!Objects.equals(expectedTraceId, traceId)) {
+                    if (expectedTraceId != null && !expectedTraceId.isBlank()
+                        && !Objects.equals(expectedTraceId, traceId)) {
                         continue;
                     }
                     String eventUid = trim(matcher.group("event"));

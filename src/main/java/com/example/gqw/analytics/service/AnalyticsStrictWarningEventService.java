@@ -1,6 +1,7 @@
 package com.example.gqw.analytics.service;
 
 import com.example.gqw.analytics.config.AnalyticsStrictWarningDictionaryConfig;
+import com.example.gqw.analytics.aop.AnalyticsEventAspect;
 import com.example.gqw.analytics.entity.AnalyticsEvent;
 import com.example.gqw.analytics.entity.AnalyticsEventAttribute;
 import com.example.gqw.analytics.entity.EventType;
@@ -12,6 +13,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.slf4j.MDC;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AnalyticsStrictWarningEventService {
 
     private static final int MAX_TEXT_LENGTH = 1900;
+    private static final Logger log = LoggerFactory.getLogger(AnalyticsStrictWarningEventService.class);
 
     private final AnalyticsEventRepository eventRepository;
     private final AnalyticsEventAttributeRepository attributeRepository;
@@ -73,8 +77,46 @@ public class AnalyticsStrictWarningEventService {
             event.setDurationMs(0);
             AnalyticsEvent saved = eventRepository.save(event);
             attributeRepository.saveAll(attributes(saved.getId(), warningType, code, reason, sourceClass, sourceMethod, eventUid, stageId));
+            logWarning(saved, warningType, code, reason, sourceClass, sourceMethod);
         } catch (RuntimeException ignored) {
             // Strict diagnostics must not create a second failure path inside instrumentation.
+        }
+    }
+
+    private static void logWarning(
+        AnalyticsEvent event,
+        String warningType,
+        String code,
+        String reason,
+        String sourceClass,
+        String sourceMethod
+    ) {
+        String previousEventUid = MDC.get(AnalyticsEventAspect.ANALYTICS_EVENT_UID_MDC_KEY);
+        String previousModule = MDC.get(AnalyticsEventAspect.APP_MODULE_MDC_KEY);
+        String previousTraceId = MDC.get(AnalyticsTraceContext.TRACE_ID_MDC_KEY);
+        try {
+            MDC.put(AnalyticsEventAspect.ANALYTICS_EVENT_UID_MDC_KEY, event.getEventUid().toString());
+            MDC.put(AnalyticsEventAspect.APP_MODULE_MDC_KEY, EventType.DEFAULT_MODULE_CODE);
+            putOrRemove(AnalyticsTraceContext.TRACE_ID_MDC_KEY, event.getTraceId());
+            log.warn(
+                "Analytics strict warning: type={}, code={}, source={}, reason={}",
+                warningType,
+                code,
+                source(sourceClass, sourceMethod),
+                truncate(reason)
+            );
+        } finally {
+            putOrRemove(AnalyticsEventAspect.ANALYTICS_EVENT_UID_MDC_KEY, previousEventUid);
+            putOrRemove(AnalyticsEventAspect.APP_MODULE_MDC_KEY, previousModule);
+            putOrRemove(AnalyticsTraceContext.TRACE_ID_MDC_KEY, previousTraceId);
+        }
+    }
+
+    private static void putOrRemove(String key, String value) {
+        if (value == null || value.isBlank()) {
+            MDC.remove(key);
+        } else {
+            MDC.put(key, value);
         }
     }
 

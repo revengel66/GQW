@@ -1,5 +1,6 @@
 package com.example.gqw.analytics.service;
  
+import com.example.gqw.analytics.config.AnalyticsStrictWarningDictionaryConfig;
 import com.example.gqw.analytics.entity.AnalyticsEvent;
 import com.example.gqw.analytics.entity.AnalyticsEventAttribute;
 import com.example.gqw.analytics.entity.AnalyticsStage;
@@ -29,6 +30,7 @@ import com.example.gqw.analytics.web.dto.AnalyticsApiDto.EventListResponse;
 import com.example.gqw.analytics.web.dto.AnalyticsApiDto.EventStageBriefDto;
 import com.example.gqw.analytics.web.dto.AnalyticsApiDto.EventStageDetailsDto;
 import com.example.gqw.analytics.web.dto.AnalyticsApiDto.EventStageMetricDto;
+import com.example.gqw.analytics.web.dto.AnalyticsApiDto.EventTraceLogStatusDto;
 import com.example.gqw.analytics.web.dto.AnalyticsApiDto.EventUnaccountedIntervalDto;
 import com.example.gqw.analytics.web.dto.AnalyticsApiDto.FilterOptionsResponse;
 import com.example.gqw.analytics.web.dto.AnalyticsApiDto.KpiDelta;
@@ -2571,7 +2573,10 @@ public class AnalyticsInsightsService {
         Map<String, String> stageTypeNames = stageTypeNameMap();
         Map<String, String> metricTypeNames = stageMetricTypeNameMap();
         Map<String, String> attributeTypeNames = eventAttributeTypeNameMap();
-        AnalyticsLogViewService.TraceLogLookupResult traceLogLookup = traceLogLookupService.loadTraceLogsSafely(event);
+        AnalyticsLogViewService.TraceLogLookupResult traceLogLookup = withStrictWarningDiagnosticFallback(
+            event,
+            traceLogLookupService.loadTraceLogsSafely(event)
+        );
         List<EventLogEntryDto> traceLogs = traceLogLookup.rows();
         EventDurationBreakdownDto durationBreakdown = buildEventDurationBreakdown(event, stages, stageTypeNames);
 
@@ -2640,6 +2645,50 @@ public class AnalyticsInsightsService {
             traceLogLookup.status(),
             traceLogs
         );
+    }
+
+    private AnalyticsLogViewService.TraceLogLookupResult withStrictWarningDiagnosticFallback(
+        AnalyticsEvent event,
+        AnalyticsLogViewService.TraceLogLookupResult lookup
+    ) {
+        if (!lookup.rows().isEmpty()
+            || !AnalyticsStrictWarningDictionaryConfig.STRICT_WARNING_EVENT_CODE.equals(event.getEventTypeCode())) {
+            return lookup;
+        }
+        String message = event.getErrorMessage() == null || event.getErrorMessage().isBlank()
+            ? "Strict analytics model warning"
+            : event.getErrorMessage();
+        EventLogEntryDto row = new EventLogEntryDto(
+            event.getStartedAt(),
+            "WARN",
+            "WARN",
+            "SYSTEM",
+            "AnalyticsStrictWarningEventService",
+            "strictWarning",
+            0,
+            message,
+            "Diagnostic record restored from the saved analytics event: " + message,
+            AnalyticsStrictWarningEventService.class.getName(),
+            event.getTraceId(),
+            event.getEventUid().toString(),
+            event.getModuleCode()
+        );
+        EventTraceLogStatusDto status = new EventTraceLogStatusDto(
+            "EVENT_DIAGNOSTIC",
+            "The physical log line is unavailable; the saved diagnostic event is shown.",
+            event.getModuleCode(),
+            null,
+            null,
+            event.getStartedAt(),
+            event.getEndedAt(),
+            1L,
+            0L,
+            1L,
+            false,
+            "diagnostic event row=1",
+            List.of()
+        );
+        return new AnalyticsLogViewService.TraceLogLookupResult(List.of(row), status);
     }
 
     private EventDurationBreakdownDto buildEventDurationBreakdown(

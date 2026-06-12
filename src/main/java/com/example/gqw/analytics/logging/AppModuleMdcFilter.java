@@ -1,12 +1,14 @@
 package com.example.gqw.analytics.logging;
 
 import com.example.gqw.analytics.aop.AnalyticsEventAspect;
+import com.example.gqw.analytics.support.AnalyticsTraceContext;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.UUID;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.Ordered;
@@ -28,16 +30,18 @@ public class AppModuleMdcFilter extends OncePerRequestFilter {
         FilterChain filterChain
     ) throws ServletException, IOException {
         String previousModule = MDC.get(AnalyticsEventAspect.APP_MODULE_MDC_KEY);
+        String previousTraceId = MDC.get(AnalyticsTraceContext.TRACE_ID_MDC_KEY);
         String resolvedModule = resolveModuleCode(request);
+        String traceId = resolveTraceId(request);
+        request.setAttribute(AnalyticsTraceContext.TRACE_ID_REQUEST_ATTRIBUTE, traceId);
+        response.setHeader(AnalyticsTraceContext.TRACE_ID_HEADER, traceId);
         MDC.put(AnalyticsEventAspect.APP_MODULE_MDC_KEY, resolvedModule);
+        MDC.put(AnalyticsTraceContext.TRACE_ID_MDC_KEY, traceId);
         try {
             filterChain.doFilter(request, response);
         } finally {
-            if (previousModule == null || previousModule.isBlank()) {
-                MDC.remove(AnalyticsEventAspect.APP_MODULE_MDC_KEY);
-            } else {
-                MDC.put(AnalyticsEventAspect.APP_MODULE_MDC_KEY, previousModule);
-            }
+            restoreMdc(AnalyticsEventAspect.APP_MODULE_MDC_KEY, previousModule);
+            restoreMdc(AnalyticsTraceContext.TRACE_ID_MDC_KEY, previousTraceId);
         }
     }
 
@@ -95,15 +99,35 @@ public class AppModuleMdcFilter extends OncePerRequestFilter {
         return value.trim().toUpperCase();
     }
 
-    private String resolveModuleFromPath(String path) {
+    static String resolveModuleFromPath(String path) {
         if (path == null || path.isBlank()) {
             return null;
         }
         if (path.startsWith("/admin")
             || path.startsWith("/analytics")
             || path.startsWith("/analytics-admin")) {
-            return null;
+            return "ADMIN";
         }
         return null;
+    }
+
+    private String resolveTraceId(HttpServletRequest request) {
+        Object existing = request.getAttribute(AnalyticsTraceContext.TRACE_ID_REQUEST_ATTRIBUTE);
+        if (existing instanceof String text && !text.isBlank()) {
+            return text.trim();
+        }
+        String header = request.getHeader(AnalyticsTraceContext.TRACE_ID_HEADER);
+        if (header != null && !header.isBlank()) {
+            return header.trim();
+        }
+        return UUID.randomUUID().toString();
+    }
+
+    private static void restoreMdc(String key, String previousValue) {
+        if (previousValue == null || previousValue.isBlank()) {
+            MDC.remove(key);
+        } else {
+            MDC.put(key, previousValue);
+        }
     }
 }

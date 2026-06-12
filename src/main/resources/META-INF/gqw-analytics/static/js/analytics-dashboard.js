@@ -42,6 +42,8 @@
         mainReloadRequestId: 0,
         expandedRangesBySource: {},
         expandedBucketBySource: {},
+        expandedLatencyMetricBySource: {},
+        expandedStageLatencyEventMetricBySource: {},
         expandedChart: {
             sourceCanvasId: "",
             instance: null,
@@ -12354,6 +12356,17 @@
         const errorCount = Number(status?.errorCount || 0);
         const summary = status?.summary || "";
         const message = status?.message || "";
+        if (code === "EVENT_DIAGNOSTIC") {
+            return `
+                <div class="alert alert-warning border analytics-trace-log-status mb-3">
+                    <div class="d-flex align-items-center justify-content-between gap-2">
+                        <div class="fw-semibold">Диагностика восстановлена из события</div>
+                        <span class="badge text-bg-warning">${escapeHtml(code)}</span>
+                    </div>
+                    <div class="small text-muted mt-1">${escapeHtml(message)}</div>
+                </div>
+            `;
+        }
         const badgeClass = code === "ARCHIVE_AVAILABLE"
             ? "text-bg-info"
             : (code === "ARCHIVE_INDEX_ONLY" ? "text-bg-warning" : "text-bg-secondary");
@@ -13063,7 +13076,8 @@
             return [];
         }
         const sorted = rawStages.slice().sort(compareStageTimelineOrder);
-        const frontendStage = pickFrontendStage(sorted);
+        const frontendStages = sorted.filter((stage) => normalizeStageCode(stage?.stageTypeCode) === "FRONTEND");
+        const frontendStage = pickFrontendStage(frontendStages);
         if (!frontendStage) {
             return sorted;
         }
@@ -13076,6 +13090,12 @@
         }
 
         const backendStages = sorted.filter((stage) => normalizeStageCode(stage.stageTypeCode) !== "FRONTEND");
+        const frontendMetrics = mergeFrontendStageMetrics(frontendStages);
+        const frontendLogs = frontendStages.flatMap((stage) => Array.isArray(stage?.logs) ? stage.logs : []);
+        const frontendHasError = frontendStages.some((stage) => Boolean(stage?.isError));
+        const frontendErrorMessage = frontendStages
+            .map((stage) => stage?.errorMessage)
+            .find((message) => message != null && String(message).trim());
         let frontendStartMs = toEpochMs(eventData?.startedAt);
 
         const frontendLogEndMs = toEpochMs(frontendStage.logEndedAt) ?? toEpochMs(frontendStage.endedAt);
@@ -13149,8 +13169,8 @@
             logStartedAt: null,
             logEndedAt: null,
             durationMs: serverWaitMs ?? 0,
-            isError: Boolean(frontendStage.isError),
-            errorMessage: frontendStage.errorMessage || null,
+            isError: frontendHasError,
+            errorMessage: frontendErrorMessage || null,
             metrics: serverWaitMetrics,
             logs: []
         };
@@ -13164,10 +13184,10 @@
             logStartedAt: null,
             logEndedAt: null,
             durationMs: frontendRenderMs ?? 0,
-            isError: Boolean(frontendStage.isError),
-            errorMessage: frontendStage.errorMessage || null,
-            metrics: frontendStage.metrics || [],
-            logs: []
+            isError: frontendHasError,
+            errorMessage: frontendErrorMessage || null,
+            metrics: frontendMetrics,
+            logs: frontendLogs
         };
 
         return [
@@ -13176,6 +13196,28 @@
             ...backendStages,
             syntheticFrontendRenderStage
         ];
+    }
+
+    function mergeFrontendStageMetrics(frontendStages) {
+        const merged = [];
+        const indexByCode = new Map();
+        for (const stage of frontendStages || []) {
+            for (const metric of stage?.metrics || []) {
+                const code = normalizeStageCode(metric?.metricTypeCode);
+                if (!code) {
+                    merged.push(metric);
+                    continue;
+                }
+                const existingIndex = indexByCode.get(code);
+                if (existingIndex == null) {
+                    indexByCode.set(code, merged.length);
+                    merged.push(metric);
+                } else {
+                    merged[existingIndex] = metric;
+                }
+            }
+        }
+        return merged;
     }
 
     function compareStageTimelineOrder(left, right) {
