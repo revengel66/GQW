@@ -12,9 +12,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
@@ -153,6 +155,30 @@ public class AnalyticsAdminController {
     ) {
         populateDictionariesModel(model, request, eventModuleCode);
         return "analytics/admin-dictionaries";
+    }
+
+    @GetMapping("/analytics-admin/events/{eventUid}")
+    public String eventDetails(
+        @PathVariable UUID eventUid,
+        Model model,
+        HttpServletRequest request
+    ) {
+        populateEventDetailsModel(model, request);
+        model.addAttribute("analyticsEventUid", eventUid);
+        model.addAttribute("analyticsEventId", "");
+        return "analytics/admin-event-details";
+    }
+
+    @GetMapping("/analytics-admin/events/by-id/{eventId}")
+    public String eventDetailsById(
+        @PathVariable Long eventId,
+        Model model,
+        HttpServletRequest request
+    ) {
+        populateEventDetailsModel(model, request);
+        model.addAttribute("analyticsEventUid", "");
+        model.addAttribute("analyticsEventId", eventId);
+        return "analytics/admin-event-details";
     }
 
     @PostMapping("/analytics-admin/credentials")
@@ -798,6 +824,15 @@ public class AnalyticsAdminController {
             "analyticsAdminUsername",
             request.getSession(true).getAttribute(AnalyticsAdminAuthService.SESSION_KEY_USERNAME)
         );
+    }
+
+    private void populateEventDetailsModel(Model model, HttpServletRequest request) {
+        model.addAttribute(
+            "analyticsAdminUsername",
+            request.getSession(true).getAttribute(AnalyticsAdminAuthService.SESSION_KEY_USERNAME)
+        );
+        model.addAttribute("analyticsActiveTab", "raw");
+        model.addAttribute("analyticsApiBase", "/analytics-admin/api");
     }
 
     private String redirectDictionariesByModule(String eventModuleFilter) {

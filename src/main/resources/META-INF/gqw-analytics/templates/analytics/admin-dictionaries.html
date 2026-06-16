@@ -8,7 +8,7 @@
     <title>Analytics Admin · Справочники</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-    <link rel="stylesheet" th:href="@{/analytics/css/app.css(v='20260605-06')}">
+    <link rel="stylesheet" th:href="@{/analytics/css/app.css(v='20260613-09')}">
     <style>
         .dict-inline {
             display: flex;
@@ -23,7 +23,7 @@
         }
         #dictionaryTabsContent .analytics-dictionary-table {
             width: 100%;
-            min-width: max-content;
+            min-width: 0;
         }
         .dict-inline .field-code {
             width: 12rem;
@@ -59,6 +59,7 @@
             margin: 0;
         }
         .dict-inline .action-cell .btn {
+            min-width: 0;
             width: 100%;
             display: flex;
             align-items: center;
@@ -126,48 +127,62 @@
             flex-basis: 88px;
         }
         .dict-inline.metrics-dict-inline .field-code {
-            width: 11rem;
+            width: 8rem;
         }
         .dict-inline.metrics-dict-inline .field-name {
-            width: 12rem;
+            width: 9rem;
         }
         .dict-inline.metrics-dict-inline .field-kind {
-            width: 8.5rem;
-        }
-        .dict-inline.metrics-dict-inline .field-unit {
             width: 7rem;
         }
+        .dict-inline.metrics-dict-inline .field-unit {
+            width: 5.5rem;
+        }
         .dict-inline.metrics-dict-inline .field-description {
-            min-width: 18rem;
-            flex: 1 1 24rem;
+            min-width: 10rem;
+            flex: 1 1 16rem;
         }
         .dict-inline.metrics-dict-inline .field-reading-guide {
-            min-width: 24rem;
-            flex: 1.3 1 34rem;
+            min-width: 12rem;
+            flex: 1.15 1 18rem;
         }
         #dictionaryTabsContent .analytics-dictionary-table thead th.metric-field-code {
-            flex-basis: 11rem;
+            flex-basis: 8rem;
         }
         #dictionaryTabsContent .analytics-dictionary-table thead th.metric-field-name {
-            flex-basis: 12rem;
+            flex-basis: 9rem;
         }
         #dictionaryTabsContent .analytics-dictionary-table thead th.metric-field-kind {
-            flex-basis: 8.5rem;
-        }
-        #dictionaryTabsContent .analytics-dictionary-table thead th.metric-field-unit {
             flex-basis: 7rem;
         }
+        #dictionaryTabsContent .analytics-dictionary-table thead th.metric-field-unit {
+            flex-basis: 5.5rem;
+        }
         #dictionaryTabsContent .analytics-dictionary-table thead th.metric-field-description {
-            min-width: 18rem;
-            flex: 1 1 24rem;
+            min-width: 10rem;
+            flex: 1 1 16rem;
         }
         #dictionaryTabsContent .analytics-dictionary-table thead th.metric-field-reading-guide {
-            min-width: 24rem;
-            flex: 1.3 1 34rem;
+            min-width: 12rem;
+            flex: 1.15 1 18rem;
+        }
+        .dict-inline.metrics-dict-inline .action-toggle,
+        #dictionaryTabsContent .analytics-dictionary-table thead th.action-toggle {
+            width: 92px;
+            flex-basis: 92px;
+        }
+        .dict-inline.metrics-dict-inline .action-delete,
+        #dictionaryTabsContent .analytics-dictionary-table thead th.action-delete {
+            width: 76px;
+            flex-basis: 76px;
+        }
+        .dict-inline.metrics-dict-inline .action-add {
+            width: 96px;
+            margin-left: 0;
         }
     </style>
 </head>
-<body>
+<body class="analytics-admin-scale">
 <th:block th:replace="~{analytics/fragments/admin-header :: adminHeader(activeTab='dictionaries', showSettingsButton=${true}, authenticated=${true})}"></th:block>
 
 <main class="container container-wide py-4">

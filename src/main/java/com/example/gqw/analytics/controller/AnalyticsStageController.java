@@ -8,6 +8,7 @@ import com.example.gqw.analytics.web.dto.AnalyticsApiDto.StageMetricResponse;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -33,7 +34,7 @@ public class AnalyticsStageController {
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
         @RequestParam(required = false) String moduleCode,
-        @RequestParam(required = false) String eventTypeCode,
+        @RequestParam(required = false) List<String> eventTypeCode,
         @RequestParam(required = false) String requestPath,
         @RequestParam(required = false) String filterMetricTypeCode,
         @RequestParam(required = false) String filterMetricValue,
@@ -63,9 +64,9 @@ public class AnalyticsStageController {
             filterAttributeMaxValue,
             bucketMinutes
         );
-        log.debug(
+        logSlow(
             "[STAGE_BREAKDOWN_PERF] controller endpoint=/api/stages totalMs={} from={} to={} module={} eventType={} requestPath={} bucket={} stages={} series={} partial={}",
-            elapsedMs(started),
+            started,
             range.from(),
             range.to(),
             moduleCode,
@@ -86,7 +87,7 @@ public class AnalyticsStageController {
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant afterFrom,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant afterTo,
         @RequestParam(required = false) String moduleCode,
-        @RequestParam(required = false) String eventTypeCode,
+        @RequestParam(required = false) List<String> eventTypeCode,
         @RequestParam(required = false) String requestPath,
         @RequestParam(required = false) String filterMetricTypeCode,
         @RequestParam(required = false) String filterMetricValue,
@@ -135,9 +136,9 @@ public class AnalyticsStageController {
             bucketMinutes
         );
         StageBreakdownCompareResponse response = new StageBreakdownCompareResponse(before, after);
-        log.debug(
+        logSlow(
             "[STAGE_BREAKDOWN_PERF] controller endpoint=/api/stages/compare totalMs={} beforeFrom={} beforeTo={} afterFrom={} afterTo={} module={} eventType={} requestPath={} bucket={} beforeStages={} afterStages={}",
-            elapsedMs(started),
+            started,
             beforeRange.from(),
             beforeRange.to(),
             afterRange.from(),
@@ -157,7 +158,7 @@ public class AnalyticsStageController {
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
         @RequestParam(required = false) String moduleCode,
-        @RequestParam(required = false) String eventTypeCode,
+        @RequestParam(required = false) List<String> eventTypeCode,
         @RequestParam(required = false) String requestPath,
         @RequestParam(required = false) String stageTypeCode,
         @RequestParam(required = false) String metricTypeCode,
@@ -197,9 +198,9 @@ public class AnalyticsStageController {
             includeTopValues,
             includeSeries
         );
-        log.debug(
+        logSlow(
             "[STAGE_METRICS_PERF] controller endpoint=/api/stage-metrics totalMs={} from={} to={} module={} eventType={} stage={} metric={} bucket={} includeSummaries={} includeTopValues={} counts summaries={} series={} topValues={}",
-            elapsedMs(started),
+            started,
             range.from(),
             range.to(),
             moduleCode,
@@ -223,7 +224,7 @@ public class AnalyticsStageController {
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant afterFrom,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant afterTo,
         @RequestParam(required = false) String moduleCode,
-        @RequestParam(required = false) String eventTypeCode,
+        @RequestParam(required = false) List<String> eventTypeCode,
         @RequestParam(required = false) String requestPath,
         @RequestParam(required = false) String stageTypeCode,
         @RequestParam(required = false) String metricTypeCode,
@@ -287,9 +288,9 @@ public class AnalyticsStageController {
             includeSeries
         );
         StageMetricCompareResponse response = new StageMetricCompareResponse(before, after);
-        log.debug(
+        logSlow(
             "[STAGE_METRICS_PERF] controller endpoint=/api/stage-metrics/compare totalMs={} beforeFrom={} beforeTo={} afterFrom={} afterTo={} module={} eventType={} stage={} metric={} bucket={} includeSummaries={} includeTopValues={}",
-            elapsedMs(started),
+            started,
             beforeRange.from(),
             beforeRange.to(),
             afterRange.from(),
@@ -307,6 +308,21 @@ public class AnalyticsStageController {
 
     private static long elapsedMs(long started) {
         return (System.nanoTime() - started) / 1_000_000L;
+    }
+
+    private static void logSlow(String message, long started, Object... args) {
+        long totalMs = elapsedMs(started);
+        if (totalMs < 500L) {
+            return;
+        }
+        Object[] payload = new Object[args.length + 1];
+        payload[0] = totalMs;
+        System.arraycopy(args, 0, payload, 1, args.length);
+        if (totalMs >= 3000L) {
+            log.warn(message, payload);
+        } else {
+            log.info(message, payload);
+        }
     }
 
     private static AnalyticsTimeRangeResolver.TimeRange resolveBeforeRange(

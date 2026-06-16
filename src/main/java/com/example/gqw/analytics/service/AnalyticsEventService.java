@@ -305,17 +305,19 @@ public class AnalyticsEventService {
         event.setDurationMs((int) Duration.between(event.getStartedAt(), finishedAt).toMillis());
         markStoredEventTypeIfNeeded(event);
         eventRepository.save(event);
-        log.warn(
-            "Analytics error event: uid='{}', code='{}', module='{}', status={}, traceId='{}', path='{}', method='{}', message='{}'",
-            event.getEventUid(),
-            event.getEventTypeCode(),
-            event.getModuleCode(),
-            event.getStatusCode(),
-            event.getTraceId(),
-            event.getRequestPath(),
-            event.getHttpMethod(),
-            errorMessage == null ? "" : errorMessage
-        );
+        if (log.isDebugEnabled()) {
+            log.debug(
+                "Analytics error event: uid='{}', code='{}', module='{}', status={}, traceId='{}', path='{}', method='{}', message='{}'",
+                event.getEventUid(),
+                event.getEventTypeCode(),
+                event.getModuleCode(),
+                event.getStatusCode(),
+                event.getTraceId(),
+                event.getRequestPath(),
+                event.getHttpMethod(),
+                errorMessage == null ? "" : errorMessage
+            );
+        }
     }
 
     private void markStoredEventTypeIfNeeded(AnalyticsEvent event) {

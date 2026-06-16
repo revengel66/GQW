@@ -4,6 +4,7 @@ import com.example.gqw.analytics.service.AnalyticsInsightsService;
 import com.example.gqw.analytics.web.dto.AnalyticsApiDto.CompareResponse;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -31,7 +32,7 @@ public class AnalyticsCompareController {
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant targetFrom,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant targetTo,
         @RequestParam(required = false) String moduleCode,
-        @RequestParam(required = false) String eventTypeCode,
+        @RequestParam(required = false) List<String> eventTypeCode,
         @RequestParam(required = false) String requestPath
     ) {
         AnalyticsTimeRangeResolver.TimeRange targetRange = AnalyticsTimeRangeResolver.resolveRange(
@@ -66,18 +67,26 @@ public class AnalyticsCompareController {
             eventTypeCode,
             requestPath
         );
-        log.debug(
-            "[COMPARE_PERF] controller endpoint=/api/compare totalMs={} baselineFrom={} baselineTo={} targetFrom={} targetTo={} module={} eventType={} requestPath={} rows={}",
-            elapsedMs(started),
-            baselineRange.from(),
-            baselineRange.to(),
-            targetRange.from(),
-            targetRange.to(),
-            moduleCode,
-            eventTypeCode,
-            requestPath,
-            response.events() == null ? 0 : response.events().size()
-        );
+        long totalMs = elapsedMs(started);
+        if (totalMs >= 500L) {
+            String message = "[COMPARE_PERF] controller endpoint=/api/compare totalMs={} baselineFrom={} baselineTo={} targetFrom={} targetTo={} module={} eventType={} requestPath={} rows={}";
+            Object[] args = {
+                totalMs,
+                baselineRange.from(),
+                baselineRange.to(),
+                targetRange.from(),
+                targetRange.to(),
+                moduleCode,
+                eventTypeCode,
+                requestPath,
+                response.events() == null ? 0 : response.events().size()
+            };
+            if (totalMs >= 3000L) {
+                log.warn(message, args);
+            } else {
+                log.info(message, args);
+            }
+        }
         return response;
     }
 

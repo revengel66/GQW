@@ -4,6 +4,7 @@ import com.example.gqw.analytics.entity.AnalyticsEventAttribute;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -13,6 +14,8 @@ public interface AnalyticsEventAttributeRepository extends JpaRepository<Analyti
     List<AnalyticsEventAttribute> findByEventId(Long eventId);
 
     List<AnalyticsEventAttribute> findByEventIdIn(Collection<Long> eventIds);
+
+    long countByEventIdIn(Collection<Long> eventIds);
 
     long countByAttributeTypeCode(String attributeTypeCode);
 
@@ -33,7 +36,8 @@ public interface AnalyticsEventAttributeRepository extends JpaRepository<Analyti
         @Param("to") Instant to,
         @Param("moduleCode") String moduleCode,
         @Param("eventTypeCode") String eventTypeCode,
-        @Param("requestPath") String requestPath
+        @Param("requestPath") String requestPath,
+        Pageable pageable
     );
 
     @Query("""
@@ -51,7 +55,8 @@ public interface AnalyticsEventAttributeRepository extends JpaRepository<Analyti
         @Param("from") Instant from,
         @Param("to") Instant to,
         @Param("moduleCode") String moduleCode,
-        @Param("eventTypeCode") String eventTypeCode
+        @Param("eventTypeCode") String eventTypeCode,
+        Pageable pageable
     );
 
     @Query(
@@ -66,6 +71,7 @@ public interface AnalyticsEventAttributeRepository extends JpaRepository<Analyti
               and a.attribute_type_code = :attributeCode
               and trim(coalesce(nullif(a.attr_value, ''), nullif(a.attr_value_json, ''))) <> ''
             order by v asc
+            limit :limit
             """,
         nativeQuery = true
     )
@@ -75,7 +81,8 @@ public interface AnalyticsEventAttributeRepository extends JpaRepository<Analyti
         @Param("moduleCode") String moduleCode,
         @Param("eventTypeCode") String eventTypeCode,
         @Param("requestPath") String requestPath,
-        @Param("attributeCode") String attributeCode
+        @Param("attributeCode") String attributeCode,
+        @Param("limit") int limit
     );
 
     @Query(
@@ -89,6 +96,7 @@ public interface AnalyticsEventAttributeRepository extends JpaRepository<Analyti
               and a.attribute_type_code = :attributeCode
               and trim(coalesce(nullif(a.attr_value, ''), nullif(a.attr_value_json, ''))) <> ''
             order by v asc
+            limit :limit
             """,
         nativeQuery = true
     )
@@ -97,7 +105,8 @@ public interface AnalyticsEventAttributeRepository extends JpaRepository<Analyti
         @Param("to") Instant to,
         @Param("moduleCode") String moduleCode,
         @Param("eventTypeCode") String eventTypeCode,
-        @Param("attributeCode") String attributeCode
+        @Param("attributeCode") String attributeCode,
+        @Param("limit") int limit
     );
 }
 

@@ -834,9 +834,7 @@
     }
 
     function isHiddenRuntimeSetting(key) {
-        return new Set([
-            "analytics.logging.enabled"
-        ]).has(String(key || ""));
+        return new Set([]).has(String(key || ""));
     }
 
     function isReservedRuntimeSetting(key) {

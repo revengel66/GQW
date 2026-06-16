@@ -136,6 +136,28 @@ public interface AnalyticsEventRepository extends JpaRepository<AnalyticsEvent, 
         @Param("moduleCode") String moduleCode
     );
 
+    @Query(
+        value = """
+            select count(e.id)
+            from analytics.event e
+            where e.started_at between :from and :to
+              and (:eventTypeCode is null or e.event_type_code = :eventTypeCode)
+              and (:moduleCode is null or e.module_code = :moduleCode)
+              and (
+                  cast(:requestPath as text) is null
+                  or lower(coalesce(e.request_path, '')) like concat('%', lower(cast(:requestPath as text)), '%')
+              )
+            """,
+        nativeQuery = true
+    )
+    long countByRangeForAdmin(
+        @Param("from") Instant from,
+        @Param("to") Instant to,
+        @Param("eventTypeCode") String eventTypeCode,
+        @Param("moduleCode") String moduleCode,
+        @Param("requestPath") String requestPath
+    );
+
     @Query("""
         select e from AnalyticsEvent e
         where e.startedAt between :from and :to
@@ -161,6 +183,41 @@ public interface AnalyticsEventRepository extends JpaRepository<AnalyticsEvent, 
         @Param("attributeValue") String attributeValue
     );
 
+    @Query(
+        value = """
+            select count(e.id)
+            from analytics.event e
+            where e.started_at between :from and :to
+              and (:eventTypeCode is null or e.event_type_code = :eventTypeCode)
+              and (:moduleCode is null or e.module_code = :moduleCode)
+              and (
+                  cast(:requestPath as text) is null
+                  or lower(coalesce(e.request_path, '')) like concat('%', lower(cast(:requestPath as text)), '%')
+              )
+              and exists (
+                  select 1
+                  from analytics.event_attribute a
+                  where a.event_id = e.id
+                    and a.attribute_type_code = :attributeCode
+                    and (
+                        cast(:attributeValue as text) is null
+                        or lower(coalesce(a.attr_value, coalesce(a.attr_value_json, '')))
+                            like concat('%', lower(cast(:attributeValue as text)), '%')
+                    )
+              )
+            """,
+        nativeQuery = true
+    )
+    long countByRangeWithAttributeForAdmin(
+        @Param("from") Instant from,
+        @Param("to") Instant to,
+        @Param("eventTypeCode") String eventTypeCode,
+        @Param("moduleCode") String moduleCode,
+        @Param("requestPath") String requestPath,
+        @Param("attributeCode") String attributeCode,
+        @Param("attributeValue") String attributeValue
+    );
+
     @Query("""
         select distinct e.eventTypeCode from AnalyticsEvent e
         where e.startedAt between :from and :to
@@ -172,7 +229,8 @@ public interface AnalyticsEventRepository extends JpaRepository<AnalyticsEvent, 
         @Param("from") Instant from,
         @Param("to") Instant to,
         @Param("moduleCode") String moduleCode,
-        @Param("requestPath") String requestPath
+        @Param("requestPath") String requestPath,
+        Pageable pageable
     );
 
     @Query("""
@@ -184,7 +242,8 @@ public interface AnalyticsEventRepository extends JpaRepository<AnalyticsEvent, 
     List<String> findDistinctEventTypeCodesByScopeNoPath(
         @Param("from") Instant from,
         @Param("to") Instant to,
-        @Param("moduleCode") String moduleCode
+        @Param("moduleCode") String moduleCode,
+        Pageable pageable
     );
 
     @Query("""

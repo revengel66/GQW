@@ -56,6 +56,10 @@ public class AnalyticsStrictWarningEventService {
     ) {
         if (!instrumentationPolicy.isEnabled()
             || !runtimeSettingsService.getBoolean(
+                AnalyticsRuntimeSettingsService.KEY_ANALYTICS_LOGGING_ENABLED,
+                true
+            )
+            || !runtimeSettingsService.getBoolean(
                 AnalyticsRuntimeSettingsService.KEY_ANALYTICS_LOGGING_STRICT_WARNINGS_ENABLED,
                 true
             )) {

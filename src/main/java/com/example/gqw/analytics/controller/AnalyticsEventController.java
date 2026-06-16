@@ -8,6 +8,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,6 +22,8 @@ import org.springframework.web.server.ResponseStatusException;
 @RestController
 @RequestMapping({"/analytics/api/events", "/analytics-admin/api/events"})
 public class AnalyticsEventController {
+
+    private static final Logger log = LoggerFactory.getLogger(AnalyticsEventController.class);
 
     private final AnalyticsInsightsService analyticsInsightsService;
 
@@ -50,8 +54,9 @@ public class AnalyticsEventController {
         @RequestParam(required = false, defaultValue = "0") Integer page,
         @RequestParam(required = false, defaultValue = "50") Integer size
     ) {
+        long started = System.nanoTime();
         AnalyticsTimeRangeResolver.TimeRange range = AnalyticsTimeRangeResolver.resolveRange(from, to, Duration.ofHours(24));
-        return analyticsInsightsService.events(
+        EventListResponse response = analyticsInsightsService.events(
             range.from(),
             range.to(),
             moduleCode,
@@ -73,6 +78,33 @@ public class AnalyticsEventController {
             page,
             size
         );
+        long totalMs = elapsedMs(started);
+        if (totalMs >= 500L) {
+            String message =
+                "Analytics events controller slow endpoint=/api/events totalMs={} from={} to={} module={} eventTypes={} stage={} systemOnly={} page={} size={} returned={} hasMore={} requestPath={} attr={} metric={}";
+            Object[] args = {
+                totalMs,
+                range.from(),
+                range.to(),
+                moduleCode,
+                eventTypeCode == null ? 0 : eventTypeCode.size(),
+                stageTypeCode,
+                Boolean.TRUE.equals(systemEventsOnly),
+                page,
+                size,
+                response.items() == null ? 0 : response.items().size(),
+                response.hasMore(),
+                requestPath,
+                attributeCode,
+                metricTypeCode
+            };
+            if (totalMs >= 3000L) {
+                log.warn(message, args);
+            } else {
+                log.info(message, args);
+            }
+        }
+        return response;
     }
 
     @GetMapping("/{eventUid}")
@@ -91,5 +123,9 @@ public class AnalyticsEventController {
         } catch (IllegalArgumentException ex) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, ex.getMessage(), ex);
         }
+    }
+
+    private static long elapsedMs(long started) {
+        return (System.nanoTime() - started) / 1_000_000L;
     }
 }

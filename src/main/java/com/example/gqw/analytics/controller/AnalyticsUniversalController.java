@@ -104,9 +104,9 @@ public class AnalyticsUniversalController {
             Boolean.TRUE.equals(systemEventsOnly),
             isError
         );
-        log.debug(
+        logSlow(
             "[UNIVERSAL_PERF] controller endpoint=/api/universal totalMs={} from={} to={} module={} eventTypes={} stage={} attr={} includeEventStageBreakdown={} counts series={} stages={} events={} eventSeries={} eventStageBreakdown={}",
-            elapsedMs(started),
+            started,
             range.from(),
             range.to(),
             moduleCode,
@@ -203,9 +203,9 @@ public class AnalyticsUniversalController {
             Boolean.TRUE.equals(systemEventsOnly),
             isError
         );
-        log.debug(
+        logSlow(
             "[UNIVERSAL_PERF] controller endpoint=/api/universal/compare totalMs={} beforeFrom={} beforeTo={} afterFrom={} afterTo={} module={} eventTypes={} includeEventStageBreakdown={}",
-            elapsedMs(started),
+            started,
             beforeRange.from(),
             beforeRange.to(),
             afterRange.from(),
@@ -255,9 +255,9 @@ public class AnalyticsUniversalController {
             sortBy,
             sortDir
         );
-        log.debug(
+        logSlow(
             "[UNIVERSAL_PERF] controller endpoint=/api/universal/attribute-breakdown totalMs={} from={} to={} eventCodes={} stageCodes={} attr={} limit={} offset={} sortBy={} sortDir={} rows={} total={}",
-            elapsedMs(started),
+            started,
             range.from(),
             range.to(),
             resolvedEventCodes.size(),
@@ -307,9 +307,9 @@ public class AnalyticsUniversalController {
             attributeValue,
             limit
         );
-        log.debug(
+        logSlow(
             "[UNIVERSAL_PERF] controller endpoint=/api/universal/root-cause totalMs={} from={} to={} eventCodes={} stageCodes={} attr={} value={} factors={} problemEvents={}",
-            elapsedMs(started),
+            started,
             range.from(),
             range.to(),
             resolvedEventCodes.size(),
@@ -352,9 +352,9 @@ public class AnalyticsUniversalController {
             moduleCode,
             limit
         );
-        log.debug(
+        logSlow(
             "[UNIVERSAL_PERF] controller endpoint=/api/universal/event-root-cause totalMs={} from={} to={} eventCodes={} stageCodes={} factors={} problemEvents={}",
-            elapsedMs(started),
+            started,
             range.from(),
             range.to(),
             resolvedEventCodes.size(),
@@ -401,9 +401,9 @@ public class AnalyticsUniversalController {
             sortBy,
             sortDir
         );
-        log.debug(
+        logSlow(
             "[UNIVERSAL_PERF] controller endpoint=/api/universal/error-breakdown totalMs={} from={} to={} eventCodes={} stageCodes={} limit={} offset={} sortBy={} sortDir={} rows={} total={}",
-            elapsedMs(started),
+            started,
             range.from(),
             range.to(),
             resolvedEventCodes.size(),
@@ -452,9 +452,9 @@ public class AnalyticsUniversalController {
             systemEventsOnly,
             limit
         );
-        log.debug(
+        logSlow(
             "[UNIVERSAL_PERF] controller endpoint=/api/universal/error-root-cause totalMs={} from={} to={} eventCodes={} stageCodes={} errorKey={} factors={} problemEvents={}",
-            elapsedMs(started),
+            started,
             range.from(),
             range.to(),
             resolvedEventCodes.size(),
@@ -499,9 +499,9 @@ public class AnalyticsUniversalController {
             sortBy,
             sortDir
         );
-        log.debug(
+        logSlow(
             "[UNIVERSAL_PERF] controller endpoint=/api/universal/module-breakdown totalMs={} from={} to={} eventCodes={} stageCodes={} module={} limit={} offset={} rows={} total={} problemEvents={}",
-            elapsedMs(started),
+            started,
             range.from(),
             range.to(),
             resolvedEventCodes.size(),
@@ -547,9 +547,9 @@ public class AnalyticsUniversalController {
             systemEventsOnly,
             limit
         );
-        log.debug(
+        logSlow(
             "[UNIVERSAL_PERF] controller endpoint=/api/universal/module-root-cause totalMs={} from={} to={} eventCodes={} stageCodes={} module={} selectedStage={} systemEventsOnly={} factors={} problemEvents={}",
-            elapsedMs(started),
+            started,
             range.from(),
             range.to(),
             resolvedEventCodes.size(),
@@ -584,6 +584,21 @@ public class AnalyticsUniversalController {
 
     private static long elapsedMs(long started) {
         return (System.nanoTime() - started) / 1_000_000L;
+    }
+
+    private static void logSlow(String message, long started, Object... args) {
+        long totalMs = elapsedMs(started);
+        if (totalMs < 500L) {
+            return;
+        }
+        Object[] payload = new Object[args.length + 1];
+        payload[0] = totalMs;
+        System.arraycopy(args, 0, payload, 1, args.length);
+        if (totalMs >= 3000L) {
+            log.warn(message, payload);
+        } else {
+            log.info(message, payload);
+        }
     }
 
     private static int size(List<?> values) {

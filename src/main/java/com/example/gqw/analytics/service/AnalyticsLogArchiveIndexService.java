@@ -62,6 +62,7 @@ public class AnalyticsLogArchiveIndexService {
             + "\\[module:(?<module>[^\\]]*)\\]\\s+---\\s+\\[(?<thread>[^\\]]*)\\]\\s+"
             + "(?<logger>[^:]+)\\s+:\\s(?<msg>.*)$"
     );
+    private static final int MAX_TRACES_PER_INDEXED_FILE = 20_000;
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
     private final AnalyticsRuntimeSettingsService runtimeSettingsService;
@@ -485,6 +486,7 @@ public class AnalyticsLogArchiveIndexService {
         ));
         long linesWithTrace = 0L;
         long parseErrors = 0L;
+        long skippedTraceIds = 0L;
         long startedAt = System.nanoTime();
         try (BufferedReader reader = newLogReader(path)) {
             String line;
@@ -512,6 +514,10 @@ public class AnalyticsLogArchiveIndexService {
                 }
                 String traceId = trim(matcher.group("trace"));
                 if (traceId == null) {
+                    continue;
+                }
+                if (!traces.containsKey(traceId) && traces.size() >= MAX_TRACES_PER_INDEXED_FILE) {
+                    skippedTraceIds++;
                     continue;
                 }
                 String eventId = trim(matcher.group("event"));
@@ -547,6 +553,15 @@ public class AnalyticsLogArchiveIndexService {
                 errorCount,
                 parseErrors,
                 Duration.ofNanos(System.nanoTime() - startedAt).toMillis()
+            );
+        }
+        if (skippedTraceIds > 0) {
+            log.warn(
+                "[LOG_INDEX] file trace index truncated fileName={} tracesIndexed={} traceLinesSkipped={} maxTraces={}",
+                path.getFileName(),
+                traces.size(),
+                skippedTraceIds,
+                MAX_TRACES_PER_INDEXED_FILE
             );
         }
         return new FileScan(firstTs, lastTs, lineCount, errorCount, warnCount, traces);

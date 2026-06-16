@@ -36,7 +36,7 @@ public class AnalyticsLoggingPolicy {
 
     public boolean isBuiltInEnabled() {
         return instrumentationPolicy.isEnabled()
-            && defaultBuiltInLoggingEnabled
+            && runtimeBuiltInLoggingEnabled()
             && level() != BuiltInLogLevel.OFF;
     }
 
@@ -56,7 +56,7 @@ public class AnalyticsLoggingPolicy {
         if (!instrumentationPolicy.isEnabled()) {
             return false;
         }
-        if (!defaultBuiltInLoggingEnabled) {
+        if (!runtimeBuiltInLoggingEnabled()) {
             return false;
         }
         BuiltInLogLevel configured = level();
@@ -88,11 +88,12 @@ public class AnalyticsLoggingPolicy {
 
     public boolean isUserLogCaptureEnabled() {
         return instrumentationPolicy.isEnabled()
+            && runtimeBuiltInLoggingEnabled()
             && runtimeSettingsService.getBoolean(AnalyticsRuntimeSettingsService.KEY_ANALYTICS_LOGGING_USER_LOG_CAPTURE_ENABLED, true);
     }
 
     public boolean isStrictWarningsEnabled() {
-        return instrumentationPolicy.isEnabled()
+        return isBuiltInEnabled()
             && runtimeSettingsService.getBoolean(AnalyticsRuntimeSettingsService.KEY_ANALYTICS_LOGGING_STRICT_WARNINGS_ENABLED, true)
             && isAllowedByConfiguredLevel(BuiltInLogLevel.WARN, level());
     }
@@ -113,6 +114,13 @@ public class AnalyticsLoggingPolicy {
         } catch (RuntimeException ignored) {
             return BuiltInLogLevel.INFO;
         }
+    }
+
+    private boolean runtimeBuiltInLoggingEnabled() {
+        return runtimeSettingsService.getBoolean(
+            AnalyticsRuntimeSettingsService.KEY_ANALYTICS_LOGGING_ENABLED,
+            defaultBuiltInLoggingEnabled
+        );
     }
 
     private static int severity(BuiltInLogLevel level) {

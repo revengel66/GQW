@@ -13,8 +13,8 @@ public class DemoEventAttributeTypeSource implements EventAttributeTypeSource {
     @Override
     public List<EventAttributeType> eventAttributeTypes() {
         return List.of(
-            text("ENTITY_TYPE", "Entity type", "Тип сущности, к которой относится событие"),
-            text("ENTITY_ID", "Entity id", "Идентификатор сущности в событии"),
+            text("ENTITY_TYPE", "\u0421\u0443\u0449\u043D\u043E\u0441\u0442\u044C", "Тип сущности, к которой относится событие"),
+            text("ENTITY_ID", "ID \u0441\u0443\u0449\u043D\u043E\u0441\u0442\u0438", "Идентификатор сущности в событии"),
             text("HTTP_METHOD", "HTTP-метод", "HTTP-метод запроса"),
             text("HTTP_PATH", "Путь запроса", "Путь HTTP-запроса"),
             text("HTTP_STATUS", "HTTP-статус", "HTTP-статус ответа"),
@@ -30,7 +30,8 @@ public class DemoEventAttributeTypeSource implements EventAttributeTypeSource {
             text("CATEGORY_ID", "Category id", "Идентификатор категории"),
             text("ORDER_ID", "Order id", "Идентификатор заказа"),
             text("SORT_TYPE", "Sort type", "Тип сортировки"),
-            text("CATEGORY_SLUG", "Category slug", "Slug категории"),
+            text("CATEGORY_SLUG", "Slug \u043A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u0438", "Slug категории"),
+            text("PRODUCT_SLUG", "Slug \u0442\u043E\u0432\u0430\u0440\u0430", "Slug товара"),
             text("CATEGORY_NAME", "Category name", "Название категории"),
             text("SEARCH_QUERY", "Search query", "Поисковая строка"),
             text("PAGE_INDEX", "Page index", "Номер страницы"),

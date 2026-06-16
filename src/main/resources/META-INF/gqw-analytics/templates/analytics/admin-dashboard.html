@@ -8,9 +8,9 @@
     <title>Analytics Admin · Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-    <link rel="stylesheet" th:href="@{/analytics/css/app.css(v='20260606-06')}">
+    <link rel="stylesheet" th:href="@{/analytics/css/app.css(v='20260616-01')}">
 </head>
-<body>
+<body class="analytics-admin-scale">
 <th:block
     th:replace="~{analytics/fragments/admin-header :: adminHeader(activeTab=${analyticsActiveTab}, showSettingsButton=${true}, authenticated=${true})}"></th:block>
 <main class="container container-wide py-4 analytics-page">
@@ -635,7 +635,20 @@
 
     <section class="glass-card analytics-panel p-3 p-lg-4 mb-4" data-analytics-view="overview">
         <div class="analytics-panel-head mb-3">
-            <div class="analytics-panel-title">Этапы выполнения</div>
+            <div>
+                <div class="analytics-panel-title">Этапы выполнения</div>
+                <div class="analytics-panel-sub" data-stage-duration-description>С учётом вложенных этапов</div>
+            </div>
+            <div class="analytics-event-stage-mode analytics-stage-duration-mode" role="group" aria-label="Режим времени этапов">
+                <label>
+                    <input type="radio" name="analytics-stage-duration-mode" value="inclusive" data-stage-duration-mode checked>
+                    <span>Полное время слоя</span>
+                </label>
+                <label>
+                    <input type="radio" name="analytics-stage-duration-mode" value="self" data-stage-duration-mode>
+                    <span>Собственное время</span>
+                </label>
+            </div>
         </div>
         <div class="analytics-grid analytics-grid-2">
             <div>
@@ -655,9 +668,9 @@
                 <tr>
                     <th>Этап</th>
                     <th class="text-end">Количество</th>
-                    <th class="text-end">AVG</th>
-                    <th class="text-end">P95</th>
-                    <th class="text-end">P99</th>
+                    <th class="text-end" data-stage-duration-column="avg">AVG, полное</th>
+                    <th class="text-end" data-stage-duration-column="p95">P95, полное</th>
+                    <th class="text-end" data-stage-duration-column="p99">P99, полное</th>
                     <th class="text-end">Доля ошибок</th>
                 </tr>
                 </thead>
@@ -1023,6 +1036,14 @@
                             Доп. фильтры
                         </button>
                     </div>
+                    <div class="analytics-events-reset-wrap">
+                        <label class="form-label mb-1 d-none d-lg-block">&nbsp;</label>
+                        <button class="btn btn-sm btn-outline-dark analytics-events-reset d-none" type="button"
+                                id="events-filter-reset" title="Сбросить к основному фильтру"
+                                aria-label="Сбросить к основному фильтру">
+                            <i class="bi bi-arrow-counterclockwise"></i>
+                        </button>
+                    </div>
                 </div>
             </section>
 
@@ -1138,25 +1159,29 @@
         </form>
         <div class="analytics-grid analytics-grid-3 mb-3" id="compare-kpi-cards"></div>
         <section class="glass-card analytics-compare-summary-card mb-3" id="compare-summary-card"></section>
-        <div class="analytics-compare-insight-grid mb-3">
-            <section class="analytics-compare-table-card glass-card">
+        <div class="analytics-compare-tabs-shell" id="compare-insight-tabs">
+            <div class="analytics-compare-tabs" role="tablist" aria-label="&#1056;&#1072;&#1079;&#1076;&#1077;&#1083;&#1099; &#1089;&#1088;&#1072;&#1074;&#1085;&#1077;&#1085;&#1080;&#1103;">
+                <button class="analytics-compare-tab active" type="button" role="tab" aria-selected="true" data-compare-insight-tab="degraded">&#1063;&#1090;&#1086; &#1091;&#1093;&#1091;&#1076;&#1096;&#1080;&#1083;&#1086;&#1089;&#1100;</button>
+                <button class="analytics-compare-tab" type="button" role="tab" aria-selected="false" data-compare-insight-tab="improved">&#1063;&#1090;&#1086; &#1091;&#1083;&#1091;&#1095;&#1096;&#1080;&#1083;&#1086;&#1089;&#1100;</button>
+                <button class="analytics-compare-tab" type="button" role="tab" aria-selected="false" data-compare-insight-tab="load">&#1048;&#1079;&#1084;&#1077;&#1085;&#1077;&#1085;&#1080;&#1077; &#1085;&#1072;&#1075;&#1088;&#1091;&#1079;&#1082;&#1080;</button>
+                <button class="analytics-compare-tab" type="button" role="tab" aria-selected="false" data-compare-insight-tab="errors">&#1048;&#1079;&#1084;&#1077;&#1085;&#1077;&#1085;&#1080;&#1077; &#1086;&#1096;&#1080;&#1073;&#1086;&#1082;</button>
+            </div>
+            <section class="analytics-compare-table-card glass-card analytics-compare-tab-panel active" data-compare-insight-panel="degraded">
                 <div class="analytics-compare-section-title">&#1063;&#1090;&#1086; &#1091;&#1093;&#1091;&#1076;&#1096;&#1080;&#1083;&#1086;&#1089;&#1100;</div>
                 <div class="analytics-compare-section-subtitle">&#1058;&#1086;&#1087; &#1076;&#1077;&#1075;&#1088;&#1072;&#1076;&#1080;&#1088;&#1086;&#1074;&#1072;&#1074;&#1096;&#1080;&#1093;&#1089;&#1103; &#1089;&#1086;&#1073;&#1099;&#1090;&#1080;&#1081;</div>
                 <div id="compare-degraded-table"></div>
             </section>
-            <section class="analytics-compare-table-card glass-card">
+            <section class="analytics-compare-table-card glass-card analytics-compare-tab-panel" data-compare-insight-panel="improved" hidden>
                 <div class="analytics-compare-section-title">&#1063;&#1090;&#1086; &#1091;&#1083;&#1091;&#1095;&#1096;&#1080;&#1083;&#1086;&#1089;&#1100;</div>
                 <div class="analytics-compare-section-subtitle">&#1058;&#1086;&#1087; &#1091;&#1083;&#1091;&#1095;&#1096;&#1080;&#1074;&#1096;&#1080;&#1093;&#1089;&#1103; &#1089;&#1086;&#1073;&#1099;&#1090;&#1080;&#1081;</div>
                 <div id="compare-improved-table"></div>
             </section>
-        </div>
-        <div class="analytics-compare-insight-grid">
-            <section class="analytics-compare-table-card glass-card analytics-compare-table-card-load">
+            <section class="analytics-compare-table-card glass-card analytics-compare-table-card-load analytics-compare-tab-panel" data-compare-insight-panel="load" hidden>
                 <div class="analytics-compare-section-title">&#1048;&#1079;&#1084;&#1077;&#1085;&#1077;&#1085;&#1080;&#1077; &#1085;&#1072;&#1075;&#1088;&#1091;&#1079;&#1082;&#1080;</div>
                 <div class="analytics-compare-section-subtitle">&#1043;&#1076;&#1077; &#1080;&#1079;&#1084;&#1077;&#1085;&#1080;&#1083;&#1086;&#1089;&#1100; &#1082;&#1086;&#1083;&#1080;&#1095;&#1077;&#1089;&#1090;&#1074;&#1086;</div>
                 <div id="compare-load-table"></div>
             </section>
-            <section class="analytics-compare-table-card glass-card">
+            <section class="analytics-compare-table-card glass-card analytics-compare-tab-panel" data-compare-insight-panel="errors" hidden>
                 <div class="analytics-compare-section-title">&#1048;&#1079;&#1084;&#1077;&#1085;&#1077;&#1085;&#1080;&#1077; &#1086;&#1096;&#1080;&#1073;&#1086;&#1082;</div>
                 <div class="analytics-compare-section-subtitle">&#1043;&#1076;&#1077; &#1074;&#1099;&#1088;&#1086;&#1089;&#1083;&#1072; &#1076;&#1086;&#1083;&#1103; &#1086;&#1096;&#1080;&#1073;&#1086;&#1082;</div>
                 <div id="compare-errors-table"></div>
@@ -1250,7 +1275,7 @@
 <script th:inline="javascript">
     window.analyticsApiBase = [[${analyticsApiBase}]];
 </script>
-<script th:src="@{/analytics/js/analytics-dashboard.js(v='20260611-03')}"></script>
+<script th:src="@{/analytics/js/analytics-dashboard.js(v='20260616-01')}"></script>
 <script th:src="@{/analytics/js/analytics-settings.js(v='20260604-07')}"></script>
 </body>
 </html>

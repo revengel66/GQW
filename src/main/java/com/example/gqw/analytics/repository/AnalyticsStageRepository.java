@@ -14,6 +14,10 @@ public interface AnalyticsStageRepository extends JpaRepository<AnalyticsStage, 
 
     List<AnalyticsStage> findByEventIdInAndStageTypeCodeOrderByEventIdAscStageOrderAsc(Collection<Long> eventIds, String stageTypeCode);
 
+    long countByEventIdIn(Collection<Long> eventIds);
+
+    long countByEventIdInAndStageTypeCode(Collection<Long> eventIds, String stageTypeCode);
+
     Optional<AnalyticsStage> findTopByEventIdOrderByStageOrderDesc(Long eventId);
 
     long countByStageTypeCode(String stageTypeCode);

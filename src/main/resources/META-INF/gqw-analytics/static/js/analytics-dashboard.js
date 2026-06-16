@@ -1,9 +1,35 @@
 (function () {
-    const inferredBase = window.location.pathname.startsWith("/analytics-admin")
+    const currentPathname = String(window.location?.pathname || "");
+    const inferredBase = currentPathname.startsWith("/analytics-admin")
         ? "/analytics-admin/api"
         : "/analytics/api";
     const API_BASE = (window.analyticsApiBase || inferredBase).replace(/\/+$/, "");
     const EXPANDED_FOCUSED_CHART_STORAGE_KEY = "gqw.analytics.expandedFocusedChart";
+    const CHART_HOVER_DEBUG_ENABLED = (() => {
+        try {
+            const queryEnabled = new URLSearchParams(window.location.search).get("chartHoverDebug") === "1";
+            return queryEnabled || window.localStorage.getItem("gqw.analytics.chartHoverDebug") === "1";
+        } catch (_error) {
+            return false;
+        }
+    })();
+    const ANALYTICS_LOAD_DEBUG_ENABLED = (() => {
+        try {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get("analyticsLoadDebug") === "1"
+                || window.localStorage.getItem("gqw.analytics.loadDebug") === "1") {
+                return true;
+            }
+            const onceKey = "gqw.analytics.loadDebug.once";
+            if (window.sessionStorage && window.sessionStorage.getItem(onceKey) !== "1") {
+                window.sessionStorage.setItem(onceKey, "1");
+                return true;
+            }
+            return false;
+        } catch (_error) {
+            return false;
+        }
+    })();
     const state = {
         charts: {},
         chartConfigs: {},
@@ -28,11 +54,14 @@
         globalCompareNoDataWarningKey: "",
         stageMetricCompareMode: "off",
         stageTextCompareMode: "off",
+        stageDurationMode: "inclusive",
+        stageDurationRenderContext: null,
         globalAttrMetaByCode: {},
         globalMetricMetaByCode: {},
         globalMetricRefreshRequestId: 0,
         globalMetricScopeSignature: "",
         globalScenarioCode: "",
+        globalEventCodes: [],
         scenarioBySource: {},
         scenarioOverriddenBySource: {},
         chartScenarioBySource: {},
@@ -40,6 +69,12 @@
         authRedirectInProgress: false,
         lastMainRangeKey: "",
         mainReloadRequestId: 0,
+        mainReloadAbortController: null,
+        analyticsFetchRequestId: 0,
+        screenGeneration: 0,
+        screenGenerationByTab: {},
+        suppressEventsScopeRefreshOnNextTabSwitch: false,
+        expandedChartRequestId: 0,
         expandedRangesBySource: {},
         expandedBucketBySource: {},
         expandedLatencyMetricBySource: {},
@@ -84,6 +119,7 @@
             from: "",
             to: ""
         },
+        eventsLocalDirty: false,
         metricHelpByCode: {},
         expandedIntervalSelectionEnabledBySource: {},
         expandedIntervalSelectionBySource: {},
@@ -104,8 +140,10 @@
         analyticsApiSuccessPending: false,
         analyticsApiToastTimer: null,
         panelLoadingDepthByElement: new WeakMap(),
+        panelLoadingSlowTimerByElement: new WeakMap(),
         expandedLoadingDepthBySource: {},
         sectionLocalLoadingDepthByElement: new WeakMap(),
+        sectionLocalLoadingSlowTimerByElement: new WeakMap(),
         mainFiltersSubmitting: false,
         mainFiltersSubmitPending: false,
         universalRequestId: 0,
@@ -201,6 +239,9 @@
         eventsRequestId: 0,
         eventsAbortController: null,
         eventsLoading: false,
+        eventsRenderedCache: {},
+        eventsLoadingSlowTimer: null,
+        eventsLoadingVerySlowTimer: null,
         eventsForcedEventCodes: null,
         eventsSortBy: "startedAt",
         eventsSortDir: "desc",
@@ -221,6 +262,7 @@
         compareAbortController: null,
         compareFilterDirty: false,
         compareLoaded: false,
+        compareInsightTab: "degraded",
         currentDashboardTab: "overview",
         eventsSystemOnly: false,
         cardLoaderHostsByScope: {},
@@ -230,11 +272,15 @@
         sectionLoaderBoundsByScope: {}
     };
     const MAX_CHART_POINTS = 220;
+    const TIME_AXIS_TICKS_DEFAULT = 20;
+    const TIME_AXIS_TICKS_EXPANDED = 48;
     const UNIVERSAL_TABLE_PAGE_SIZE = 50;
     const UNIVERSAL_DEFAULT_SOFT_LIMIT = 500;
     const UNIVERSAL_DEFAULT_HARD_LIMIT = 2000;
     const UNIVERSAL_ATTRIBUTE_TABLE_TIMEOUT_MS = 3000;
     const STAGE_METRIC_SERIES_CACHE_LIMIT = 200;
+    const ANALYTICS_LOADING_TEXT = "\u0417\u0430\u0433\u0440\u0443\u0436\u0430\u0435\u043c...";
+    const ANALYTICS_SLOW_LOADING_TEXT = "\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0430 \u0437\u0430\u043d\u0438\u043c\u0430\u0435\u0442 \u0431\u043e\u043b\u044c\u0448\u0435 \u043e\u0431\u044b\u0447\u043d\u043e\u0433\u043e...";
         const HELP_TEXTS = {
         "kpi-total-events": "Общее число событий за выбранный период. Рост при стабильной ошибке обычно означает рост нагрузки.",
         "kpi-avg-ms": "Среднее время обработки события. Удобно отслеживать общий тренд производительности.",
@@ -914,6 +960,10 @@
             problemSignals: ["Одинаковый класс ошибки повторяется", "Один внутренний маршрут доминирует в ошибках", "Этап базы данных или сервиса сильно выделяется"]
         }
     };
+
+    if (typeof Chart !== "undefined") {
+        Chart.defaults.devicePixelRatio = Math.max(window.devicePixelRatio || 1, 1);
+    }
 
     ANALYTICS_CHART_HELP_REGISTRY["chart-events-count"] = {
         ...ANALYTICS_CHART_HELP_REGISTRY["chart-event-kpi"],
@@ -1669,9 +1719,18 @@
         initDateTimeClipboardSupport();
         ensureParameterHelpButtons();
         bindEvents();
+        installGlobalChartHoverDebug();
+        if (refs.eventDetailsPage) {
+            window.addEventListener("resize", () => scheduleTimelineSegmentLabelRefresh(refs.eventDetailsBody));
+            void initStandaloneEventDetailsPage();
+            return;
+        }
         initDashboardViewMode();
         syncCompareRangeFromMain();
         void initDashboard();
+        window.setTimeout(resizeAllAnalyticsCharts, 0);
+        window.setTimeout(resizeAllAnalyticsCharts, 250);
+        window.addEventListener("resize", () => scheduleTimelineSegmentLabelRefresh(refs.eventDetailsBody));
     });
 
     function initDateTimeClipboardSupport() {
@@ -1743,10 +1802,11 @@
         if (!path) {
             return API_BASE;
         }
-        if (path.startsWith("/")) {
-            return `${API_BASE}${path}`;
+        const normalizedPath = typeof path === "string" ? path : String(path ?? "");
+        if (normalizedPath.startsWith("/")) {
+            return `${API_BASE}${normalizedPath}`;
         }
-        return `${API_BASE}/${path}`;
+        return `${API_BASE}/${normalizedPath}`;
     }
 
     function initRefs() {
@@ -1963,6 +2023,7 @@
         refs.eventsFrom = document.getElementById("events-from");
         refs.eventsTo = document.getElementById("events-to");
         refs.eventsQuickRange = document.getElementById("events-quick-range");
+        refs.eventsFilterReset = document.getElementById("events-filter-reset");
         refs.eventsMetricType = document.getElementById("events-metric-type");
         refs.eventsMetricMin = document.getElementById("events-metric-min");
         refs.eventsMetricMax = document.getElementById("events-metric-max");
@@ -2023,6 +2084,9 @@
 
         refs.eventModalEl = document.getElementById("analytics-event-modal");
         refs.eventModalBody = document.getElementById("analytics-event-modal-body");
+        refs.eventDetailsPage = document.getElementById("analytics-event-details-page");
+        refs.eventDetailsBody = document.getElementById("analytics-event-details-body");
+        refs.eventDetailsTitle = document.getElementById("analytics-event-details-title");
         refs.helpModalEl = document.getElementById("analytics-help-modal");
         refs.helpModalTitle = document.getElementById("analytics-help-modal-title");
         refs.helpModalBody = document.getElementById("analytics-help-modal-body");
@@ -2034,49 +2098,55 @@
 
     function bindEvents() {
         const runMainFiltersOnce = async () => {
-            const nextMainRangeKey = buildMainRangeKey();
-            const mainRangeChanged = !!state.lastMainRangeKey && state.lastMainRangeKey !== nextMainRangeKey;
-            state.lastMainRangeKey = nextMainRangeKey;
-            if (mainRangeChanged && state.globalCompareEnabled) {
-                state.globalCompareBeforeCustom = false;
+            const earlyDashboardLoaders = showDashboardReloadLoadersForCurrentTab();
+            try {
+                const nextMainRangeKey = buildMainRangeKey();
+                const mainRangeChanged = !!state.lastMainRangeKey && state.lastMainRangeKey !== nextMainRangeKey;
+                state.lastMainRangeKey = nextMainRangeKey;
+                if (mainRangeChanged && state.globalCompareEnabled) {
+                    state.globalCompareBeforeCustom = false;
+                }
+                const preserveChartUiState = !!state.preserveChartUiStateDuringMainSubmit;
+                if (!preserveChartUiState) {
+                    state.universalDiagnosticsDrilldownContext = null;
+                    clearAllChartLocalOverrides();
+                    resetInlineComparePresetsFromTopFilter();
+                }
+                if (!preserveChartUiState) {
+                    state.expandedRangesBySource = {};
+                }
+                if (!preserveChartUiState) {
+                    state.expandedBucketBySource = {};
+                }
+                if (!preserveChartUiState) {
+                    syncOpenedExpandedChartRangeFromTopFilter();
+                }
+                syncStageMetricQuickRangeFromMain();
+                syncStageMetricRangesFromMain(true);
+                syncStageTextQuickRangeFromMain();
+                syncStageTextRangesFromMain(true);
+                syncEventsRangeFromMain(true);
+                syncUniversalRangeFromMain(true);
+                if (state.currentDashboardTab !== "system") {
+                    void syncSystemChartFiltersFromMain({refreshOptions: true})
+                        .catch((error) => console.error("System chart filter sync failed", error));
+                }
+                void refreshScopedOptionsSafe()
+                    .catch((error) => console.error("Scoped options refresh failed", error));
+                applyGlobalMetricToEventsFilter();
+                state.eventsPage = 0;
+                const compareSynced = syncCompareRangeFromMain();
+                await reloadAll({dashboardLoaders: earlyDashboardLoaders});
+                if (state.currentDashboardTab !== "compare" && shouldRefreshCompareAfterMainSync(compareSynced)) {
+                    await loadCompare();
+                }
+                if (state.globalCompareEnabled) {
+                    await applyGlobalCompareToAllCharts();
+                }
+                await syncExpandedGraphFiltersFromTop();
+            } finally {
+                hideDashboardReloadLoaders(earlyDashboardLoaders);
             }
-            const preserveChartUiState = !!state.preserveChartUiStateDuringMainSubmit;
-            if (!preserveChartUiState) {
-                state.universalDiagnosticsDrilldownContext = null;
-                clearAllChartLocalOverrides();
-                resetInlineComparePresetsFromTopFilter();
-            }
-            if (!preserveChartUiState) {
-                state.expandedRangesBySource = {};
-            }
-            if (!preserveChartUiState) {
-                state.expandedBucketBySource = {};
-            }
-            if (!preserveChartUiState) {
-                syncOpenedExpandedChartRangeFromTopFilter();
-            }
-            syncStageMetricQuickRangeFromMain();
-            syncStageMetricRangesFromMain(true);
-            syncStageTextQuickRangeFromMain();
-            syncStageTextRangesFromMain(true);
-            syncEventsRangeFromMain(true);
-            syncUniversalRangeFromMain(true);
-            await syncSystemChartFiltersFromMain({refreshOptions: true});
-            await refreshScopedOptionsSafe();
-            applyGlobalMetricToEventsFilter();
-            state.eventsPage = 0;
-            const compareSynced = syncCompareRangeFromMain();
-            await reloadAll();
-            if (state.currentDashboardTab === "system") {
-                await loadSystemEventsChart();
-            }
-            if (shouldRefreshCompareAfterMainSync(compareSynced)) {
-                await loadCompare();
-            }
-            if (state.globalCompareEnabled) {
-                await applyGlobalCompareToAllCharts();
-            }
-            await syncExpandedGraphFiltersFromTop();
         };
         const submitMainFilters = async () => {
             if (state.mainFiltersSubmitting) {
@@ -2151,6 +2221,14 @@
         });
         document.addEventListener("pointerdown", handleParameterHelpPointerDown, true);
         document.addEventListener("click", handleParameterHelpClick, true);
+        document.addEventListener("click", (event) => {
+            const tab = event.target?.closest?.("[data-compare-insight-tab]");
+            if (!tab) {
+                return;
+            }
+            event.preventDefault();
+            setCompareInsightTab(tab.getAttribute("data-compare-insight-tab") || "degraded");
+        });
 
         refs.analyticsTabButtons?.forEach((button) => {
             button.addEventListener("click", () => {
@@ -2171,6 +2249,8 @@
         refs.floatingReset?.addEventListener("click", async () => {
             if (refs.moduleType) refs.moduleType.value = "";
             if (refs.eventType) refs.eventType.value = "";
+            state.globalEventCodes = [];
+            clearGlobalEventSetOption();
             if (refs.analyticsRequestPath) refs.analyticsRequestPath.value = "";
             if (refs.bucket) refs.bucket.value = "";
             if (refs.globalMetricCode) refs.globalMetricCode.value = "";
@@ -2346,6 +2426,7 @@
             await submitEventsFilters();
         });
         refs.eventsIsError?.addEventListener("change", () => {
+            markEventsLocalDirty();
             updateEventsErrorClassVisibility();
         });
         refs.eventsAdvancedToggle?.addEventListener("click", () => {
@@ -2357,7 +2438,11 @@
             if (!preset) {
                 return;
             }
+            markEventsLocalDirty();
             await applyEventsQuickRangePreset(preset);
+        });
+        refs.eventsFilterReset?.addEventListener("click", () => {
+            void resetEventsFiltersToMain();
         });
 
         refs.eventsLoadMore?.addEventListener("click", async () => {
@@ -2405,6 +2490,7 @@
                 }
             }
             updateEventsSortHeaders();
+            markEventsLocalDirty();
             await loadEvents(true);
         });
 
@@ -2551,11 +2637,11 @@
             const uid = (button.getAttribute("data-event-uid") || "").trim();
             try {
                 if (uid && uid.toLowerCase() !== "null" && uid.toLowerCase() !== "undefined") {
-                    await openEventDetails(uid);
+                    window.open(`/analytics-admin/events/${encodeURIComponent(uid)}`, "_blank", "noopener");
                     return;
                 }
                 if (eventId && eventId.toLowerCase() !== "null" && eventId.toLowerCase() !== "undefined") {
-                    await openEventDetailsById(eventId);
+                    window.open(`/analytics-admin/events/by-id/${encodeURIComponent(eventId)}`, "_blank", "noopener");
                     return;
                 }
                 showEventModalError("У этого события отсутствуют идентификаторы, открыть детали невозможно.");
@@ -2584,6 +2670,66 @@
                 event.preventDefault();
                 await copyRawLogRow(copyRawButton);
             }
+        });
+        refs.eventDetailsBody?.addEventListener("click", async (event) => {
+            const tabButton = event.target.closest("[data-event-detail-tab-key]");
+            if (tabButton) {
+                rememberEventDetailsTab(tabButton.getAttribute("data-event-detail-tab-key"));
+                window.setTimeout(() => scheduleTimelineSegmentLabelRefresh(refs.eventDetailsBody), 0);
+            }
+            const copyButton = event.target.closest("[data-event-copy-value]");
+            if (copyButton) {
+                event.preventDefault();
+                await copyEventDetailsValue(copyButton);
+                return;
+            }
+            const sortButton = event.target.closest("[data-event-sort-key]");
+            if (sortButton) {
+                event.preventDefault();
+                sortEventDetailsTable(sortButton);
+                return;
+            }
+            const rawToggleButton = event.target.closest(".analytics-log-raw-toggle");
+            if (rawToggleButton) {
+                event.preventDefault();
+                toggleRawLogRow(rawToggleButton);
+                return;
+            }
+            const messageToggleButton = event.target.closest(".analytics-log-message-toggle");
+            if (messageToggleButton) {
+                event.preventDefault();
+                toggleMessageCell(messageToggleButton);
+                return;
+            }
+            const copyRawButton = event.target.closest(".analytics-log-copy-raw");
+            if (copyRawButton) {
+                event.preventDefault();
+                await copyRawLogRow(copyRawButton);
+            }
+        });
+        refs.eventDetailsBody?.addEventListener("input", (event) => {
+            const attributeSearch = event.target.closest("[data-event-attribute-search]");
+            if (attributeSearch) {
+                filterEventAttributeCards(attributeSearch);
+                return;
+            }
+            const logSearch = event.target.closest("[data-event-log-search]");
+            if (logSearch) {
+                filterEventLogRows(logSearch);
+            }
+        });
+        refs.eventDetailsBody?.addEventListener("pointerover", handleTimelineTooltipPointer);
+        refs.eventDetailsBody?.addEventListener("pointermove", handleTimelineTooltipPointer);
+        refs.eventDetailsBody?.addEventListener("pointerout", (event) => {
+            const segment = event.target.closest("[data-timeline-tooltip]");
+            if (!segment) {
+                return;
+            }
+            const next = event.relatedTarget;
+            if (next && segment.contains(next)) {
+                return;
+            }
+            hideTimelineTooltip();
         });
         refs.eventModalEl?.addEventListener("hidden.bs.modal", () => {
             state.eventDetailsRequestId += 1;
@@ -2636,6 +2782,11 @@
             await submitMainFilters();
         });
 
+        refs.eventType?.addEventListener("change", () => {
+            state.globalEventCodes = [];
+            clearGlobalEventSetOption();
+        });
+
         [refs.eventType, refs.from, refs.to, refs.analyticsRequestPath].forEach((control) => {
             control?.addEventListener("change", () => {
                 void submitMainFilters();
@@ -2648,6 +2799,16 @@
                 : submitMainFilters());
         });
         refs.analyticsRequestPath?.addEventListener("input", debouncedMainFilters);
+
+        document.querySelectorAll("[data-stage-duration-mode]").forEach((input) => {
+            input.addEventListener("change", () => {
+                if (!input.checked) {
+                    return;
+                }
+                state.stageDurationMode = input.value === "self" ? "self" : "inclusive";
+                renderStageDurationBreakdown();
+            });
+        });
 
         [refs.stageMetricStageType].forEach((control) => {
             control?.addEventListener("change", () => {
@@ -2811,6 +2972,7 @@
             refs.eventsEventTypeToggle
         );
         refs.eventsEventTypeAll?.addEventListener("change", () => {
+            markEventsLocalDirty();
             if (refs.eventsEventTypeAll.checked) {
                 Array.from(refs.eventsEventType?.options || []).forEach((option) => {
                     option.selected = false;
@@ -2824,6 +2986,7 @@
         [refs.eventsIsError, refs.eventsErrorClass, refs.eventsEventType, refs.eventsMetricType, refs.eventsAttributeCode]
             .forEach((control) => {
                 control?.addEventListener("change", () => {
+                    markEventsLocalDirty();
                     if (control === refs.eventsEventType) {
                         if (refs.eventsEventTypeAll) {
                             refs.eventsEventTypeAll.checked = selectedRawEventTypeCodes().length === 0;
@@ -2838,12 +3001,14 @@
         [refs.eventsMetricMin, refs.eventsMetricMax, refs.eventsMinDuration, refs.eventsRequestPath, refs.eventsAttributeValue]
             .forEach((control) => {
                 control?.addEventListener("change", () => {
+                    markEventsLocalDirty();
                     state.eventsForcedEventCodes = null;
                     void submitEventsFilters();
                 });
-                control?.addEventListener("input", debouncedEventsFilters);
                 control?.addEventListener("input", () => {
+                    markEventsLocalDirty();
                     state.eventsForcedEventCodes = null;
+                    debouncedEventsFilters();
                 });
             });
         const debouncedEventsRangeFilters = debounce(() => {
@@ -2851,10 +3016,12 @@
         }, 260);
         [refs.eventsFrom, refs.eventsTo].forEach((control) => {
             control?.addEventListener("change", () => {
+                markEventsLocalDirty();
                 syncEventsQuickRangeFromInputs();
                 debouncedEventsRangeFilters();
             });
             control?.addEventListener("input", () => {
+                markEventsLocalDirty();
                 syncEventsQuickRangeFromInputs();
                 debouncedEventsRangeFilters();
             });
@@ -3472,11 +3639,26 @@
     }
 
     async function initDashboard() {
+        let initialDashboardLoaders = null;
         try {
             clearDashboardDataStatus();
             ensureKpiMiniWrap(document.getElementById("chart-event-kpi"));
             initChartExpandUi();
             initHelpUi();
+            initialDashboardLoaders = showDashboardReloadLoadersForCurrentTab();
+            if (state.currentDashboardTab === "raw" || state.currentDashboardTab === "system") {
+                showEventsLoadingState(true, "", {
+                    initialMessage: state.currentDashboardTab === "system"
+                        ? "Загружаем служебные события..."
+                        : "Загружаем журнал событий...",
+                    slowMessage: state.currentDashboardTab === "system"
+                        ? "Загружаем служебные события..."
+                        : "Загружаем журнал событий...",
+                    verySlowMessage: state.currentDashboardTab === "system"
+                        ? "Служебные события загружаются дольше обычного..."
+                        : "Журнал загружается дольше обычного..."
+                });
+            }
             await ensureAllTimeRangeLoaded();
             syncStageMetricRangesFromMain(true);
             syncStageTextQuickRangeFromMain();
@@ -3495,20 +3677,15 @@
                 syncUniversalCompareFromGlobalFilter();
             }
             syncGlobalCompareControlsVisibility();
-            try {
-                await loadDictionaries();
-            } catch (error) {
-                console.error("Dictionaries bootstrap failed, continue with fallback", error);
-            }
-            try {
-                await refreshEventTypeOptionsByScope();
-            } catch (error) {
-                console.error("Event-type options bootstrap failed, continue", error);
-            }
+            const dictionariesBootstrap = loadDictionaries()
+                .catch((error) => console.error("Dictionaries bootstrap failed, continue with fallback", error));
+            const eventTypeOptionsBootstrap = refreshEventTypeOptionsByScope()
+                .catch((error) => console.error("Event-type options bootstrap failed, continue", error));
             if (state.currentDashboardTab === "system") {
                 await syncSystemChartFiltersFromMain({force: true, refreshOptions: true});
             }
-            await reloadAll();
+            await reloadAll({dashboardLoaders: initialDashboardLoaders});
+            void Promise.allSettled([dictionariesBootstrap, eventTypeOptionsBootstrap]);
             await restoreExpandedFocusedChartSnapshotIfNeeded();
             applyUniversalChartZoom("chart-universal-timeline", refs.universalTimelineZoomX?.value, refs.universalTimelineZoomY?.value);
             applyUniversalChartZoom("chart-universal-stages", refs.universalStagesZoomX?.value, refs.universalStagesZoomY?.value);
@@ -3516,6 +3693,8 @@
         } catch (error) {
             showDashboardDataStatus(error instanceof Error ? error.message : "Не удалось загрузить аналитические данные.", true);
             console.error("Analytics bootstrap failed", error);
+        } finally {
+            hideDashboardReloadLoaders(initialDashboardLoaders);
         }
     }
 
@@ -3871,8 +4050,19 @@
             ? normalizedTab
             : "overview";
         const previousSystemOnly = state.eventsSystemOnly;
+        const previousTab = state.currentDashboardTab || "overview";
         state.currentDashboardTab = normalized;
         state.eventsSystemOnly = normalized === "system";
+        const screenGeneration = nextAnalyticsScreenGeneration(normalized);
+        abortOffscreenAnalyticsRequests(normalized, previousTab);
+        logAnalyticsNavigation("tab-change", {
+            from: previousTab,
+            to: normalized,
+            shouldPushState: !!shouldPushState,
+            previousSystemOnly,
+            systemOnly: state.eventsSystemOnly,
+            screenGeneration
+        });
 
         refs.analyticsOverviewSections?.forEach((section) => {
             section.hidden = normalized !== "overview";
@@ -3911,26 +4101,39 @@
             button.classList.toggle("active", tab.toLowerCase() === normalized);
         });
         syncEventsPanelMode();
-        if (previousSystemOnly !== state.eventsSystemOnly) {
+        const suppressEventsScopeRefresh = state.suppressEventsScopeRefreshOnNextTabSwitch === true;
+        state.suppressEventsScopeRefreshOnNextTabSwitch = false;
+        const eventsScopeRefreshStarted = !suppressEventsScopeRefresh && previousSystemOnly !== state.eventsSystemOnly;
+        if (eventsScopeRefreshStarted) {
             void refreshEventsScopeForMode();
-        } else if (normalized === "system") {
+        } else if (!suppressEventsScopeRefresh && normalized === "system") {
             void loadSystemEventsChart();
         }
         if (shouldPushState) {
             if (normalized === "overview") {
                 void reloadActiveDashboardTab(nextMainReloadRequestId())
                     .then(() => restoreExpandedFocusedChartSnapshotIfNeeded())
-                    .catch((error) => console.error("Overview tab lazy load failed", error));
+                    .catch((error) => {
+                        if (!isAbortError(error)) {
+                            console.error("Overview tab lazy load failed", error);
+                        }
+                    });
             } else if (normalized === "universal") {
                 void withUniversalChartLoaders(() => loadUniversal())
                     .catch((error) => console.error("Diagnostics tab lazy load failed", error));
             } else if (normalized === "metrics") {
                 void withStageMetricLoaders("all", () => loadStageMetrics())
                     .catch((error) => console.error("Metrics tab lazy load failed", error));
-            } else if (normalized === "raw") {
+            } else if (normalized === "raw" && !eventsScopeRefreshStarted) {
                 state.eventsPage = 0;
+                showEventsLoadingState(true, "", {
+                    initialMessage: "Загружаем журнал событий...",
+                    slowMessage: "Загружаем журнал событий...",
+                    verySlowMessage: "Журнал загружается дольше обычного..."
+                });
                 void refreshRawEventTypeOptionsForMode(selectedRawEventTypeCodes())
-                    .then(() => loadEvents(true))
+                    .catch((error) => console.error("Events tab options refresh failed", error));
+                void loadEvents(true)
                     .catch((error) => console.error("Events tab lazy load failed", error));
             } else if (normalized === "compare") {
                 void loadCompare()
@@ -3941,6 +4144,10 @@
         if (!shouldPushState) {
             return;
         }
+        replaceAnalyticsTabUrl(normalized);
+    }
+
+    function replaceAnalyticsTabUrl(normalized) {
         const url = new URL(window.location.href);
         if (normalized === "overview") {
             url.searchParams.delete("tab");
@@ -3978,9 +4185,30 @@
 
     async function refreshEventsScopeForMode() {
         try {
+            logAnalyticsNavigation("events-scope-refresh-start", {
+                tab: state.currentDashboardTab,
+                systemOnly: !!state.eventsSystemOnly
+            });
             syncEventsRangeFromMain(true);
-            await refreshScopedOptionsSafe();
-            await refreshRawEventTypeOptionsForMode(selectedRawEventTypeCodes(), {useMainRange: true});
+            showEventsLoadingState(true, "", {
+                initialMessage: state.eventsSystemOnly
+                    ? "Загружаем служебные события..."
+                    : "Загружаем журнал событий...",
+                slowMessage: state.eventsSystemOnly
+                    ? "Загружаем служебные события..."
+                    : "Загружаем журнал событий...",
+                verySlowMessage: state.eventsSystemOnly
+                    ? "Служебные события загружаются дольше обычного..."
+                    : "Журнал загружается дольше обычного..."
+            });
+            const scopedOptionsTask = state.eventsSystemOnly
+                ? Promise.resolve()
+                : refreshScopedOptionsSafe()
+                    .catch((error) => console.error("Events scoped options refresh failed", error));
+            const rawEventOptionsTask = state.eventsSystemOnly
+                ? Promise.resolve()
+                : refreshRawEventTypeOptionsForMode(selectedRawEventTypeCodes(), {useMainRange: true})
+                    .catch((error) => console.error("Events raw options refresh failed", error));
             state.eventsPage = 0;
             const tasks = [loadEvents(true)];
             if (state.eventsSystemOnly) {
@@ -3988,13 +4216,25 @@
                 tasks.push(loadSystemEventsChart());
             }
             await Promise.all(tasks);
+            void Promise.allSettled([scopedOptionsTask, rawEventOptionsTask]);
+            logAnalyticsNavigation("events-scope-refresh-end", {
+                tab: state.currentDashboardTab,
+                systemOnly: !!state.eventsSystemOnly
+            });
         } catch (error) {
+            logAnalyticsNavigation("events-scope-refresh-error", {
+                tab: state.currentDashboardTab,
+                systemOnly: !!state.eventsSystemOnly,
+                error: error instanceof Error ? error.message : String(error)
+            });
             console.error("Events scope refresh failed", error);
         }
     }
 
-    async function reloadAll() {
+    async function reloadAll(options = {}) {
         const mainReloadRequestId = nextMainReloadRequestId();
+        const ownDashboardLoaders = options?.dashboardLoaders ? null : showDashboardReloadLoadersForCurrentTab();
+        const dashboardLoaders = options?.dashboardLoaders || ownDashboardLoaders;
         setGlobalScreenLoading(true);
         try {
             ensureDashboardActiveIntervalChip();
@@ -4003,7 +4243,7 @@
             syncStageTextQuickRangeFromMain();
             syncStageTextRangesFromMain(true);
             syncEventsRangeFromMain(true);
-            await reloadActiveDashboardTab(mainReloadRequestId);
+            await reloadActiveDashboardTab(mainReloadRequestId, {dashboardLoaders});
             return;
             const criticalResults = await Promise.allSettled([
                 loadOverview(mainReloadRequestId),
@@ -4024,6 +4264,7 @@
             }
         } finally {
             setGlobalScreenLoading(false);
+            hideDashboardReloadLoaders(ownDashboardLoaders);
         }
 
         // Heavy secondary blocks are refreshed in background and must not block the screen loader.
@@ -4038,7 +4279,7 @@
         }
     }
 
-    async function reloadActiveDashboardTab(mainReloadRequestId) {
+    async function reloadActiveDashboardTab(mainReloadRequestId, options = {}) {
         const tab = state.currentDashboardTab || "overview";
         if (tab === "universal") {
             await withUniversalChartLoaders(() => loadUniversal(mainReloadRequestId));
@@ -4055,25 +4296,32 @@
         }
         if (tab === "system") {
             state.eventsPage = 0;
+            showEventsLoadingState(true, "", {
+                initialMessage: "Загружаем служебные события...",
+                slowMessage: "Загружаем служебные события...",
+                verySlowMessage: "Служебные события загружаются дольше обычного..."
+            });
+            const eventsTask = loadEvents(true);
             await syncSystemChartFiltersFromMain({refreshOptions: true});
-            await Promise.all([loadSystemEventsChart(), loadEvents(true)]);
+            await Promise.all([loadSystemEventsChart(), eventsTask]);
             return;
         }
         if (tab === "compare") {
             await loadCompare();
             return;
         }
+        const dashboardLoaders = options?.dashboardLoaders || {};
         const criticalResults = await Promise.allSettled([
-            loadOverview(mainReloadRequestId),
-            loadStages(mainReloadRequestId)
+            loadOverview(mainReloadRequestId, {loaderToken: dashboardLoaders.overview}),
+            loadStages(mainReloadRequestId, {loaderToken: dashboardLoaders.stages})
         ]);
         criticalResults.forEach((result, index) => {
-            if (result.status === "rejected") {
+            if (result.status === "rejected" && !isAbortError(result.reason)) {
                 const label = index === 0 ? "loadOverview" : "loadStages";
                 console.error(`${label} failed`, result.reason);
             }
         });
-        const firstRejected = criticalResults.find((result) => result.status === "rejected");
+        const firstRejected = criticalResults.find((result) => result.status === "rejected" && !isAbortError(result.reason));
         if (firstRejected && firstRejected.reason) {
             throw firstRejected.reason;
         }
@@ -5933,7 +6181,10 @@
 
     function universalCoveragePercent(count, problemEventCount) {
         const total = toNumber(problemEventCount);
-        return total > 0 ? (toNumber(count) / total) * 100 : 0;
+        if (total <= 0) {
+            return 0;
+        }
+        return Math.min(100, Math.max(0, (toNumber(count) / total) * 100));
     }
 
     function renderUniversalRootCauseFactorLine(factor, options = {}) {
@@ -6276,7 +6527,7 @@
                 .join(" ");
             const message = String(row?.errorMessage || row?.errorKey || "Неизвестная ошибка");
             const shortLabel = universalErrorShortLabel(row);
-            const coverage = universalCoveragePercent(row?.count, problemEventCount);
+            const coverage = universalCoveragePercent(row?.eventCount ?? row?.count, problemEventCount);
             return `
                 <tr class="${rowClass}" data-universal-error-row="${escapeHtml(errorKey)}" data-universal-error-system="${systemEvent ? "true" : "false"}">
                     <td><div class="analytics-universal-error-name" title="${escapeHtml(message)}">${escapeHtml(shortLabel)}</div></td>
@@ -7403,6 +7654,8 @@
     }
 
     async function loadUniversal(loadOptions) {
+        const requestScreen = "universal";
+        const requestScreenGeneration = currentAnalyticsScreenGeneration(requestScreen);
         const totalStarted = performance.now();
         const options = (loadOptions && typeof loadOptions === "object")
             ? loadOptions
@@ -7495,7 +7748,8 @@
                 void eventScopePromise.then((eventScopePayload) => {
                     if (!eventScopePayload
                         || isStaleUniversalRequest(universalRequestId)
-                        || isStaleMainReloadRequest(mainReloadRequestId)) {
+                        || isStaleMainReloadRequest(mainReloadRequestId)
+                        || !isCurrentAnalyticsScreenRequest(requestScreen, requestScreenGeneration)) {
                         return;
                     }
                     rememberUniversalEventScope(eventsScopeKey, eventScopePayload);
@@ -7515,7 +7769,17 @@
             universalEventsScope = universal;
         }
         const fetchTotalMs = Math.round(performance.now() - fetchStarted);
-        if (isStaleUniversalRequest(universalRequestId) || isStaleMainReloadRequest(mainReloadRequestId)) {
+        if (isStaleUniversalRequest(universalRequestId)
+            || isStaleMainReloadRequest(mainReloadRequestId)
+            || !isCurrentAnalyticsScreenRequest(requestScreen, requestScreenGeneration)) {
+            logAnalyticsNavigation("universal-stale-response", {
+                universalRequestId,
+                requestScreen,
+                requestScreenGeneration,
+                activeScreen: activeAnalyticsScreen(),
+                activeScreenGeneration: currentAnalyticsScreenGeneration(requestScreen),
+                appliedToUi: false
+            });
             return;
         }
         const currentExpectedParamsKey = [universalParams(false, {includeEventStageBreakdown}).toString(), universalStageScopeKey()].filter(Boolean).join("&");
@@ -8512,11 +8776,13 @@
         if (Array.isArray(drilldownCodes) && drilldownCodes.length > 0) {
             return new Set(drilldownCodes);
         }
-        return new Set(
-            Array.from(refs.universalEventTypeList?.selectedOptions || [])
-                .map((item) => String(item.value || "").trim())
-                .filter((value) => value.length > 0)
-        );
+        const selected = Array.from(refs.universalEventTypeList?.selectedOptions || [])
+            .map((item) => String(item.value || "").trim())
+            .filter((value) => value.length > 0);
+        if (selected.length > 0) {
+            return new Set(selected);
+        }
+        return new Set(selectedGlobalEventCodes());
     }
 
     function selectedUniversalStageCodes() {
@@ -9219,10 +9485,19 @@
         };
     }
 
-    async function loadOverview(mainReloadRequestId) {
+    async function loadOverview(mainReloadRequestId, options = {}) {
+        const requestScreen = "overview";
+        const requestScreenGeneration = currentAnalyticsScreenGeneration(requestScreen);
         const eventKpiMiniLoadId = Number(state.eventKpiMiniLoadId || 0) + 1;
         state.eventKpiMiniLoadId = eventKpiMiniLoadId;
         beginEventKpiMiniRenderPass(eventKpiMiniLoadId);
+        logAnalyticsNavigation("render-start", {
+            group: "overview",
+            requestScreen,
+            requestScreenGeneration
+        });
+        const externalOverviewLoaderToken = options?.loaderToken || null;
+        const overviewLoaderToken = externalOverviewLoaderToken || showOverviewLoaders();
         try {
         const params = mainParams();
         const needInlineCompareEventsCount = !!state.inlineCompareEnabled["chart-events-count"];
@@ -9230,7 +9505,8 @@
         const needInlineCompareError = !!state.inlineCompareEnabled["chart-error-rate"];
         const miniKpiCompareMode = resolveMiniKpiCompareMode("chart-event-kpi");
         const needInlineCompareEventKpi = miniKpiCompareMode !== "off";
-        const requests = [fetchJson(`${api("/overview")}?${params.toString()}`)];
+        const overviewFetchOptions = mainReloadFetchOptions("overview");
+        const requests = [fetchJson(`${api("/overview")}?${params.toString()}`, overviewFetchOptions)];
         const baselineRequests = new Map();
         const targetRequests = new Map();
         const compareKeysByCanvas = new Map();
@@ -9244,7 +9520,7 @@
             if (!baselineRequests.has(beforeKey)) {
                 baselineRequests.set(
                     beforeKey,
-                    fetchJson(`${api("/overview")}?${beforeParams.toString()}`)
+                    fetchJson(`${api("/overview")}?${beforeParams.toString()}`, overviewFetchOptions)
                 );
             }
             const afterKey = `overview-after:${rangeKey}`;
@@ -9252,7 +9528,7 @@
             if (!targetRequests.has(afterKey)) {
                 targetRequests.set(
                     afterKey,
-                    fetchJson(`${api("/overview")}?${afterParams.toString()}`)
+                    fetchJson(`${api("/overview")}?${afterParams.toString()}`, overviewFetchOptions)
                 );
             }
             compareKeysByCanvas.set(canvasId, {beforeKey, afterKey});
@@ -9286,7 +9562,16 @@
                 targetDataByKey.set(entry[0], values[index]);
             });
         }
-        if (isStaleMainReloadRequest(mainReloadRequestId)) {
+        if (isStaleMainReloadRequest(mainReloadRequestId)
+            || !isCurrentAnalyticsScreenRequest(requestScreen, requestScreenGeneration)) {
+            logAnalyticsNavigation("render-skip-stale", {
+                group: "overview",
+                requestScreen,
+                requestScreenGeneration,
+                activeScreen: activeAnalyticsScreen(),
+                activeScreenGeneration: currentAnalyticsScreenGeneration(requestScreen),
+                appliedToUi: false
+            });
             completeEventKpiMiniRenderPass(eventKpiMiniLoadId);
             return;
         }
@@ -9349,7 +9634,7 @@
                 }]
             },
             options: baseChartOptions("Количество"),
-            __analyticsTimePoints: sampledEvents.indexes.map((index) => eventTimePoints[index]).filter(Boolean),
+            __analyticsTimePoints: sampledEvents.indexes.map((index) => eventTimePoints[index]),
             __analyticsEffectiveBucketMinutes: eventsCountData?.bucketMinutes || ""
         });
         if (needInlineCompareEventsCount) {
@@ -9408,7 +9693,7 @@
                 ]
             },
             options: baseChartOptions("ms"),
-            __analyticsTimePoints: sampledLatency.indexes.map((index) => latencyTimePoints[index]).filter(Boolean),
+            __analyticsTimePoints: sampledLatency.indexes.map((index) => latencyTimePoints[index]),
             __analyticsEffectiveBucketMinutes: latencyData?.bucketMinutes || ""
         });
         if (needInlineCompareLatency) {
@@ -9452,7 +9737,7 @@
                 }]
             },
             options: barChartOptions("%"),
-            __analyticsTimePoints: sampledError.indexes.map((index) => errorTimePoints[index]).filter(Boolean),
+            __analyticsTimePoints: sampledError.indexes.map((index) => errorTimePoints[index]),
             __analyticsEffectiveBucketMinutes: errorData?.bucketMinutes || ""
         });
         if (needInlineCompareError) {
@@ -9506,10 +9791,20 @@
         if (!state.eventKpiFirstLoadCompleted) {
             await waitForChartPaint(1);
         }
+        logAnalyticsNavigation("render-end", {
+            group: "overview",
+            requestScreen,
+            requestScreenGeneration,
+            appliedToUi: true
+        });
         completeEventKpiMiniRenderPass(eventKpiMiniLoadId);
         } catch (error) {
             completeEventKpiMiniRenderPass(eventKpiMiniLoadId);
             throw error;
+        } finally {
+            if (!externalOverviewLoaderToken) {
+                hideOverviewLoaders(overviewLoaderToken);
+            }
         }
     }
 
@@ -9538,8 +9833,106 @@
         }
     }
 
-    async function loadStages(mainReloadRequestId) {
+    function renderStageDurationBreakdown(context = state.stageDurationRenderContext) {
+        if (!context) {
+            return;
+        }
+        const selfMode = state.stageDurationMode === "self";
+        const avgKey = selfMode ? "avgSelfMs" : "avgMs";
+        const p95Key = selfMode ? "p95SelfMs" : "p95Ms";
+        const p99Key = selfMode ? "p99SelfMs" : "p99Ms";
+        const modeLabel = selfMode ? "собственное время слоя" : "с учётом вложенных этапов";
+        const value = (row, key, inclusiveKey) => {
+            const candidate = row?.[key];
+            return candidate === null || candidate === undefined ? (row?.[inclusiveKey] || 0) : candidate;
+        };
+
+        const description = document.querySelector("[data-stage-duration-description]");
+        if (description) {
+            description.textContent = selfMode
+                ? "Собственное время слоя без вложенных вызовов"
+                : "Полное время слоя с учётом вложенных этапов";
+        }
+        document.querySelectorAll("[data-stage-duration-column]").forEach((header) => {
+            const metric = header.getAttribute("data-stage-duration-column") || "";
+            const prefix = metric === "avg" ? "AVG" : metric.toUpperCase();
+            header.textContent = `${prefix}, ${selfMode ? "собственное" : "полное"}`;
+        });
+
+        const rows = context.tableData?.stages || [];
+        refs.stageTableBody.innerHTML = rows.map((row) => `
+            <tr>
+                <td>${escapeHtml(row.stageTypeName || row.stageTypeCode || "-")}</td>
+                <td class="text-end">${formatInt(row.count || 0)}</td>
+                <td class="text-end">${formatMs(value(row, avgKey, "avgMs"))}</td>
+                <td class="text-end">${formatMs(value(row, p95Key, "p95Ms"))}</td>
+                <td class="text-end">${formatMs(value(row, p99Key, "p99Ms"))}</td>
+                <td class="text-end">${formatPercent(row.errorRate)}</td>
+            </tr>
+        `).join("");
+
+        const stageLatencyRows = context.chartData?.stages || [];
+        upsertChart("chart-stage-latency", {
+            type: "bar",
+            data: {
+                labels: stageLatencyRows.map((row) => row.stageTypeName || row.stageTypeCode),
+                datasets: [
+                    {
+                        label: `AVG, ${modeLabel}, мс`,
+                        data: stageLatencyRows.map((row) => value(row, avgKey, "avgMs")),
+                        backgroundColor: "rgba(15,118,110,0.72)",
+                        borderRadius: 8
+                    },
+                    {
+                        label: `P95, ${modeLabel}, мс`,
+                        data: stageLatencyRows.map((row) => value(row, p95Key, "p95Ms")),
+                        backgroundColor: "rgba(124,58,237,0.72)",
+                        borderRadius: 8
+                    }
+                ]
+            },
+            options: barChartOptions("мс")
+        });
+
+        if (context.compareEnabled) {
+            const baselineRows = context.baselineData?.stages || [];
+            upsertChart(context.compareCanvasId || "chart-stage-latency-compare-inline", {
+                type: "bar",
+                data: {
+                    labels: baselineRows.map((row) => row.stageTypeName || row.stageTypeCode),
+                    datasets: [
+                        {
+                            label: `AVG (До), ${modeLabel}, мс`,
+                            data: baselineRows.map((row) => value(row, avgKey, "avgMs")),
+                            backgroundColor: "rgba(15,118,110,0.52)",
+                            borderRadius: 8
+                        },
+                        {
+                            label: `P95 (До), ${modeLabel}, мс`,
+                            data: baselineRows.map((row) => value(row, p95Key, "p95Ms")),
+                            backgroundColor: "rgba(124,58,237,0.52)",
+                            borderRadius: 8
+                        }
+                    ]
+                },
+                options: barChartOptions("мс")
+            });
+        }
+    }
+
+    async function loadStages(mainReloadRequestId, options = {}) {
+        const requestScreen = "overview";
+        const requestScreenGeneration = currentAnalyticsScreenGeneration(requestScreen);
+        logAnalyticsNavigation("render-start", {
+            group: "stages",
+            requestScreen,
+            requestScreenGeneration
+        });
+        const externalStageOverviewLoaderToken = options?.loaderToken || null;
+        const stageOverviewLoaderToken = externalStageOverviewLoaderToken || showStageOverviewLoaders();
+        try {
         const params = mainParams();
+        const stagesFetchOptions = mainReloadFetchOptions("stages");
         const needInlineCompareStageLatency = !!state.inlineCompareEnabled["chart-stage-latency"];
         const needInlineCompareStageErrors = !!state.inlineCompareEnabled["chart-stage-errors"];
         const baselineRequests = new Map();
@@ -9552,14 +9945,14 @@
             if (!baselineRequests.has(beforeKey)) {
                 baselineRequests.set(
                     beforeKey,
-                    fetchJson(`${api("/stages")}?${buildScopedParamsByLocalRange(ranges.beforeFrom, ranges.beforeTo).toString()}`)
+                    fetchJson(`${api("/stages")}?${buildScopedParamsByLocalRange(ranges.beforeFrom, ranges.beforeTo).toString()}`, stagesFetchOptions)
                 );
             }
             const afterKey = `stages-after:${rangeKey}`;
             if (!targetRequests.has(afterKey)) {
                 targetRequests.set(
                     afterKey,
-                    fetchJson(`${api("/stages")}?${buildScopedParamsByLocalRange(ranges.afterFrom, ranges.afterTo).toString()}`)
+                    fetchJson(`${api("/stages")}?${buildScopedParamsByLocalRange(ranges.afterFrom, ranges.afterTo).toString()}`, stagesFetchOptions)
                 );
             }
             compareKeysByCanvas.set(canvasId, {beforeKey, afterKey});
@@ -9570,7 +9963,7 @@
         if (needInlineCompareStageErrors) {
             ensureStagesPairRequests("chart-stage-errors");
         }
-        const data = await fetchJson(`${api("/stages")}?${params.toString()}`);
+        const data = await fetchJson(`${api("/stages")}?${params.toString()}`, stagesFetchOptions);
         const baselineDataByKey = new Map();
         const targetDataByKey = new Map();
         if (baselineRequests.size > 0) {
@@ -9587,7 +9980,16 @@
                 targetDataByKey.set(entry[0], values[index]);
             });
         }
-        if (isStaleMainReloadRequest(mainReloadRequestId)) {
+        if (isStaleMainReloadRequest(mainReloadRequestId)
+            || !isCurrentAnalyticsScreenRequest(requestScreen, requestScreenGeneration)) {
+            logAnalyticsNavigation("render-skip-stale", {
+                group: "stages",
+                requestScreen,
+                requestScreenGeneration,
+                activeScreen: activeAnalyticsScreen(),
+                activeScreenGeneration: currentAnalyticsScreenGeneration(requestScreen),
+                appliedToUi: false
+            });
             return;
         }
 
@@ -9595,72 +9997,21 @@
         const stageErrorsKeys = compareKeysByCanvas.get("chart-stage-errors");
         const stageLatencyData = needInlineCompareStageLatency ? (targetDataByKey.get(stageLatencyKeys?.afterKey || "") || data) : data;
         const stageErrorsData = needInlineCompareStageErrors ? (targetDataByKey.get(stageErrorsKeys?.afterKey || "") || data) : data;
-        const rows = data.stages || [];
-        refs.stageTableBody.innerHTML = rows.map((row) => `
-            <tr>
-                <td>${escapeHtml(row.stageTypeName || row.stageTypeCode || "-")}</td>
-                <td class="text-end">${formatInt(row.count || 0)}</td>
-                <td class="text-end">${formatMs(row.avgMs)}</td>
-                <td class="text-end">${formatMs(row.p95Ms)}</td>
-                <td class="text-end">${formatMs(row.p99Ms)}</td>
-                <td class="text-end">${formatPercent(row.errorRate)}</td>
-            </tr>
-        `).join("");
+        const stageLatencyBaselineData = needInlineCompareStageLatency
+            ? baselineDataByKey.get(stageLatencyKeys?.beforeKey || "")
+            : null;
+        state.stageDurationRenderContext = {
+            tableData: data,
+            chartData: stageLatencyData,
+            compareEnabled: needInlineCompareStageLatency,
+            baselineData: stageLatencyBaselineData,
+            compareCanvasId: state.inlineCompareCanvasBySource["chart-stage-latency"] || "chart-stage-latency-compare-inline"
+        };
+        renderStageDurationBreakdown();
 
-        const stageLatencyRows = stageLatencyData.stages || [];
         const stageErrorsRows = stageErrorsData.stages || [];
-        const stageLabels = stageLatencyRows.map((row) => row.stageTypeName || row.stageTypeCode);
-        const stageP95 = stageLatencyRows.map((row) => row.p95Ms || 0);
-        const stageAvg = stageLatencyRows.map((row) => row.avgMs || 0);
+        const stageLabels = stageErrorsRows.map((row) => row.stageTypeName || row.stageTypeCode);
         const stageErrors = stageErrorsRows.map((row) => toPercentNumber(row.errorRate));
-
-        upsertChart("chart-stage-latency", {
-            type: "bar",
-            data: {
-                labels: stageLabels,
-                datasets: [
-                    {
-                        label: "AVG, ms",
-                        data: stageAvg,
-                        backgroundColor: "rgba(15,118,110,0.72)",
-                        borderRadius: 8
-                    },
-                    {
-                        label: "P95, ms",
-                        data: stageP95,
-                        backgroundColor: "rgba(124,58,237,0.72)",
-                        borderRadius: 8
-                    }
-                ]
-            },
-            options: barChartOptions("ms")
-        });
-        if (needInlineCompareStageLatency) {
-            const baselineData = baselineDataByKey.get(stageLatencyKeys?.beforeKey || "");
-            const baselineRows = baselineData?.stages || [];
-            const compareCanvasId = state.inlineCompareCanvasBySource["chart-stage-latency"] || "chart-stage-latency-compare-inline";
-            upsertChart(compareCanvasId, {
-                type: "bar",
-                data: {
-                    labels: baselineRows.map((row) => row.stageTypeName || row.stageTypeCode),
-                    datasets: [
-                        {
-                            label: "AVG (До), ms",
-                            data: baselineRows.map((row) => row.avgMs || 0),
-                            backgroundColor: "rgba(15,118,110,0.52)",
-                            borderRadius: 8
-                        },
-                        {
-                            label: "P95 (До), ms",
-                            data: baselineRows.map((row) => row.p95Ms || 0),
-                            backgroundColor: "rgba(124,58,237,0.52)",
-                            borderRadius: 8
-                        }
-                    ]
-                },
-                options: barChartOptions("ms")
-            });
-        }
 
         upsertChart("chart-stage-errors", {
             type: "bar",
@@ -9693,9 +10044,16 @@
                 options: barChartOptions("%")
             });
         }
+        } finally {
+            if (!externalStageOverviewLoaderToken) {
+                hideStageOverviewLoaders(stageOverviewLoaderToken);
+            }
+        }
     }
 
     async function loadStageMetrics() {
+        const requestScreen = "metrics";
+        const requestScreenGeneration = currentAnalyticsScreenGeneration(requestScreen);
         beginStageMetricPerf(resolveStageMetricPerfAction());
         const requestId = (state.stageMetricsRequestId || 0) + 1;
         state.stageMetricsRequestId = requestId;
@@ -9734,8 +10092,17 @@
             finishStageMetricPerf({error: error instanceof Error ? error.message : String(error || "unknown")});
             throw error;
         }
-        if (isStaleStageMetricsRequest(requestId)) {
+        if (isStaleStageMetricsRequest(requestId)
+            || !isCurrentAnalyticsScreenRequest(requestScreen, requestScreenGeneration)) {
             finishStageMetricPerf({stale: true});
+            logAnalyticsNavigation("stage-metrics-stale-response", {
+                requestId,
+                requestScreen,
+                requestScreenGeneration,
+                activeScreen: activeAnalyticsScreen(),
+                activeScreenGeneration: currentAnalyticsScreenGeneration(requestScreen),
+                appliedToUi: false
+            });
             return;
         }
         const buildStarted = nowMs();
@@ -10689,10 +11056,7 @@
         if (moduleCode) {
             params.set("moduleCode", moduleCode);
         }
-        const eventType = refs.eventType.value?.trim();
-        if (eventType) {
-            params.set("eventTypeCode", eventType);
-        }
+        appendMainEventTypeParams(params, true);
         const globalPath = refs.analyticsRequestPath?.value?.trim();
         if (globalPath) {
             params.set("requestPath", globalPath);
@@ -11399,16 +11763,14 @@
     }
 
     function applyMainEventToSystemSelector() {
+        const selectedCodes = selectedGlobalEventCodes();
         const mainEventCode = refs.eventType?.value?.trim() || "";
-        const matchingOption = mainEventCode
-            ? Array.from(refs.systemChartEventsList?.options || [])
-                .find((option) => String(option.value || "").trim() === mainEventCode)
-            : null;
+        const selected = new Set(selectedCodes.length > 0 ? selectedCodes : (mainEventCode ? [mainEventCode] : []));
         Array.from(refs.systemChartEventsList?.options || []).forEach((option) => {
-            option.selected = !!matchingOption && option === matchingOption;
+            option.selected = selected.has(String(option.value || "").trim());
         });
         if (refs.systemChartEventsAll) {
-            refs.systemChartEventsAll.checked = !matchingOption;
+            refs.systemChartEventsAll.checked = selected.size === 0;
         }
         updateSystemChartEventsLabel();
         syncSystemChartMetricMode();
@@ -11519,6 +11881,11 @@
         if (state.currentDashboardTab !== "system") {
             return;
         }
+        showEventsLoadingState(true, "", {
+            initialMessage: "Загружаем служебные события...",
+            slowMessage: "Загружаем служебные события...",
+            verySlowMessage: "Служебные события загружаются дольше обычного..."
+        });
         if (options.refreshOptions) {
             await refreshSystemChartEventOptions();
         }
@@ -11700,7 +12067,7 @@
             ? singleEventRow.series
             : aggregateSeries;
         const labels = sourceSeries.map((point) => formatTime(point.time));
-        const timePoints = sourceSeries.map((point) => point?.time).filter(Boolean);
+        const timePoints = sourceSeries.map((point) => point?.time ?? null);
         const palette = ["#4f46e5", "#0f766e", "#b45309", "#b91c1c", "#1d4ed8", "#be185d", "#475569", "#0369a1"];
         const datasets = [];
         if (selectedCodes.length > 1) {
@@ -11779,6 +12146,8 @@
         if (!refs.systemChartForm || state.currentDashboardTab !== "system") {
             return;
         }
+        const requestScreen = "system";
+        const requestScreenGeneration = currentAnalyticsScreenGeneration(requestScreen);
         const range = systemChartRange();
         if (!range) {
             if (refs.systemChartStatus) {
@@ -11790,6 +12159,7 @@
         state.systemChartAbortController?.abort?.();
         const abortController = new AbortController();
         state.systemChartAbortController = abortController;
+        setChartActionLoading("chart-system-events", true);
         if (refs.systemChartStatus) {
             refs.systemChartStatus.textContent = "Загрузка...";
         }
@@ -11797,7 +12167,17 @@
             if (options.refreshOptions !== false) {
                 await refreshSystemChartEventOptions();
             }
-            if (requestId !== state.systemChartRequestId) {
+            if (requestId !== state.systemChartRequestId
+                || !isCurrentAnalyticsScreenRequest(requestScreen, requestScreenGeneration)) {
+                logAnalyticsNavigation("system-chart-stale-response", {
+                    requestId,
+                    activeRequestId: state.systemChartRequestId,
+                    requestScreen,
+                    requestScreenGeneration,
+                    activeScreen: activeAnalyticsScreen(),
+                    activeScreenGeneration: currentAnalyticsScreenGeneration(requestScreen),
+                    appliedToUi: false
+                });
                 return;
             }
             const params = systemChartParams(range.fromDate, range.toDate);
@@ -11810,7 +12190,17 @@
                 ? Promise.resolve(null)
                 : fetchJson(`${api("/universal")}?${systemChartParams(beforeFrom, beforeTo).toString()}`, {signal: abortController.signal});
             const [current, baseline] = await Promise.all([currentRequest, baselineRequest]);
-            if (requestId !== state.systemChartRequestId) {
+            if (requestId !== state.systemChartRequestId
+                || !isCurrentAnalyticsScreenRequest(requestScreen, requestScreenGeneration)) {
+                logAnalyticsNavigation("system-chart-stale-response", {
+                    requestId,
+                    activeRequestId: state.systemChartRequestId,
+                    requestScreen,
+                    requestScreenGeneration,
+                    activeScreen: activeAnalyticsScreen(),
+                    activeScreenGeneration: currentAnalyticsScreenGeneration(requestScreen),
+                    appliedToUi: false
+                });
                 return;
             }
             const currentConfig = buildSystemChartConfig(current);
@@ -11836,7 +12226,8 @@
             if (error?.name === "AbortError") {
                 return;
             }
-            if (requestId !== state.systemChartRequestId) {
+            if (requestId !== state.systemChartRequestId
+                || !isCurrentAnalyticsScreenRequest(requestScreen, requestScreenGeneration)) {
                 return;
             }
             if (refs.systemChartStatus) {
@@ -11846,7 +12237,10 @@
             }
             console.error("System events chart failed", error);
         } finally {
-            if (requestId === state.systemChartRequestId && state.systemChartAbortController === abortController) {
+            setChartActionLoading("chart-system-events", false);
+            if (requestId === state.systemChartRequestId
+                && isCurrentAnalyticsScreenRequest(requestScreen, requestScreenGeneration)
+                && state.systemChartAbortController === abortController) {
                 state.systemChartAbortController = null;
             }
         }
@@ -11914,7 +12308,7 @@
 
         let dragging = false;
         let startX = 0;
-        const localX = (event) => event.clientX - canvas.getBoundingClientRect().left;
+        const localX = (event) => pointerLocalXInElement(event, canvas);
         const updateOverlay = (leftX, rightX) => {
             const chart = state.charts["chart-system-events"];
             const area = chart?.chartArea;
@@ -11925,8 +12319,8 @@
             const maxX = Math.min(area.right, Math.max(leftX, rightX));
             const wrapRect = wrap.getBoundingClientRect();
             const canvasRect = canvas.getBoundingClientRect();
-            overlay.style.left = `${canvasRect.left - wrapRect.left + minX}px`;
-            overlay.style.top = `${canvasRect.top - wrapRect.top + area.top}px`;
+            overlay.style.left = `${rectDeltaToElementCssPx(canvasRect.left - wrapRect.left, wrap) + minX}px`;
+            overlay.style.top = `${rectDeltaToElementCssPx(canvasRect.top - wrapRect.top, wrap, "y") + area.top}px`;
             overlay.style.width = `${Math.max(0, maxX - minX)}px`;
             overlay.style.height = `${Math.max(0, area.bottom - area.top)}px`;
             overlay.classList.remove("d-none");
@@ -11974,18 +12368,23 @@
         if (!reset && state.eventsLoading) {
             return;
         }
+        logAnalyticsNavigation(reset ? "loadEvents-reset-start" : "loadEvents-next-page-start", {
+            tab: state.currentDashboardTab,
+            systemOnly: !!state.eventsSystemOnly,
+            page: reset ? 0 : state.eventsPage
+        });
         if (reset) {
             state.eventsPage = 0;
         }
         const requestId = ++state.eventsRequestId;
         const requestSystemOnly = !!state.eventsSystemOnly;
+        const requestScreen = screenForEventsMode(requestSystemOnly);
+        const requestScreenGeneration = currentAnalyticsScreenGeneration(requestScreen);
         state.eventsAbortController?.abort?.();
         const abortController = new AbortController();
         state.eventsAbortController = abortController;
         state.eventsLoading = true;
-        if (refs.eventsLoadMore) {
-            refs.eventsLoadMore.disabled = true;
-        }
+        setEventsLoadMoreVisible(false);
         const params = rangeParams();
         const eventsFromIso = toIso(requestSystemOnly ? refs.systemChartFrom?.value : refs.eventsFrom?.value);
         const eventsToIso = toIso(requestSystemOnly ? refs.systemChartTo?.value : refs.eventsTo?.value);
@@ -12011,11 +12410,14 @@
                 ? state.eventsForcedEventCodes.map((code) => String(code || "").trim()).filter(Boolean)
                 : [];
             const rawEventTypes = selectedRawEventTypeCodes();
+            const globalEventTypes = selectedGlobalEventCodes();
             const mainEventType = refs.eventType?.value?.trim();
             if (forcedEventCodes.length) {
                 forcedEventCodes.forEach((code) => params.append("eventTypeCode", code));
             } else if (rawEventTypes.length) {
                 rawEventTypes.forEach((code) => params.append("eventTypeCode", code));
+            } else if (globalEventTypes.length) {
+                globalEventTypes.forEach((code) => params.append("eventTypeCode", code));
             } else if (mainEventType) {
                 params.set("eventTypeCode", mainEventType);
             }
@@ -12081,15 +12483,42 @@
         if (sortDir) {
             params.set("sortDir", sortDir);
         }
+        const requestCacheKey = eventsRequestCacheKey(requestSystemOnly, params.toString());
+        showEventsLoadingState(reset, requestCacheKey);
+        logAnalyticsNavigation("loadEvents-request", {
+            tab: state.currentDashboardTab,
+            systemOnly: requestSystemOnly,
+            reset: !!reset,
+            requestId,
+            requestScreen,
+            requestScreenGeneration,
+            params: params.toString()
+        });
 
         try {
-            const data = await fetchJson(`${api("/events")}?${params.toString()}`, {signal: abortController.signal});
-            if (requestId !== state.eventsRequestId || requestSystemOnly !== !!state.eventsSystemOnly) {
+            const data = await fetchJson(`${api("/events")}?${params.toString()}`, {signal: abortController.signal, silent: true});
+            if (requestId !== state.eventsRequestId
+                || requestSystemOnly !== !!state.eventsSystemOnly
+                || !isCurrentAnalyticsScreenRequest(requestScreen, requestScreenGeneration)) {
+                logAnalyticsNavigation("loadEvents-stale-response", {
+                    requestId,
+                    activeRequestId: state.eventsRequestId,
+                    requestSystemOnly,
+                    currentSystemOnly: !!state.eventsSystemOnly,
+                    requestScreen,
+                    activeScreen: activeAnalyticsScreen(),
+                    requestScreenGeneration,
+                    activeScreenGeneration: currentAnalyticsScreenGeneration(requestScreen),
+                    isStale: true,
+                    appliedToUi: false
+                });
                 return;
             }
+            clearEventsLoadingTimers();
+            removeEventsLoadingRows();
             state.eventsHasMore = !!data.hasMore;
-            refs.eventsLoadMore.classList.toggle("d-none", !state.eventsHasMore);
 
+            const renderStarted = typeof performance !== "undefined" ? performance.now() : Date.now();
             const rowsHtml = (data.items || []).map((item) => {
                 const attrText = compactAttributes(item.attributes || {});
                 const statusClass = item.isError ? "analytics-badge-error" : "analytics-badge-success";
@@ -12118,31 +12547,52 @@
             }).join("");
 
             if (reset) {
-                refs.eventsTableBody.innerHTML = rowsHtml || eventsInfoRow("По выбранным фильтрам событий не найдено.", false);
+                refs.eventsTableBody.innerHTML = rowsHtml || eventsInfoRow("Событий за выбранный период нет.", false);
+                cacheEventsRows(requestCacheKey);
             } else if (rowsHtml) {
                 refs.eventsTableBody.insertAdjacentHTML("beforeend", rowsHtml);
             }
+            hideEventsRefreshStatus();
+            setEventsLoadMoreVisible(state.eventsHasMore);
+            showAnalyticsApiToast("Данные обновлены", false);
+            logAnalyticsNavigation("loadEvents-render-end", {
+                tab: state.currentDashboardTab,
+                systemOnly: requestSystemOnly,
+                reset: !!reset,
+                requestId,
+                rows: (data.items || []).length,
+                hasMore: !!data.hasMore,
+                renderMs: Math.round((typeof performance !== "undefined" ? performance.now() : Date.now()) - renderStarted),
+                isStale: false,
+                appliedToUi: true
+            });
         } catch (error) {
             if (error?.name === "AbortError") {
+                logAnalyticsNavigation("loadEvents-aborted", {requestId, systemOnly: requestSystemOnly});
                 return;
             }
-            if (requestId !== state.eventsRequestId || requestSystemOnly !== !!state.eventsSystemOnly) {
+            if (requestId !== state.eventsRequestId
+                || requestSystemOnly !== !!state.eventsSystemOnly
+                || !isCurrentAnalyticsScreenRequest(requestScreen, requestScreenGeneration)) {
                 return;
             }
+            clearEventsLoadingTimers();
+            hideEventsRefreshStatus();
+            removeEventsLoadingRows();
             console.error("Events load failed", error);
             state.eventsHasMore = false;
-            refs.eventsLoadMore.classList.add("d-none");
+            setEventsLoadMoreVisible(false);
             const detail = error instanceof Error ? error.message : "неизвестная ошибка";
             refs.eventsTableBody.innerHTML = eventsInfoRow(`Не удалось загрузить события: ${detail}`, true);
         } finally {
-            if (requestId === state.eventsRequestId) {
+            if (requestId === state.eventsRequestId
+                && isCurrentAnalyticsScreenRequest(requestScreen, requestScreenGeneration)) {
+                clearEventsLoadingTimers();
                 state.eventsLoading = false;
                 if (state.eventsAbortController === abortController) {
                     state.eventsAbortController = null;
                 }
-                if (refs.eventsLoadMore) {
-                    refs.eventsLoadMore.disabled = !state.eventsHasMore;
-                }
+                setEventsLoadMoreVisible(state.eventsHasMore);
             }
         }
     }
@@ -12181,172 +12631,1809 @@
         }
     }
 
-    function renderEventDetailsModal(data) {
+    async function initStandaloneEventDetailsPage() {
+        if (!refs.eventDetailsPage || !refs.eventDetailsBody) {
+            return;
+        }
+        const uid = String(refs.eventDetailsPage.dataset.eventUid || "").trim();
+        const id = String(refs.eventDetailsPage.dataset.eventId || "").trim();
+        refs.eventDetailsBody.innerHTML = `
+            <div class="d-flex align-items-center gap-2 py-4">
+                <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                <span class="small text-muted">Загрузка деталей события...</span>
+            </div>
+        `;
+        try {
+            const url = uid
+                ? `${api("/events")}/${encodeURIComponent(uid)}`
+                : `${api("/events/by-id")}/${encodeURIComponent(id)}`;
+            const data = await fetchJson(url);
+            if (refs.eventDetailsTitle) {
+                refs.eventDetailsTitle.textContent = "Разбор события";
+            }
+            document.title = `${data.eventTypeName || data.eventTypeCode || "Детали события"} · Analytics Admin`;
+            refs.eventDetailsBody.innerHTML = renderEventDetailsHtml(data);
+            scheduleTimelineSegmentLabelRefresh(refs.eventDetailsBody);
+        } catch (error) {
+            const detail = error instanceof Error ? error.message : "неизвестная ошибка";
+            refs.eventDetailsBody.innerHTML = `
+                <div class="alert alert-danger">
+                    Не удалось загрузить детали события: ${escapeHtml(detail)}
+                </div>
+            `;
+        }
+    }
+
+    function renderEventDetailsHtml(data) {
         const stages = buildLinearTimelineStages(data, data.stages || []);
         const traceLogs = data.traceLogs || [];
         const traceLogStatus = data.traceLogStatus || {};
         const uidSafe = String(data.eventUid || "event").replace(/[^a-zA-Z0-9_-]/g, "");
         const durationBreakdown = resolveEventDurationBreakdown(data, data.stages || []);
         const displayDurationMs = durationBreakdown.eventDurationMs;
-
-        const attrsHtml = (data.attributes || []).map((attr) => {
-            const code = String(attr.attributeTypeCode || "").trim().toUpperCase();
-            const hint = SYSTEM_ATTRIBUTE_HELP[code] || "";
-            const helpBadge = hint
-                ? `<span class="analytics-metric-help-badge" data-tooltip="${escapeHtml(hint)}" tabindex="0">?</span>`
-                : "";
-            return `
-                <tr>
-                    <td>
-                        <span class="analytics-metric-name-cell">
-                            ${escapeHtml(attr.attributeTypeName || attr.attributeTypeCode)}
-                            ${helpBadge}
-                        </span>
-                    </td>
-                    <td>${escapeHtml(attr.value || attr.valueJson || "-")}</td>
-                </tr>
-            `;
-        }).join("");
-
-        const stageSummaryMap = new Map();
-        for (const stage of stages) {
-            const key = stage.stageTypeCode || "UNKNOWN";
-            const name = stage.stageTypeName || stage.stageTypeCode || "Неизвестно";
-            const duration = Number(stage.durationMs || 0);
-            const current = stageSummaryMap.get(key) || {
-                key,
-                name,
-                count: 0,
-                totalDuration: 0,
-                maxDuration: 0,
-                errorCount: 0
-            };
-            current.count += 1;
-            current.totalDuration += duration;
-            if (duration > current.maxDuration) {
-                current.maxDuration = duration;
-            }
-            if (stage.isError) {
-                current.errorCount += 1;
-            }
-            stageSummaryMap.set(key, current);
-        }
-
-        const stageSummaryHtml = Array.from(stageSummaryMap.values())
-            .sort((a, b) => b.totalDuration - a.totalDuration)
-            .map((item) => `
-                <tr>
-                    <td>${escapeHtml(item.name)}</td>
-                    <td class="text-end">${formatInt(item.count)}</td>
-                    <td class="text-end">${formatInt(item.totalDuration)} ms</td>
-                    <td class="text-end">${formatInt(item.maxDuration)} ms</td>
-                    <td class="text-end ${item.errorCount > 0 ? "text-danger" : "text-muted"}">${formatInt(item.errorCount)}</td>
-                </tr>
-            `).join("");
-
-        const durationBreakdownHtml = renderEventDurationBreakdownReadable(durationBreakdown, data.stages || []);
-        const stageGroups = buildStageGroups(stages);
-        const stagesHtml = stageGroups.map((group, groupIndex) => {
-            if (!group || !group.items || group.items.length === 0) {
-                return "";
-            }
-            if (group.items.length === 1) {
-                const single = group.items[0];
-                return renderStageCard(single.stage, single.index, uidSafe, false);
-            }
-            return renderStageGroupCard(group, groupIndex, uidSafe);
-        }).join("");
-
+        const stageSummary = buildEventStageSummary(stages);
+        const stageGroups = buildStageGroups(buildStageSummaryIntervals(stages));
+        const inspectorHtml = renderEventInspectorCard(data, displayDurationMs);
+        const timeTabHtml = renderEventTimeAnalysisTab(data, stages, durationBreakdown);
+        const attributesTabHtml = renderEventAttributesTab(data);
+        const stagesTabHtml = renderEventStagesTab(stageSummary);
+        const groupedCallsHtml = renderEventGroupedCallsTab(stageGroups, uidSafe);
+        const logsHtml = renderEventLogsTab(traceLogs, traceLogStatus, data.traceId);
         const hasErrorMessage = Boolean(data.isError || (data.errorMessage && data.errorMessage.trim() && data.errorMessage.trim() !== "Нет ошибок"));
-        const detailsGridClass = hasErrorMessage
-            ? "analytics-grid analytics-event-details-grid"
-            : "analytics-grid analytics-event-details-grid is-single";
-        const overviewTabId = `analytics-event-overview-${uidSafe}`;
-        const logsTabId = `analytics-event-logs-${uidSafe}`;
         const errorSectionHtml = hasErrorMessage ? `
-                <section class="glass-card p-3">
-                    <div class="fw-semibold mb-2">Ошибка</div>
-                    <div class="small ${data.isError ? "text-danger" : "text-muted"}">
-                        ${escapeHtml(data.errorMessage || "Ошибка без текста")}
-                    </div>
-                </section>
-            ` : "";
-
-        refs.eventModalBody.innerHTML = `
-            <div class="analytics-event-header mb-3">
-                <div class="small text-muted">${formatDateTime(data.startedAt)} - ${formatDateTime(data.endedAt)}</div>
-                <div class="h6 mb-1">${escapeHtml(data.eventTypeName || data.eventTypeCode || "-")}</div>
-                <div class="small text-muted">Модуль: ${escapeHtml(data.moduleName || data.moduleCode || "-")}</div>
-                <div class="small text-muted">UID: ${escapeHtml(data.eventUid)}</div>
-                <div class="small text-muted">Внутренний маршрут: ${escapeHtml(data.requestPath || "-")} · Трассировка: ${escapeHtml(data.traceId || "-")}</div>
-                <div class="small text-muted">HTTP ${data.statusCode == null ? "-" : escapeHtml(String(data.statusCode))} · ${formatInt(displayDurationMs)} ms</div>
-                <div class="small text-muted">Класс ошибки: ${escapeHtml(data.errorClass || "NONE")}</div>
-            </div>
-            <ul class="nav nav-tabs analytics-event-tabs" role="tablist">
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#${overviewTabId}" type="button" role="tab">Обзор</button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#${logsTabId}" type="button" role="tab">Логи трассировки</button>
-                </li>
-            </ul>
-            <div class="tab-content pt-3">
-                <div class="tab-pane fade show active" id="${overviewTabId}" role="tabpanel">
-                    ${durationBreakdownHtml}
-                    <div class="${detailsGridClass}">
-                        <section class="glass-card p-3">
-                            <div class="fw-semibold mb-2">Атрибуты</div>
-                            <div class="table-responsive">
-                                <table class="table table-sm align-middle analytics-table analytics-event-attrs-table mb-0">
-                                    <thead>
-                                    <tr><th>Код</th><th>Значение</th></tr>
-                                    </thead>
-                                    <tbody>${attrsHtml || "<tr><td colspan='2' class='text-muted'>Нет данных</td></tr>"}</tbody>
-                                </table>
-                            </div>
-                        </section>
-                        ${errorSectionHtml}
-                    </div>
-                    <section class="mt-3">
-                        <div class="fw-semibold mb-2">Этапы по вызову</div>
-                        <div class="table-responsive mb-3">
-                            <table class="table table-sm align-middle analytics-table mb-0">
-                                <thead>
-                                <tr>
-                                    <th>Этап</th>
-                                    <th class="text-end">Метрика</th>
-                                    <th class="text-end">Σ длительность</th>
-                                    <th class="text-end">Max</th>
-                                    <th class="text-end">Ошибки</th>
-                                </tr>
-                                </thead>
-                                <tbody>${stageSummaryHtml || "<tr><td colspan='5' class='text-muted'>Нет данных</td></tr>"}</tbody>
-                            </table>
-                        </div>
-                        <div class="fw-semibold mb-1">Сгруппированные вызовы</div>
-                        <div class="small text-muted mb-2">
-                            Это агрегированные последовательные вызовы: один источник, одна операция, backend-путь и один класс ошибки.
-                        </div>
-                        ${stagesHtml || "<div class='text-muted'>Этапы не найдены</div>"}
-                    </section>
+            <section class="glass-card analytics-event-error-card">
+                <div class="analytics-section-heading">Ошибка события</div>
+                <div class="analytics-event-error-message ${data.isError ? "text-danger" : "text-muted"}">
+                    ${escapeHtml(data.errorMessage || "Ошибка без текста")}
                 </div>
-                <div class="tab-pane fade" id="${logsTabId}" role="tabpanel">
-                    <div class="small text-muted mb-2">
-                        Нормализованные логи по трассировке: <b>${escapeHtml(data.traceId || "-")}</b>. Логи полезны для детального разбора ошибки на уровне этапов.
-                    </div>
-                    ${renderTraceLogStatus(traceLogStatus)}
-                    ${renderNormalizedLogsTable(traceLogs, "По этому trace логи не найдены.", true)}
+            </section>
+        ` : "";
+
+        const activeTabKey = eventDetailsActiveTabKey();
+        const tabIds = {
+            time: `analytics-event-time-${uidSafe}`,
+            attributes: `analytics-event-attributes-${uidSafe}`,
+            stages: `analytics-event-stages-${uidSafe}`,
+            calls: `analytics-event-calls-${uidSafe}`,
+            logs: `analytics-event-logs-${uidSafe}`
+        };
+        const tabMeta = [
+            {key: "time", label: "Разбор времени"},
+            {key: "attributes", label: "Атрибуты"},
+            {key: "stages", label: "Этапы по вызову"},
+            {key: "calls", label: "Сгруппированные вызовы"},
+            {key: "logs", label: "Логи и трассировка"}
+        ];
+
+        return `
+            <div class="analytics-event-details-redesign">
+                ${inspectorHtml}
+                ${errorSectionHtml}
+                <div class="analytics-event-tabs-shell">
+                    <ul class="nav analytics-event-tabs analytics-event-pill-tabs" role="tablist">
+                        ${tabMeta.map((tab) => `
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link ${tab.key === activeTabKey ? "active" : ""}"
+                                        data-event-detail-tab-key="${tab.key}"
+                                        data-bs-toggle="tab"
+                                        data-bs-target="#${tabIds[tab.key]}"
+                                        type="button"
+                                        role="tab">
+                                    ${escapeHtml(tab.label)}
+                                </button>
+                            </li>
+                        `).join("")}
+                    </ul>
+                </div>
+                <div class="tab-content analytics-event-tab-content">
+                    <div class="tab-pane fade ${activeTabKey === "time" ? "show active" : ""}" id="${tabIds.time}" role="tabpanel">${timeTabHtml}</div>
+                    <div class="tab-pane fade ${activeTabKey === "attributes" ? "show active" : ""}" id="${tabIds.attributes}" role="tabpanel">${attributesTabHtml}</div>
+                    <div class="tab-pane fade ${activeTabKey === "stages" ? "show active" : ""}" id="${tabIds.stages}" role="tabpanel">${stagesTabHtml}</div>
+                    <div class="tab-pane fade ${activeTabKey === "calls" ? "show active" : ""}" id="${tabIds.calls}" role="tabpanel">${groupedCallsHtml}</div>
+                    <div class="tab-pane fade ${activeTabKey === "logs" ? "show active" : ""}" id="${tabIds.logs}" role="tabpanel">${logsHtml}</div>
                 </div>
             </div>
         `;
+    }
 
+    function renderEventDetailsModal(data) {
+        if (!refs.eventModalBody) {
+            return;
+        }
+        refs.eventModalBody.innerHTML = renderEventDetailsHtml(data);
+        scheduleTimelineSegmentLabelRefresh(refs.eventModalBody);
         const modal = bootstrap.Modal.getOrCreateInstance(refs.eventModalEl);
         modal.show();
     }
 
-    function renderTraceLogStatus(status) {
+    function eventDetailsActiveTabKey() {
+        const allowed = new Set(["time", "attributes", "stages", "calls", "logs"]);
+        try {
+            const stored = localStorage.getItem("analytics.eventDetails.activeTab") || "";
+            return allowed.has(stored) ? stored : "time";
+        } catch (_error) {
+            return "time";
+        }
+    }
+
+    function rememberEventDetailsTab(key) {
+        const normalized = String(key || "").trim();
+        if (!normalized) {
+            return;
+        }
+        try {
+            localStorage.setItem("analytics.eventDetails.activeTab", normalized);
+        } catch (_error) {
+            // Tab persistence is optional.
+        }
+    }
+
+    function renderEventInspectorCard(data, displayDurationMs) {
+        const statusCode = data.statusCode == null ? null : Number(data.statusCode);
+        const statusClass = statusCode == null
+            ? "analytics-badge-muted"
+            : (statusCode >= 500 ? "analytics-badge-error" : (statusCode >= 400 ? "analytics-badge-warning" : "analytics-badge-success"));
+        const errorClass = data.errorClass || (data.isError ? "ERROR" : "NONE");
+        const eventTitle = data.eventTypeName || data.eventTypeCode || "Детали события";
+        const route = data.requestPath || "—";
+        const traceId = data.traceId || "—";
+        const eventUid = data.eventUid || "—";
+        return `
+            <section class="glass-card analytics-event-inspector">
+                <div class="analytics-event-inspector-main">
+                    <div class="analytics-event-eyebrow">Событие</div>
+                    <h2 class="analytics-event-inspector-title">${escapeHtml(eventTitle)}</h2>
+                    <div class="analytics-event-inspector-route">
+                        <span class="analytics-event-method">${escapeHtml(data.httpMethod || "HTTP")}</span>
+                        <code>${escapeHtml(route)}</code>
+                    </div>
+                    <div class="analytics-event-id-grid">
+                        ${renderEventInspectorId("Trace", traceId)}
+                        ${renderEventInspectorId("UID", eventUid)}
+                    </div>
+                </div>
+                <div class="analytics-event-inspector-side">
+                    <div class="analytics-event-inspector-stat">
+                        <span>HTTP</span>
+                        <strong><span class="analytics-status-badge ${statusClass}">${statusCode == null ? "—" : statusCode}</span></strong>
+                    </div>
+                    <div class="analytics-event-inspector-stat">
+                        <span>Duration</span>
+                        <strong>${formatInt(displayDurationMs || 0)} ms</strong>
+                    </div>
+                    <div class="analytics-event-inspector-stat">
+                        <span>Модуль</span>
+                        <strong>${escapeHtml(data.moduleName || data.moduleCode || "Общий")}</strong>
+                    </div>
+                    <div class="analytics-event-inspector-stat">
+                        <span>Класс ошибки</span>
+                        <strong><span class="analytics-status-badge ${errorClassBadgeClass(errorClass)}">${escapeHtml(errorClass || "NONE")}</span></strong>
+                    </div>
+                    <div class="analytics-event-inspector-period">
+                        ${escapeHtml(formatEventDetailsDateTime(data.startedAt))} — ${escapeHtml(formatEventDetailsDateTime(data.endedAt))}
+                    </div>
+                </div>
+            </section>
+        `;
+    }
+
+    function renderEventInspectorId(label, value) {
+        const text = value == null || value === "" ? "—" : String(value);
+        return `
+            <div class="analytics-event-id-item">
+                <span>${escapeHtml(label)}</span>
+                <code title="${escapeHtml(text)}">${escapeHtml(text)}</code>
+                ${text !== "—" ? renderEventCopyButton(text) : ""}
+            </div>
+        `;
+    }
+
+    function renderEventCopyButton(value) {
+        return `
+            <button class="analytics-event-copy-btn" type="button" data-event-copy-value="${escapeHtml(value)}" title="Копировать">
+                <i class="bi bi-clipboard"></i>
+            </button>
+        `;
+    }
+
+    function renderEventTimeAnalysisTab(_data, stages, breakdown) {
+        const eventDuration = Number(breakdown?.eventDurationMs || 0);
+        const covered = Number(breakdown?.coveredStageDurationMs || 0);
+        const unaccounted = Number(breakdown?.unaccountedDurationMs || 0);
+        const coverage = eventDuration > 0 ? Math.min(100, Math.max(0, (covered / eventDuration) * 100)) : 0;
+        const intervals = Array.isArray(breakdown?.unaccountedIntervals) ? breakdown.unaccountedIntervals : [];
+        return `
+            <section class="analytics-event-tab-section analytics-event-time-tab">
+                <div class="analytics-event-kpi-grid">
+                    ${renderEventKpiTile("Общая длительность", `${formatInt(eventDuration)} мс`, "neutral")}
+                    ${renderEventKpiTile("Покрыто этапами", `${formatInt(covered)} мс`, "success")}
+                    ${renderEventKpiTile("Нераспределено", `${formatInt(unaccounted)} мс`, unaccounted > 0 ? "warning" : "neutral")}
+                    ${renderEventKpiTile("Процент покрытия", `${coverage.toFixed(1)}%`, coverage >= 80 ? "success" : "warning")}
+                </div>
+                <article class="glass-card analytics-event-trace-card">
+                    <div class="analytics-event-section-head">
+                        <div>
+                            <h3>Timeline вызова</h3>
+                            <p>Интервалы этапов относительно общей длительности события.</p>
+                        </div>
+                        <span class="analytics-event-trace-scale">0 — ${formatInt(eventDuration)} мс</span>
+                    </div>
+                    ${renderEventTimeline(stages, breakdown)}
+                </article>
+                <article class="glass-card analytics-event-unaccounted-card">
+                    <div class="analytics-event-section-head">
+                        <div>
+                            <h3>Время вне инструментирования</h3>
+                            <p>Крупные промежутки, которые не покрыты AOP-stage интервалами.</p>
+                        </div>
+                    </div>
+                    <div class="analytics-event-unaccounted-grid">
+                        ${intervals.length ? intervals.map((interval) => renderUnaccountedIntervalCard(interval, stages)).join("") : `
+                            <div class="analytics-event-empty-inline">Промежутков вне этапов нет.</div>
+                        `}
+                    </div>
+                </article>
+            </section>
+        `;
+    }
+
+    function renderEventKpiTile(label, value, tone) {
+        return `
+            <article class="glass-card analytics-event-kpi-tile analytics-event-kpi-${escapeHtml(tone || "neutral")}">
+                <span>${escapeHtml(label)}</span>
+                <strong>${escapeHtml(value)}</strong>
+            </article>
+        `;
+    }
+
+    function renderEventTimeline(stages, breakdown) {
+        const eventDuration = Math.max(1, Number(breakdown?.eventDurationMs || 0));
+        const intervals = buildTimelineStageRows(stages, breakdown);
+        if (!intervals.length) {
+            return `<div class="analytics-event-empty-inline">Этапы отсутствуют.</div>`;
+        }
+        return `
+            <div class="analytics-event-trace-timeline">
+                ${intervals.map((interval) => {
+                    const isUninstrumented = interval.timelineKind === "uninstrumented";
+                    const stageCode = String(interval.stageTypeCode || interval.stageTypeName || "").toUpperCase();
+                    const isFrontendStage = stageCode.includes("FRONTEND") || stageCode.includes("ФРОНТЕНД");
+                    const contextNote = timelineStageContextNote(interval);
+                    const metricsHtml = isUninstrumented
+                        ? `<span class="analytics-event-trace-note">вне инструментирования</span>`
+                        : (stageCode === "FRONTEND_START"
+                            ? `<span class="analytics-event-trace-note is-marker">Маркер начала frontend-навигации</span>`
+                            : renderTimelineSummaryChips(interval, isFrontendStage));
+                    const segments = Array.isArray(interval.segments) && interval.segments.length
+                        ? interval.segments
+                        : [interval];
+                    return `
+                        <div class="analytics-event-trace-row ${isUninstrumented ? "is-uninstrumented" : stageToneClass(interval)} ${isFrontendStage ? "is-after-backend" : ""}">
+                            <div class="analytics-event-trace-label">
+                                <strong>${escapeHtml(interval.stageTypeName || interval.stageTypeCode || "Этап")}</strong>
+                                <div class="analytics-event-trace-metrics">${metricsHtml}</div>
+                                ${contextNote ? `<p class="analytics-event-trace-context">${escapeHtml(contextNote)}</p>` : ""}
+                            </div>
+                            <div class="analytics-event-trace-track">
+                                ${segments.map((segment, segmentIndex) => renderTimelineSegment(segment, interval, eventDuration, segmentIndex)).join("")}
+                            </div>
+                        </div>
+                    `;
+                }).join("")}
+            </div>
+        `;
+    }
+
+    function renderTimelineSummaryChips(interval, isFrontendStage) {
+        const callCount = Number(interval?.callCount || 0);
+        const chips = [
+            `${formatInt(callCount)} ${pluralRu(callCount, "вызов", "вызова", "вызовов")}`,
+            `Всего: ${formatInt(interval?.sumDurationMs || 0)} мс`,
+            `<strong>Собственное: ${formatInt(interval?.selfDurationMs || 0)} мс</strong>`,
+            `Вложено: ${formatInt(interval?.nestedDurationMs || 0)} мс`,
+            `Среднее: ${formatDecimal(interval?.avgDurationMs || 0)} мс`,
+            `Макс.: ${formatInt(interval?.maxDurationMs || 0)} мс`
+        ];
+        if (isFrontendStage) {
+            chips.push("после backend");
+        }
+        return chips.map((chip, index) => (
+            `<span class="analytics-event-trace-chip ${index === 2 ? "is-self" : ""}">${chip}</span>`
+        )).join("");
+    }
+
+    function renderTimelineSegment(segment, row, eventDuration, segmentIndex) {
+        const duration = Number(segment?.durationMs || 0);
+        const rawLeft = Math.max(0, (Number(segment?.offsetFromEventStartMs || 0) / eventDuration) * 100);
+        const rawWidth = (duration / eventDuration) * 100;
+        const microWidth = Math.min(3, Math.max(0.32, Math.sqrt(Math.max(duration, 1)) * 0.18));
+        const isCompactDuration = duration <= 30;
+        const minVisibleWidth = duration <= 30 ? microWidth : 1.15;
+        const edgeInset = 1.05;
+        const width = Math.min(100 - edgeInset * 2, Math.max(minVisibleWidth, rawWidth));
+        const rawEnd = rawLeft + rawWidth;
+        const isLeftEdge = rawLeft <= edgeInset;
+        const isRightEdge = rawEnd >= 100 - edgeInset || rawLeft >= 88;
+        const isEdgeCompact = isCompactDuration && (isLeftEdge || isRightEdge);
+        const edgePaddingPx = 8;
+        const widthStyle = `${width.toFixed(3)}%`;
+        const left = isRightEdge
+            ? null
+            : Math.min(Math.max(rawLeft, edgeInset), 100 - edgeInset - width);
+        const positionStyle = isRightEdge
+            ? `right:${edgePaddingPx}px;width:${widthStyle};`
+            : (isLeftEdge
+                ? `left:${edgePaddingPx}px;width:${widthStyle};`
+                : `left:${left.toFixed(3)}%;width:${widthStyle};`);
+        const percent = Math.min(100, Math.max(0, (duration / eventDuration) * 100));
+        const toneClass = timelineDurationToneClass(duration);
+        const selfDuration = Number(segment?.selfDurationMs ?? duration);
+        const nestedDuration = Number(segment?.nestedDurationMs ?? 0);
+        const isUninstrumented = row?.timelineKind === "uninstrumented";
+        const stageCode = String(row?.stageTypeCode || row?.stageTypeName || "").toUpperCase();
+        const isNavigationMarker = stageCode === "FRONTEND_START";
+        const isFrontendStage = stageCode.includes("FRONTEND") || stageCode.includes("ФРОНТЕНД");
+        const uninstrumentedDetails = isUninstrumented ? technicalUninstrumentedTooltipDetails(row) : [];
+        const stageExplanation = timelineStageTooltipDetails(row);
+        const tooltip = [
+            isNavigationMarker ? "Маркер начала навигации" : `${formatInt(duration)} мс`,
+            row?.stageTypeName || row?.stageTypeCode ? `Этап: ${row?.stageTypeName || row?.stageTypeCode}` : "Этап",
+            isUninstrumented ? "" : `Вызов #${formatInt(segmentIndex + 1)}`,
+            `Начало: ${formatEventDetailsDateTime(segment?.startedAt)}`,
+            `Конец: ${formatEventDetailsDateTime(segment?.endedAt)}`,
+            isNavigationMarker ? "Тип: временная точка, не операция" : `Длительность: ${formatInt(duration)} мс`,
+            isUninstrumented || isNavigationMarker ? "" : `Собственное время: ${formatInt(selfDuration)} мс`,
+            isUninstrumented || isNavigationMarker ? "" : `Вложено: ${formatInt(nestedDuration)} мс`,
+            nestedDuration > 0 ? "Собственное время = длительность без вложенных вызовов." : "",
+            ...stageExplanation,
+            ...uninstrumentedDetails,
+            `Доля: ${percent.toFixed(1)}%`,
+            isFrontendStage ? "Сегмент после backend-обработки" : ""
+        ].filter(Boolean).join("\n");
+        return `
+            <div class="analytics-event-trace-bar analytics-event-trace-segment ${toneClass} ${isUninstrumented ? "is-uninstrumented" : ""} ${isLeftEdge ? "is-left-edge" : ""} ${isRightEdge ? "is-right-edge" : ""} ${isCompactDuration ? "is-compact" : ""} ${isEdgeCompact ? "is-edge-compact" : ""}"
+                 style="${positionStyle}"
+                 data-timeline-tooltip="${escapeHtml(tooltip)}">
+                <span>${formatInt(duration)} мс</span>
+            </div>
+        `;
+    }
+
+    function scheduleTimelineSegmentLabelRefresh(root) {
+        const target = root || refs.eventDetailsBody || document;
+        window.requestAnimationFrame(() => refreshTimelineSegmentLabels(target));
+    }
+
+    function refreshTimelineSegmentLabels(root) {
+        const target = root || document;
+        target.querySelectorAll(".analytics-event-trace-segment").forEach((segment) => {
+            const label = segment.querySelector("span");
+            if (!label) {
+                return;
+            }
+            segment.classList.remove("has-visible-label");
+            const segmentWidth = segment.getBoundingClientRect().width;
+            const labelWidth = label.scrollWidth || label.getBoundingClientRect().width;
+            if (segmentWidth >= labelWidth + 8) {
+                segment.classList.add("has-visible-label");
+            }
+        });
+    }
+
+    function buildTimelineStageRows(stages, breakdown) {
+        const allIntervals = buildTimelineIntervals(stages, breakdown);
+        const stageIntervals = annotateTimelineSelfTimes(allIntervals
+            .filter((interval) => interval.timelineKind !== "uninstrumented")
+            .map((interval, index) => normalizeTimelineStageInterval(interval, index)));
+        const grouped = new Map();
+        stageIntervals.forEach((interval) => {
+            const code = String(interval.stageTypeCode || interval.stageTypeName || "UNKNOWN").trim() || "UNKNOWN";
+            const key = code.toUpperCase();
+            const duration = Number(interval.durationMs || 0);
+            const offset = Number(interval.offsetFromEventStartMs || 0);
+            const finishOffset = offset + duration;
+            const existing = grouped.get(key) || {
+                ...interval,
+                stageTypeCode: interval.stageTypeCode || code,
+                stageTypeName: interval.stageTypeName || code,
+                durationMs: duration,
+                offsetFromEventStartMs: offset,
+                callCount: 0,
+                sumDurationMs: 0,
+                maxDurationMs: 0,
+                firstOffsetMs: offset,
+                lastFinishOffsetMs: finishOffset,
+                firstStartedAtMs: parseTimelineDateMs(interval.startedAt),
+                lastEndedAtMs: parseTimelineDateMs(interval.endedAt),
+                selfDurationMs: 0,
+                nestedDurationMs: 0,
+                hasError: false,
+                stage: null,
+                segments: []
+            };
+            existing.segments.push({
+                ...interval,
+                durationMs: duration,
+                offsetFromEventStartMs: offset,
+                selfDurationMs: Number(interval.selfDurationMs || 0),
+                nestedDurationMs: Number(interval.nestedDurationMs || 0)
+            });
+            existing.callCount += 1;
+            existing.sumDurationMs += duration;
+            existing.selfDurationMs += Number(interval.selfDurationMs || 0);
+            existing.nestedDurationMs += Number(interval.nestedDurationMs || 0);
+            existing.maxDurationMs = Math.max(existing.maxDurationMs, duration);
+            existing.hasError = existing.hasError || Boolean(interval.stage?.isError);
+            if (offset < existing.firstOffsetMs) {
+                existing.firstOffsetMs = offset;
+                existing.offsetFromEventStartMs = offset;
+                existing.startedAt = interval.startedAt;
+                existing.firstStartedAtMs = parseTimelineDateMs(interval.startedAt);
+            }
+            if (finishOffset > existing.lastFinishOffsetMs) {
+                existing.lastFinishOffsetMs = finishOffset;
+                existing.endedAt = interval.endedAt;
+                existing.lastEndedAtMs = parseTimelineDateMs(interval.endedAt);
+            }
+            grouped.set(key, existing);
+        });
+        const stageRows = Array.from(grouped.values()).map((row) => ({
+            ...row,
+            durationMs: Math.max(0, row.lastFinishOffsetMs - row.firstOffsetMs),
+            avgDurationMs: row.callCount > 0 ? row.sumDurationMs / row.callCount : 0,
+            segments: row.segments
+                .slice()
+                .sort((left, right) => Number(left.offsetFromEventStartMs || 0) - Number(right.offsetFromEventStartMs || 0)),
+            stage: {isError: row.hasError}
+        }));
+        const unaccountedRows = allIntervals
+            .filter((interval) => interval.timelineKind === "uninstrumented");
+        return stageRows
+            .concat(unaccountedRows)
+            .sort((left, right) => Number(left.offsetFromEventStartMs || 0) - Number(right.offsetFromEventStartMs || 0));
+    }
+
+    function normalizeTimelineStageInterval(interval, index) {
+        const offset = Number(interval?.offsetFromEventStartMs || 0);
+        const duration = Math.max(0, Number(interval?.durationMs || 0));
+        return {
+            ...interval,
+            timelineIndex: index,
+            offsetFromEventStartMs: offset,
+            durationMs: duration,
+            finishOffsetMs: offset + duration
+        };
+    }
+
+    function annotateTimelineSelfTimes(intervals) {
+        return intervals.map((parent) => {
+            const parentStart = Number(parent.offsetFromEventStartMs || 0);
+            const parentEnd = Number(parent.finishOffsetMs ?? (parentStart + Number(parent.durationMs || 0)));
+            const nestedIntervals = intervals
+                .filter((child) => isNestedTimelineChild(parent, child))
+                .map((child) => {
+                    const childStart = Number(child.offsetFromEventStartMs || 0);
+                    const childEnd = Number(child.finishOffsetMs ?? (childStart + Number(child.durationMs || 0)));
+                    return {
+                        startedAtMs: Math.max(parentStart, childStart),
+                        endedAtMs: Math.min(parentEnd, childEnd)
+                    };
+                })
+                .filter((interval) => interval.endedAtMs > interval.startedAtMs);
+            const duration = Math.max(0, Number(parent.durationMs || 0));
+            const nestedDuration = Math.min(duration, unionTimelineDuration(nestedIntervals));
+            return {
+                ...parent,
+                nestedDurationMs: nestedDuration,
+                selfDurationMs: Math.max(0, duration - nestedDuration)
+            };
+        });
+    }
+
+    function isNestedTimelineChild(parent, child) {
+        // DTO does not expose an explicit parent id here, so nesting is inferred only
+        // from temporal containment of stage intervals inside the same event.
+        if (!parent || !child || parent.timelineIndex === child.timelineIndex) {
+            return false;
+        }
+        const parentStart = Number(parent.offsetFromEventStartMs || 0);
+        const parentEnd = Number(parent.finishOffsetMs ?? (parentStart + Number(parent.durationMs || 0)));
+        const childStart = Number(child.offsetFromEventStartMs || 0);
+        const childEnd = Number(child.finishOffsetMs ?? (childStart + Number(child.durationMs || 0)));
+        if (parentEnd <= parentStart || childEnd <= childStart) {
+            return false;
+        }
+        const epsilonMs = 0.001;
+        const sameBounds = Math.abs(parentStart - childStart) <= epsilonMs && Math.abs(parentEnd - childEnd) <= epsilonMs;
+        return !sameBounds && childStart >= parentStart - epsilonMs && childEnd <= parentEnd + epsilonMs;
+    }
+
+    function unionTimelineDuration(intervals) {
+        const sorted = (Array.isArray(intervals) ? intervals : [])
+            .map((interval) => ({
+                startedAtMs: Number(interval.startedAtMs || 0),
+                endedAtMs: Number(interval.endedAtMs || 0)
+            }))
+            .filter((interval) => interval.endedAtMs > interval.startedAtMs)
+            .sort((left, right) => left.startedAtMs - right.startedAtMs);
+        let total = 0;
+        let currentStart = null;
+        let currentEnd = null;
+        sorted.forEach((interval) => {
+            if (currentStart == null || currentEnd == null) {
+                currentStart = interval.startedAtMs;
+                currentEnd = interval.endedAtMs;
+                return;
+            }
+            if (interval.startedAtMs <= currentEnd) {
+                currentEnd = Math.max(currentEnd, interval.endedAtMs);
+                return;
+            }
+            total += Math.max(0, currentEnd - currentStart);
+            currentStart = interval.startedAtMs;
+            currentEnd = interval.endedAtMs;
+        });
+        if (currentStart != null && currentEnd != null) {
+            total += Math.max(0, currentEnd - currentStart);
+        }
+        return Math.max(0, Math.round(total));
+    }
+
+    function parseTimelineDateMs(value) {
+        const parsed = value ? Date.parse(value) : NaN;
+        return Number.isFinite(parsed) ? parsed : 0;
+    }
+
+    function pluralRu(value, one, few, many) {
+        const number = Math.abs(Number(value || 0));
+        const mod10 = number % 10;
+        const mod100 = number % 100;
+        if (mod10 === 1 && mod100 !== 11) {
+            return one;
+        }
+        if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
+            return few;
+        }
+        return many;
+    }
+
+    function formatDecimal(value) {
+        const number = Number(value || 0);
+        if (!Number.isFinite(number)) {
+            return "0";
+        }
+        return number.toLocaleString("ru-RU", {
+            maximumFractionDigits: number >= 10 ? 1 : 2
+        });
+    }
+
+    function buildTimelineIntervals(stages, breakdown) {
+        const byOrder = new Map((Array.isArray(stages) ? stages : [])
+            .map((stage) => [String(stage?.stageOrder ?? ""), stage]));
+        const rawIntervals = Array.isArray(breakdown?.stageIntervals) && breakdown.stageIntervals.length
+            ? breakdown.stageIntervals
+            : (Array.isArray(stages) ? stages : []).map((stage) => ({
+                stageTypeCode: stage.stageTypeCode,
+                stageTypeName: stage.stageTypeName,
+                stageOrder: stage.stageOrder,
+                startedAt: stage.startedAt,
+                endedAt: stage.endedAt,
+                durationMs: stage.durationMs,
+                offsetFromEventStartMs: 0
+            }));
+        const syntheticFrontendStages = (Array.isArray(stages) ? stages : [])
+            .filter((stage) => isSyntheticFrontendStage(stage?.stageTypeCode));
+        const rawTimelineIntervals = syntheticFrontendStages.length
+            ? rawIntervals.filter((interval) => normalizeStageCode(interval?.stageTypeCode) !== "FRONTEND")
+            : rawIntervals;
+        const stageTimelineIntervals = rawTimelineIntervals
+            .map((interval) => ({
+                ...interval,
+                stage: byOrder.get(String(interval.stageOrder ?? "")) || null
+            }))
+            .filter((interval) => Number(interval.durationMs || 0) >= 0);
+        const timelineEventStartMs = resolveTimelineEventStartMs(stageTimelineIntervals);
+        const syntheticFrontendIntervals = syntheticFrontendStages
+            .filter((stage) => !stageTimelineIntervals.some((interval) => normalizeStageCode(interval?.stageTypeCode) === normalizeStageCode(stage?.stageTypeCode)))
+            .map((stage) => syntheticStageToTimelineInterval(stage, timelineEventStartMs))
+            .filter(Boolean);
+        const unaccountedTimelineIntervals = (Array.isArray(breakdown?.unaccountedIntervals) ? breakdown.unaccountedIntervals : [])
+            .filter((interval) => Number(interval?.durationMs || 0) > 0)
+            .map((interval, index) => ({
+                ...interval,
+                timelineKind: "uninstrumented",
+                stage: null,
+                stageTypeCode: `UNINSTRUMENTED_${interval.type || index}`,
+                stageTypeName: timelineUninstrumentedTitle(interval),
+                stageOrder: `gap-${index}`
+            }));
+        return stageTimelineIntervals
+            .concat(syntheticFrontendIntervals)
+            .concat(unaccountedTimelineIntervals)
+            .sort((left, right) => Number(left.offsetFromEventStartMs || 0) - Number(right.offsetFromEventStartMs || 0));
+    }
+
+    function isSyntheticFrontendStage(stageTypeCode) {
+        return ["FRONTEND_START", "SERVER_WAIT", "FRONTEND_RENDER"].includes(normalizeStageCode(stageTypeCode));
+    }
+
+    function resolveTimelineEventStartMs(intervals) {
+        const candidates = (Array.isArray(intervals) ? intervals : [])
+            .map((interval) => {
+                const startedAtMs = toEpochMs(interval?.startedAt);
+                const offsetMs = Number(interval?.offsetFromEventStartMs || 0);
+                return startedAtMs == null ? null : startedAtMs - offsetMs;
+            })
+            .filter((value) => Number.isFinite(value));
+        return candidates.length ? Math.min(...candidates) : null;
+    }
+
+    function syntheticStageToTimelineInterval(stage, eventStartedAtMs) {
+        const startedAtMs = toEpochMs(stage?.startedAt);
+        let endedAtMs = toEpochMs(stage?.endedAt);
+        const duration = normalizeDuration(stage?.durationMs || 0);
+        if (startedAtMs == null) {
+            return null;
+        }
+        if (endedAtMs == null || endedAtMs < startedAtMs) {
+            endedAtMs = startedAtMs + duration;
+        }
+        return {
+            stageTypeCode: stage.stageTypeCode,
+            stageTypeName: stage.stageTypeName,
+            stageOrder: stage.stageOrder,
+            startedAt: stage.startedAt,
+            endedAt: stage.endedAt,
+            durationMs: Math.max(0, endedAtMs - startedAtMs),
+            offsetFromEventStartMs: eventStartedAtMs == null ? 0 : Math.max(0, startedAtMs - eventStartedAtMs),
+            stage
+        };
+    }
+
+    function timelineUninstrumentedTitle(interval) {
+        const type = String(interval?.type || "").toUpperCase();
+        if (type === "BEFORE_FIRST_STAGE") {
+            return "До первого stage";
+        }
+        if (type === "AFTER_LAST_STAGE") {
+            return "После последнего stage";
+        }
+        if (type === "BETWEEN_STAGE_INTERVALS") {
+            return "Между stage intervals";
+        }
+        return interval?.label || "Вне инструментирования";
+    }
+
+    function stageToneClass(interval) {
+        const duration = Number(interval?.durationMs || 0);
+        return timelineDurationToneClass(duration);
+    }
+
+    function timelineDurationToneClass(durationMs) {
+        const duration = Number(durationMs || 0);
+        if (duration >= 500) {
+            return "is-duration-critical";
+        }
+        if (duration >= 200) {
+            return "is-duration-high";
+        }
+        if (duration >= 50) {
+            return "is-duration-medium";
+        }
+        return "is-duration-low";
+    }
+
+    function renderUnaccountedIntervalCard(interval, stages) {
+        const details = unaccountedIntervalUiDetails(interval, stages);
+        return `
+            <article class="analytics-event-gap-card">
+                <div class="analytics-event-gap-top">
+                    <strong>${escapeHtml(interval.label || interval.type || "Время вне этапов")}</strong>
+                    <span>${formatInt(interval.durationMs || 0)} мс</span>
+                </div>
+                ${unaccountedIntervalContextNote(interval) ? `
+                    <p class="analytics-event-gap-context">${escapeHtml(unaccountedIntervalContextNote(interval))}</p>
+                ` : ""}
+                <div class="analytics-event-gap-meta">
+                    <span>${interval.startedAt ? escapeHtml(formatEventDetailsDateTime(interval.startedAt)) : "—"}</span>
+                    <span>+${formatInt(interval.offsetFromEventStartMs || 0)} мс</span>
+                </div>
+                <div class="analytics-event-gap-detail">
+                    <span>Источник</span>
+                    <code>${escapeHtml(details.source)}</code>
+                </div>
+                <div class="analytics-event-gap-detail">
+                    <span>Вероятные причины</span>
+                    <ul>
+                        ${details.reasons.map((reason) => `<li>${escapeHtml(reason)}</li>`).join("")}
+                    </ul>
+                </div>
+                <div class="analytics-event-gap-detail">
+                    <span>Точность</span>
+                    <strong>${escapeHtml(details.precision)}</strong>
+                </div>
+            </article>
+        `;
+    }
+
+    function unaccountedIntervalContextNote(interval) {
+        const type = String(interval?.type || "").toUpperCase();
+        if (type === "AFTER_LAST_STAGE") {
+            return "Время после последнего backend/frontend stage до завершения события. Это не TTFB.";
+        }
+        if (type === "BEFORE_FIRST_STAGE") {
+            return "Время от начала события до первого инструментированного stage.";
+        }
+        return "";
+    }
+
+    function unaccountedIntervalUiDetails(interval, stages) {
+        const type = String(interval?.type || "").toUpperCase();
+        const hasFrontendEvidence = Boolean(findFrontendTimingEvidence(null, stages));
+        if (type === "BEFORE_FIRST_STAGE") {
+            return {
+                source: "request start → first stage start",
+                precision: "Высокая",
+                reasons: [
+                    "Servlet filters",
+                    "Spring Security",
+                    "Spring MVC routing",
+                    "request context preparation"
+                ]
+            };
+        }
+        if (type === "AFTER_LAST_STAGE") {
+            return {
+                source: "last stage end → event complete",
+                precision: hasFrontendEvidence ? "Средняя: backend-границы точные, frontend-часть приблизительная" : "Средняя",
+                reasons: [
+                    "сериализация ответа",
+                    "отправка HTTP-ответа",
+                    "postHandle / afterCompletion / servlet filters",
+                    "browser processing",
+                    "frontend render",
+                    "frontend telemetry"
+                ]
+            };
+        }
+        if (type === "BETWEEN_STAGE_INTERVALS") {
+            return {
+                source: "previous stage end → next stage start",
+                precision: "Высокая по границам, средняя по причине",
+                reasons: [
+                    "код вне AOP-инструментирования",
+                    "ожидание между слоями",
+                    "технический участок без отдельного stage"
+                ]
+            };
+        }
+        return {
+            source: "durationBreakdown.unaccountedIntervals",
+            precision: "Средняя",
+            reasons: [
+                "код вне AOP-инструментирования",
+                "завершение HTTP-ответа",
+                "frontend/browser processing"
+            ]
+        };
+    }
+
+    function technicalUninstrumentedTooltipDetails(interval) {
+        const type = String(interval?.type || "").toUpperCase();
+        if (type === "BEFORE_FIRST_STAGE") {
+            return [
+                "Источник: request start → first stage start",
+                "Вероятно: servlet filters, Spring Security, маршрутизация, подготовка контекста",
+                "Точность: высокая"
+            ];
+        }
+        if (type === "AFTER_LAST_STAGE") {
+            return [
+                "Источник: last stage end → event complete",
+                "Это время после последнего backend/frontend stage до завершения события; оно не равно TTFB.",
+                "Вероятно: сериализация ответа, postHandle/afterCompletion, filters, frontend/browser",
+                "Точность: высокая по границам, средняя по причине"
+            ];
+        }
+        if (type === "BETWEEN_STAGE_INTERVALS") {
+            return [
+                "Источник: previous stage end → next stage start",
+                "Вероятно: код вне AOP или ожидание между слоями",
+                "Точность: высокая по границам, средняя по причине"
+            ];
+        }
+        return [
+            "Источник: unaccounted interval",
+            "Вероятно: код вне AOP-инструментирования",
+            "Точность: средняя"
+        ];
+    }
+
+    function timelineStageContextNote(stage) {
+        const code = normalizeStageCode(stage?.stageTypeCode);
+        if (code === "FRONTEND_START") {
+            return "Точка начала измерения frontend-навигации, а не этап с длительностью.";
+        }
+        if (code === "SERVER_WAIT") {
+            return "TTFB — от начала навигации до первого байта ответа.";
+        }
+        if (code === "FRONTEND_RENDER") {
+            return "Длительность этапа после ответа; browser-метрики считаются отдельно от начала навигации.";
+        }
+        return "";
+    }
+
+    function timelineStageTooltipDetails(stage) {
+        const note = timelineStageContextNote(stage);
+        if (!note) {
+            return [];
+        }
+        return [note];
+    }
+
+    function renderEventAttributesTab(data) {
+        const sections = groupEventAttributes(data);
+        return `
+            <section class="analytics-event-tab-section analytics-event-attributes-tab">
+                <div class="analytics-event-tab-toolbar">
+                    <div>
+                        <h3>Атрибуты события</h3>
+                        <p>Сгруппированы по назначению, длинные значения можно копировать.</p>
+                    </div>
+                    <input type="search" class="form-control analytics-event-search" data-event-attribute-search placeholder="Поиск по атрибутам">
+                </div>
+                <div class="analytics-event-attribute-grid">
+                    ${sections.map(renderEventAttributeSection).join("")}
+                </div>
+            </section>
+        `;
+    }
+
+    function groupEventAttributes(data) {
+        const raw = Array.isArray(data?.attributes) ? data.attributes : [];
+        const rows = raw.map((attribute) => ({
+            code: attribute.attributeTypeCode || "",
+            name: attribute.attributeTypeName || attribute.attributeTypeCode || "",
+            value: attribute.valueJson || attribute.value || ""
+        })).filter((attribute) => attribute.code || attribute.value);
+        const systemRows = [
+            {code: "HTTP_METHOD", name: "HTTP-метод", value: data.httpMethod || ""},
+            {code: "HTTP_PATH", name: "Путь запроса", value: data.requestPath || ""},
+            {code: "HTTP_STATUS", name: "HTTP-статус", value: data.statusCode == null ? "" : String(data.statusCode)},
+            {code: "TRACE_ID", name: "Trace ID", value: data.traceId || ""}
+        ];
+        const byCode = new Map();
+        [...systemRows, ...rows].forEach((row) => {
+            const code = String(row.code || "").trim();
+            if (!code || byCode.has(code)) {
+                return;
+            }
+            byCode.set(code, {
+                ...row,
+                name: eventAttributeDisplayName(code, row.name),
+                value: eventAttributeDisplayValue(code, row.value)
+            });
+        });
+        const rawUserAgentRow = byCode.get("USER_AGENT");
+        const rawUserAgent = String(rawUserAgentRow?.value || "").trim();
+        if (rawUserAgentRow && rawUserAgent) {
+            const parsedUserAgent = parseUserAgentForEventDetails(rawUserAgent);
+            byCode.set("USER_AGENT", {
+                ...rawUserAgentRow,
+                name: "User-Agent",
+                value: rawUserAgent
+            });
+            if (parsedUserAgent.application) {
+                byCode.set("CLIENT_APPLICATION", {
+                    code: "CLIENT_APPLICATION",
+                    name: "Клиентское приложение",
+                    value: parsedUserAgent.application
+                });
+            }
+            if (parsedUserAgent.platform) {
+                byCode.set("CLIENT_PLATFORM", {
+                    code: "CLIENT_PLATFORM",
+                    name: "Платформа",
+                    value: parsedUserAgent.platform
+                });
+            }
+        }
+        const sections = [
+            {key: "http", title: "HTTP", codes: ["HTTP_METHOD", "HTTP_PATH", "HTTP_STATUS"]},
+            {key: "client", title: "Клиент", codes: ["CLIENT_TYPE", "CLIENT_APPLICATION", "CLIENT_PLATFORM", "USER_AGENT", "REFERRER"]},
+            {key: "ids", title: "Идентификаторы", codes: ["REQUEST_ID", "TRACE_ID", "SESSION_ID_HASH", "USER_ID_HASH"]},
+            {key: "domain", title: "Доменные атрибуты", codes: ["ENTITY_TYPE", "ENTITY_ID", "CATEGORY_SLUG", "PRODUCT_SLUG", "CATEGORY_NAME"]}
+        ].map((section) => ({
+            ...section,
+            rows: section.codes.map((code) => byCode.get(code)).filter(Boolean)
+        }));
+        const usedCodes = new Set(sections.flatMap((section) => section.rows.map((row) => row.code)));
+        const customRows = Array.from(byCode.values())
+            .filter((row) => !usedCodes.has(row.code))
+            .sort((left, right) => String(left.name || left.code).localeCompare(String(right.name || right.code), "ru"));
+        if (customRows.length) {
+            sections.push({key: "custom", title: "Прочие атрибуты", rows: customRows});
+        }
+        return sections.filter((section) => section.rows.length);
+    }
+
+    function eventAttributeDisplayName(code, fallback) {
+        const normalized = String(code || "").trim().toUpperCase();
+        if (normalized === "ENTITY_TYPE") {
+            return "Сущность";
+        }
+        if (normalized === "ENTITY_ID") {
+            return "ID сущности";
+        }
+        if (normalized === "CATEGORY_SLUG") {
+            return "Slug категории";
+        }
+        if (normalized === "PRODUCT_SLUG") {
+            return "Slug товара";
+        }
+        return fallback || code || "";
+    }
+
+    function eventAttributeDisplayValue(code, value) {
+        const normalized = String(code || "").trim().toUpperCase();
+        const text = value == null ? "" : String(value);
+        if (normalized === "ENTITY_TYPE") {
+            const entityType = text.trim().toUpperCase();
+            if (entityType === "CATEGORY") {
+                return "Категория / CATEGORY";
+            }
+            if (entityType === "PRODUCT") {
+                return "Товар / PRODUCT";
+            }
+        }
+        return text;
+    }
+
+    function parseUserAgentForEventDetails(userAgent) {
+        const ua = String(userAgent || "");
+        if (!ua.trim()) {
+            return {application: "", platform: ""};
+        }
+        const browser = detectUserAgentBrowser(ua);
+        const os = detectUserAgentOs(ua);
+        const arch = detectUserAgentArchitecture(ua);
+        return {
+            application: browser.name ? `${browser.name}${browser.major ? ` ${browser.major}` : ""}` : "Неизвестный браузер",
+            platform: [os, arch].filter(Boolean).join(" ")
+        };
+    }
+
+    function detectUserAgentBrowser(ua) {
+        const detectors = [
+            {name: "Opera", pattern: /(?:OPR|Opera)\/(\d+)/i},
+            {name: "Edge", pattern: /(?:Edg|EdgA|EdgiOS)\/(\d+)/i},
+            {name: "Firefox", pattern: /(?:Firefox|FxiOS)\/(\d+)/i},
+            {name: "Chrome", pattern: /(?:Chrome|CriOS)\/(\d+)/i},
+            {name: "Safari", pattern: /Version\/(\d+)(?:\.\d+)*\s+Safari\//i}
+        ];
+        for (const detector of detectors) {
+            const match = ua.match(detector.pattern);
+            if (match) {
+                return {name: detector.name, major: match[1] || ""};
+            }
+        }
+        return {name: "", major: ""};
+    }
+
+    function detectUserAgentOs(ua) {
+        if (/Windows NT 10\.0/i.test(ua)) {
+            return "Windows (NT 10.0)";
+        }
+        if (/Windows NT 6\.3/i.test(ua)) {
+            return "Windows 8.1";
+        }
+        if (/Windows NT 6\.2/i.test(ua)) {
+            return "Windows 8";
+        }
+        if (/Windows NT 6\.1/i.test(ua)) {
+            return "Windows 7";
+        }
+        if (/Android\s+([\d.]+)/i.test(ua)) {
+            const version = ua.match(/Android\s+([\d.]+)/i)?.[1] || "";
+            return `Android${version ? ` ${version.split(".")[0]}` : ""}`;
+        }
+        if (/(iPhone|iPad|iPod)/i.test(ua)) {
+            const version = ua.match(/OS\s+([\d_]+)/i)?.[1]?.replace(/_/g, ".") || "";
+            return `iOS${version ? ` ${version.split(".")[0]}` : ""}`;
+        }
+        if (/Mac OS X\s+([\d_]+)/i.test(ua)) {
+            const version = ua.match(/Mac OS X\s+([\d_]+)/i)?.[1]?.replace(/_/g, ".") || "";
+            return `macOS${version ? ` ${version.split(".").slice(0, 2).join(".")}` : ""}`;
+        }
+        if (/Linux/i.test(ua)) {
+            return "Linux";
+        }
+        return "";
+    }
+
+    function detectUserAgentArchitecture(ua) {
+        if (/(arm64|aarch64|armv8|armv7| arm;|; arm)/i.test(ua)) {
+            return "arm";
+        }
+        if (/(Win64|x64|x86_64|WOW64|amd64)/i.test(ua)) {
+            return "x64";
+        }
+        if (/(i686|i386|x86)/i.test(ua)) {
+            return "x86";
+        }
+        return "";
+    }
+
+    function renderEventAttributeSection(section) {
+        return `
+            <article class="glass-card analytics-event-attribute-section" data-event-attribute-section>
+                <h4>${escapeHtml(section.title)}</h4>
+                <div class="analytics-event-attribute-list">
+                    ${section.rows.map(renderEventAttributeItem).join("")}
+                </div>
+            </article>
+        `;
+    }
+
+    function renderEventAttributeItem(attribute) {
+        const value = attribute.value == null || attribute.value === "" ? "—" : String(attribute.value);
+        const searchable = `${attribute.code} ${attribute.name} ${value}`.toLowerCase();
+        return `
+            <div class="analytics-event-attribute-item" data-event-attribute-item data-search-text="${escapeHtml(searchable)}">
+                <span>${escapeHtml(attribute.name || attribute.code)}</span>
+                <div>
+                    <code title="${escapeHtml(value)}">${escapeHtml(value)}</code>
+                    ${value !== "—" ? renderEventCopyButton(value) : ""}
+                </div>
+            </div>
+        `;
+    }
+
+    function buildStageSummaryIntervals(stages) {
+        const source = Array.isArray(stages) ? stages : [];
+        const startedAtValues = source
+            .map((stage) => toEpochMs(stage?.startedAt))
+            .filter((value) => Number.isFinite(value));
+        const firstStartedAt = startedAtValues.length ? Math.min(...startedAtValues) : 0;
+        return annotateTimelineSelfTimes(source.map((stage, index) => {
+            const duration = Math.max(0, Number(stage?.durationMs || 0));
+            const explicitOffset = Number(stage?.offsetFromEventStartMs);
+            const startedAt = toEpochMs(stage?.startedAt);
+            const offset = Number.isFinite(explicitOffset)
+                ? Math.max(0, explicitOffset)
+                : (Number.isFinite(startedAt) ? Math.max(0, startedAt - firstStartedAt) : 0);
+            return {
+                ...stage,
+                timelineIndex: index,
+                offsetFromEventStartMs: offset,
+                durationMs: duration,
+                finishOffsetMs: offset + duration
+            };
+        }));
+    }
+
+    function buildEventStageSummary(stages) {
+        const byCode = new Map();
+        buildStageSummaryIntervals(stages).forEach((stage) => {
+            const code = normalizeStageCode(stage?.stageTypeCode) || "UNKNOWN";
+            const duration = Number(stage?.durationMs || 0);
+            const selfDuration = Math.max(0, Number(stage?.selfDurationMs ?? duration));
+            if (!byCode.has(code)) {
+                byCode.set(code, {
+                    stageTypeCode: code,
+                    stageTypeName: stage?.stageTypeName || code,
+                    count: 0,
+                    durations: [],
+                    selfDurations: [],
+                    totalDurationMs: 0,
+                    totalSelfDurationMs: 0,
+                    totalNestedDurationMs: 0,
+                    maxDurationMs: 0,
+                    maxSelfDurationMs: 0,
+                    errorCount: 0
+                });
+            }
+            const row = byCode.get(code);
+            row.count += 1;
+            row.durations.push(duration);
+            row.selfDurations.push(selfDuration);
+            row.totalDurationMs += duration;
+            row.totalSelfDurationMs += selfDuration;
+            row.totalNestedDurationMs += Math.max(0, duration - selfDuration);
+            row.maxDurationMs = Math.max(row.maxDurationMs, duration);
+            row.maxSelfDurationMs = Math.max(row.maxSelfDurationMs, selfDuration);
+            if (stage?.isError) {
+                row.errorCount += 1;
+            }
+        });
+        const totalSelfDuration = Array.from(byCode.values())
+            .reduce((sum, row) => sum + Number(row.totalSelfDurationMs || 0), 0);
+        const rows = Array.from(byCode.values()).map((row) => ({
+            ...row,
+            avgMs: row.count > 0 ? row.totalDurationMs / row.count : 0,
+            p95Ms: percentile(row.durations, 0.95),
+            p99Ms: percentile(row.durations, 0.99),
+            avgSelfMs: row.count > 0 ? row.totalSelfDurationMs / row.count : 0,
+            p95SelfMs: percentile(row.selfDurations, 0.95),
+            p99SelfMs: percentile(row.selfDurations, 0.99),
+            selfShare: totalSelfDuration > 0 ? (row.totalSelfDurationMs / totalSelfDuration) * 100 : 0,
+            errorRate: row.count > 0 ? (row.errorCount / row.count) * 100 : 0
+        })).sort((left, right) => right.maxDurationMs - left.maxDurationMs || right.errorCount - left.errorCount);
+        const slowestSelf = rows
+            .slice()
+            .sort((left, right) => right.maxSelfDurationMs - left.maxSelfDurationMs || right.totalSelfDurationMs - left.totalSelfDurationMs)[0] || null;
+        return {
+            rows,
+            slowest: rows[0] || null,
+            slowestSelf
+        };
+    }
+
+    function formatEventStageMs(value) {
+        const number = Number(value || 0);
+        if (!Number.isFinite(number)) {
+            return "0 мс";
+        }
+        return `${formatInt(number)} мс`;
+    }
+
+    function percentile(values, percentileValue) {
+        const nums = (Array.isArray(values) ? values : [])
+            .map(Number)
+            .filter((value) => Number.isFinite(value))
+            .sort((a, b) => a - b);
+        if (!nums.length) {
+            return 0;
+        }
+        const index = Math.min(nums.length - 1, Math.max(0, Math.ceil(nums.length * percentileValue) - 1));
+        return nums[index];
+    }
+
+    function renderEventStagesTab(stageSummary) {
+        const rows = Array.isArray(stageSummary?.rows) ? stageSummary.rows : [];
+        if (!rows.length) {
+            return `<section class="analytics-event-tab-section"><div class="analytics-event-empty-state">Этапы не найдены.</div></section>`;
+        }
+        const slowestCode = stageSummary.slowest?.stageTypeCode || "";
+        const slowestSelfCode = stageSummary.slowestSelf?.stageTypeCode || "";
+        return `
+            <section class="analytics-event-tab-section analytics-event-stages-tab">
+                <div class="analytics-event-stage-overview">
+                    <article class="glass-card analytics-event-stage-chart-card">
+                        <div class="analytics-event-section-head">
+                            <div>
+                                <h3>Этапы выполнения</h3>
+                                <p>AVG и P95 по слоям можно смотреть с учётом вложенных вызовов или как собственное время слоя.</p>
+                            </div>
+                        </div>
+                        <div class="analytics-event-stage-mode" role="group" aria-label="Режим времени этапов">
+                            <label>
+                                <input type="radio" name="analytics-event-stage-mode" value="inclusive" data-event-stage-mode-input checked>
+                                <span>С учётом вложенных этапов</span>
+                            </label>
+                            <label>
+                                <input type="radio" name="analytics-event-stage-mode" value="self" data-event-stage-mode-input>
+                                <span>Собственное время слоя</span>
+                            </label>
+                        </div>
+                        <div class="analytics-event-stage-legend" title="Длина полос нормализована относительно максимального значения среди этапов текущего события.">
+                            <span><i class="is-avg"></i> Бирюзовая полоса = AVG</span>
+                            <span><i class="is-p95"></i> Фиолетовая полоса = P95</span>
+                            <small>Длина полос нормализована относительно максимального значения среди этапов текущего события.</small>
+                        </div>
+                        <div class="analytics-event-stage-mode-panel is-inclusive">
+                            ${rows.map((row) => renderStageSummaryBar(row, slowestCode, "inclusive")).join("")}
+                        </div>
+                        <div class="analytics-event-stage-mode-panel is-self">
+                            ${rows.map((row) => renderStageSummaryBar(row, slowestSelfCode, "self")).join("")}
+                        </div>
+                    </article>
+                </div>
+                <article class="glass-card analytics-event-data-card">
+                    ${stageSummary.slowest ? `
+                        <div class="analytics-event-slowest-badge">
+                            <span>Самый медленный этап с учётом вложенных вызовов</span>
+                            <strong>${escapeHtml(stageSummary.slowest.stageTypeName)}</strong>
+                            <b>${formatEventStageMs(stageSummary.slowest.maxDurationMs)}</b>
+                        </div>
+                    ` : ""}
+                    ${stageSummary.slowestSelf ? `
+                        <div class="analytics-event-slowest-badge is-self">
+                            <span>Максимальное собственное время</span>
+                            <strong>${escapeHtml(stageSummary.slowestSelf.stageTypeName)}</strong>
+                            <b>${formatEventStageMs(stageSummary.slowestSelf.maxSelfDurationMs)}</b>
+                        </div>
+                    ` : ""}
+                    <div class="table-responsive analytics-event-datagrid-wrap">
+                        <table class="table table-sm analytics-table analytics-event-datagrid analytics-event-sortable-table mb-0">
+                            <thead>
+                            <tr>
+                                <th><button type="button" data-event-sort-key="name">Этап</button></th>
+                                <th class="text-end"><button type="button" data-event-sort-key="count">Количество</button></th>
+                                <th class="text-end"><button type="button" data-event-sort-key="avg">AVG с влож.</button></th>
+                                <th class="text-end"><button type="button" data-event-sort-key="p95">P95 с влож.</button></th>
+                                <th class="text-end"><button type="button" data-event-sort-key="p99">P99 с влож.</button></th>
+                                <th class="text-end"><button type="button" data-event-sort-key="selfAvg">AVG собств.</button></th>
+                                <th class="text-end"><button type="button" data-event-sort-key="selfP95">P95 собств.</button></th>
+                                <th class="text-end"><button type="button" data-event-sort-key="selfShare">Доля собственного</button></th>
+                                <th class="text-end"><button type="button" data-event-sort-key="errors">Доля ошибок</button></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            ${rows.map((row) => `
+                                <tr class="${row.stageTypeCode === slowestCode || row.stageTypeCode === slowestSelfCode ? "is-slowest" : ""} ${row.errorCount > 0 ? "is-error" : ""}">
+                                    <td data-sort-value="${escapeHtml(row.stageTypeName)}">
+                                        <div class="analytics-event-stage-cell">
+                                            <div>
+                                                <strong>${escapeHtml(row.stageTypeName)}</strong>
+                                                ${row.stageTypeCode === slowestCode ? `<span class="analytics-event-row-badge">Самый медленный</span>` : ""}
+                                                ${row.stageTypeCode === slowestSelfCode ? `<span class="analytics-event-row-badge is-self">Макс. собственное</span>` : ""}
+                                            </div>
+                                            <div class="analytics-event-stage-cell-metrics">
+                                                <span>Всего: ${formatEventStageMs(row.totalDurationMs)}</span>
+                                                <span class="is-self">Собственное: ${formatEventStageMs(row.totalSelfDurationMs)}</span>
+                                                <span>Вложено: ${formatEventStageMs(row.totalNestedDurationMs)}</span>
+                                                <span>Макс. с влож.: ${formatEventStageMs(row.maxDurationMs)}</span>
+                                                <span>Макс. собственное: ${formatEventStageMs(row.maxSelfDurationMs)}</span>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="text-end" data-sort-value="${row.count}">${formatInt(row.count)}</td>
+                                    <td class="text-end" data-sort-value="${row.avgMs}">${formatEventStageMs(row.avgMs)}</td>
+                                    <td class="text-end" data-sort-value="${row.p95Ms}">${formatEventStageMs(row.p95Ms)}</td>
+                                    <td class="text-end" data-sort-value="${row.p99Ms}">${formatEventStageMs(row.p99Ms)}</td>
+                                    <td class="text-end" data-sort-value="${row.avgSelfMs}">${formatEventStageMs(row.avgSelfMs)}</td>
+                                    <td class="text-end" data-sort-value="${row.p95SelfMs}">${formatEventStageMs(row.p95SelfMs)}</td>
+                                    <td class="text-end" data-sort-value="${row.selfShare}">${formatPercentValue(row.selfShare)}</td>
+                                    <td class="text-end" data-sort-value="${row.errorRate}">${formatPercentValue(row.errorRate)}</td>
+                                </tr>
+                            `).join("")}
+                            </tbody>
+                        </table>
+                    </div>
+                </article>
+            </section>
+        `;
+    }
+
+    function renderStageSummaryBar(row, slowestCode, mode = "inclusive") {
+        const isSelfMode = mode === "self";
+        const avgValue = isSelfMode ? row.avgSelfMs : row.avgMs;
+        const p95Value = isSelfMode ? row.p95SelfMs : row.p95Ms;
+        const maxValue = Math.max(1, isSelfMode ? row.maxSelfDurationMs : row.maxDurationMs, p95Value, avgValue);
+        const avgWidth = Math.max(8, Math.min(100, (avgValue / maxValue) * 100));
+        const p95Width = Math.max(8, Math.min(100, (p95Value / maxValue) * 100));
+        const countLabel = formatStageCallCount(row.count);
+        const meta = isSelfMode
+            ? `${countLabel} · AVG собственное ${formatEventStageMs(avgValue)} · P95 собственное ${formatEventStageMs(p95Value)} · Сумма собственного ${formatEventStageMs(row.totalSelfDurationMs)} · Доля собственного ${formatPercentValue(row.selfShare)}`
+            : `${countLabel} · AVG с вложенными ${formatEventStageMs(avgValue)} · P95 с вложенными ${formatEventStageMs(p95Value)} · Ошибки ${formatPercentValue(row.errorRate)}`;
+        return `
+            <div class="analytics-event-stage-bar-row ${row.stageTypeCode === slowestCode ? "is-slowest" : ""}">
+                <div class="analytics-event-stage-bar-label">
+                    <strong>${escapeHtml(row.stageTypeName)}</strong>
+                    <span>${escapeHtml(meta)}</span>
+                </div>
+                <div class="analytics-event-stage-bar-track">
+                    <span class="analytics-event-stage-bar is-avg" style="width:${avgWidth.toFixed(2)}%" title="${isSelfMode ? "AVG собственное" : "AVG с учётом вложенных этапов"} ${formatEventStageMs(avgValue)}">
+                        <b>${formatEventStageMs(avgValue)}</b>
+                    </span>
+                    <span class="analytics-event-stage-bar is-p95" style="width:${p95Width.toFixed(2)}%" title="${isSelfMode ? "P95 собственное" : "P95 с учётом вложенных этапов"} ${formatEventStageMs(p95Value)}">
+                        <b>${formatEventStageMs(p95Value)}</b>
+                    </span>
+                </div>
+            </div>
+        `;
+    }
+
+    function formatStageCallCount(value) {
+        const count = Math.max(0, Math.round(Number(value || 0)));
+        const lastTwo = count % 100;
+        const last = count % 10;
+        if (lastTwo >= 11 && lastTwo <= 14) {
+            return `${formatInt(count)} вызовов`;
+        }
+        if (last === 1) {
+            return `${formatInt(count)} вызов`;
+        }
+        if (last >= 2 && last <= 4) {
+            return `${formatInt(count)} вызова`;
+        }
+        return `${formatInt(count)} вызовов`;
+    }
+
+    function renderEventGroupedCallsTab(stageGroups, uidSafe) {
+        const groups = Array.isArray(stageGroups) ? stageGroups : [];
+        if (!groups.length) {
+            return `<section class="analytics-event-tab-section"><div class="analytics-event-empty-state">Вызовы не найдены.</div></section>`;
+        }
+        return `
+            <section class="analytics-event-tab-section analytics-event-calls-tab">
+                <div class="analytics-event-tab-toolbar">
+                    <div>
+                        <h3>Trace tree</h3>
+                        <p>Группировка последовательных вызовов по слою, источнику и операции.</p>
+                    </div>
+                </div>
+                <div class="analytics-event-call-tree">
+                    ${groups.map((group, index) => renderTraceGroupAccordion(group, index, uidSafe)).join("")}
+                </div>
+            </section>
+        `;
+    }
+
+    function renderTraceGroupAccordion(group, index, uidSafe) {
+        const items = Array.isArray(group?.items) ? group.items : [];
+        const totalDuration = items.reduce((sum, item) => sum + Number(item.stage?.durationMs || 0), 0);
+        const totalSelfDuration = items.reduce((sum, item) => sum + Number(item.stage?.selfDurationMs ?? item.stage?.durationMs ?? 0), 0);
+        const totalNestedDuration = items.reduce((sum, item) => sum + Number(item.stage?.nestedDurationMs || 0), 0);
+        const maxDuration = items.reduce((max, item) => Math.max(max, Number(item.stage?.durationMs || 0)), 0);
+        const hasErrors = items.some((item) => item.stage?.isError);
+        const stageCode = normalizeStageCode(group?.stageTypeCode);
+        const contextNote = groupedCallContextNote(stageCode);
+        return `
+            <details class="glass-card analytics-event-call-node ${hasErrors ? "is-error" : (maxDuration >= 100 ? "is-warning" : "is-ok")}" ${index === 0 ? "open" : ""}>
+                <summary>
+                    <span class="analytics-event-call-indicator"></span>
+                    <span class="analytics-event-call-title">
+                        <strong>${escapeHtml(group.stageTypeName || group.stageTypeCode || "Вызов")}</strong>
+                        <small>${escapeHtml(group.source || "—")} · ${escapeHtml(group.operation || "—")}</small>
+                        ${contextNote ? `<small class="analytics-event-call-context">${escapeHtml(contextNote)}</small>` : ""}
+                    </span>
+                    ${renderGroupedCallDuration(totalDuration, totalSelfDuration, totalNestedDuration, stageCode)}
+                    <span class="analytics-status-badge ${hasErrors ? "analytics-badge-error" : "analytics-badge-success"}">${hasErrors ? "Ошибка" : "OK"}</span>
+                </summary>
+                <div class="analytics-event-call-body">
+                    ${items.map((item) => renderTraceStageItem(item.stage, item.index)).join("")}
+                </div>
+            </details>
+        `;
+    }
+
+    function renderTraceStageItem(stage, index) {
+        const metrics = Array.isArray(stage?.metrics) ? stage.metrics : [];
+        const logs = Array.isArray(stage?.logs) ? stage.logs : [];
+        const stageCode = normalizeStageCode(stage?.stageTypeCode);
+        const isNavigationMarker = stageCode === "FRONTEND_START";
+        const nestedDuration = supportsGroupedCallSelfTime(stageCode)
+            ? Math.max(0, Number(stage?.nestedDurationMs || 0))
+            : 0;
+        const selfDuration = Math.max(0, Number(stage?.selfDurationMs ?? stage?.durationMs ?? 0));
+        const contextNote = groupedCallContextNote(stageCode);
+        const metricsHtml = renderTraceStageMetrics(stage, metrics);
+        const logsHtml = logs.length ? `
+            <div class="analytics-event-call-detail-section analytics-event-call-log-section">
+                <h5>Логи этапа</h5>
+                ${renderStageInlineLogs(logs)}
+            </div>
+        ` : "";
+        return `
+            <article class="analytics-event-call-stage">
+                <div class="analytics-event-call-stage-head">
+                    <div>
+                        <strong>#${formatInt(index + 1)} ${escapeHtml(stage?.stageTypeName || stage?.stageTypeCode || "Этап")}</strong>
+                        <span>${escapeHtml(formatEventDetailsDateTime(stage?.startedAt))} — ${escapeHtml(formatEventDetailsDateTime(stage?.endedAt))}</span>
+                        ${contextNote ? `<span class="analytics-event-call-context">${escapeHtml(contextNote)}</span>` : ""}
+                    </div>
+                    <div>
+                        ${renderTraceStageTiming(stage, selfDuration, nestedDuration, isNavigationMarker)}
+                        <span class="analytics-status-badge ${stage?.isError ? "analytics-badge-error" : "analytics-badge-success"}">${stage?.isError ? "Ошибка" : "OK"}</span>
+                    </div>
+                </div>
+                ${stage?.errorMessage ? `<div class="analytics-event-call-error">${escapeHtml(stage.errorMessage)}</div>` : ""}
+                ${metricsHtml || logsHtml ? `<div class="analytics-event-call-details">${metricsHtml}${logsHtml}</div>` : ""}
+            </article>
+        `;
+    }
+
+    function renderGroupedCallDuration(totalDuration, totalSelfDuration, totalNestedDuration, stageCode) {
+        if (stageCode === "FRONTEND_START") {
+            return `<span class="analytics-event-call-duration is-marker">Маркер</span>`;
+        }
+        if (supportsGroupedCallSelfTime(stageCode) && totalNestedDuration > 0) {
+            return `
+                <span class="analytics-event-call-duration has-breakdown"
+                      title="Собственное время = длительность без вложенных вызовов.">
+                    <strong>Всего: ${formatInt(totalDuration)} мс</strong>
+                    <small>Собственное: ${formatInt(totalSelfDuration)} мс · Вложено: ${formatInt(totalNestedDuration)} мс</small>
+                </span>
+            `;
+        }
+        if (stageCode === "SERVER_WAIT") {
+            return `<span class="analytics-event-call-duration">TTFB: ${formatInt(totalDuration)} мс</span>`;
+        }
+        if (stageCode === "FRONTEND_RENDER") {
+            return `<span class="analytics-event-call-duration">Этап: ${formatInt(totalDuration)} мс</span>`;
+        }
+        return `<span class="analytics-event-call-duration">${formatInt(totalDuration)} мс</span>`;
+    }
+
+    function renderTraceStageTiming(stage, selfDuration, nestedDuration, isNavigationMarker) {
+        if (isNavigationMarker) {
+            return `<b class="analytics-event-call-marker">Маркер</b>`;
+        }
+        const duration = Math.max(0, Number(stage?.durationMs || 0));
+        if (nestedDuration <= 0) {
+            const stageCode = normalizeStageCode(stage?.stageTypeCode);
+            if (stageCode === "SERVER_WAIT") {
+                return `<b>TTFB: ${formatInt(duration)} мс</b>`;
+            }
+            if (stageCode === "FRONTEND_RENDER") {
+                return `<b>Длительность этапа: ${formatInt(duration)} мс</b>`;
+            }
+            return `<b>${formatInt(duration)} мс</b>`;
+        }
+        return `
+            <div class="analytics-event-call-timing" title="Собственное время = длительность без вложенных вызовов.">
+                <b>Всего: ${formatInt(duration)} мс</b>
+                <span class="is-self">Собственное: ${formatInt(selfDuration)} мс</span>
+                <span>Вложено: ${formatInt(nestedDuration)} мс</span>
+            </div>
+        `;
+    }
+
+    function supportsGroupedCallSelfTime(stageCode) {
+        return !["FRONTEND_START", "SERVER_WAIT", "FRONTEND_RENDER"].includes(normalizeStageCode(stageCode));
+    }
+
+    function groupedCallContextNote(stageCode) {
+        if (stageCode === "FRONTEND_START") {
+            return "Точка начала измерения frontend-навигации, а не операция.";
+        }
+        if (stageCode === "SERVER_WAIT") {
+            return "TTFB — от начала навигации до первого байта ответа.";
+        }
+        if (stageCode === "FRONTEND_RENDER") {
+            return "Длительность этапа после получения ответа. Навигационные метрики ниже считаются от начала навигации.";
+        }
+        return "";
+    }
+
+    function renderTraceStageMetrics(stage, metrics) {
+        if (!metrics.length) {
+            return "";
+        }
+        const stageCode = normalizeStageCode(stage?.stageTypeCode);
+        if (stageCode !== "FRONTEND_RENDER" && stageCode !== "SERVER_WAIT") {
+            return renderGenericTraceStageMetrics(metrics, "Метрики");
+        }
+        const browserMetrics = metrics.filter((metric) => browserNavigationMetricMeta(metric?.metricTypeCode));
+        const otherMetrics = metrics.filter((metric) => !browserNavigationMetricMeta(metric?.metricTypeCode));
+        const browserHtml = browserMetrics.length ? `
+            <div class="analytics-event-call-detail-section analytics-event-browser-metrics">
+                <h5>Навигационные метрики браузера</h5>
+                <p>Считаются от начала навигации и не равны длительности frontend-этапа.</p>
+                <div class="analytics-event-call-metric-grid">
+                    ${browserMetrics.map(renderBrowserNavigationMetric).join("")}
+                </div>
+            </div>
+        ` : "";
+        const otherHtml = otherMetrics.length ? renderGenericTraceStageMetrics(otherMetrics, "Метрики этапа") : "";
+        return browserHtml + otherHtml;
+    }
+
+    function renderGenericTraceStageMetrics(metrics, title) {
+        return `
+            <div class="analytics-event-call-detail-section">
+                <h5>${escapeHtml(title)}</h5>
+                <div class="analytics-event-call-metric-grid">
+                    ${metrics.map((metric) => `
+                        <div>
+                            <span>${escapeHtml(localizeMetricDisplayName(metric.metricTypeCode, metric.metricTypeName || metric.metricTypeCode))}</span>
+                            <strong>${metric.metricValueNum != null ? escapeHtml(String(metric.metricValueNum)) : escapeHtml(metric.metricValueText || "—")} ${escapeHtml(metric.unit || "")}</strong>
+                        </div>
+                    `).join("")}
+                </div>
+            </div>
+        `;
+    }
+
+    function browserNavigationMetricMeta(metricCode) {
+        const code = normalizeStageCode(metricCode);
+        const meta = {
+            FRONTEND_TTFB_MS: {label: "TTFB", suffix: "от начала навигации", tooltip: "TTFB — от начала навигации до первого байта ответа."},
+            TTFB_MS: {label: "TTFB", suffix: "от начала навигации", tooltip: "TTFB — от начала навигации до первого байта ответа."},
+            FRONTEND_DOM_INTERACTIVE_MS: {label: "DOM Interactive", suffix: "от начала навигации"},
+            DOM_INTERACTIVE_MS: {label: "DOM Interactive", suffix: "от начала навигации"},
+            FRONTEND_DOM_CONTENT_LOADED_MS: {label: "DOMContentLoaded", suffix: "от начала навигации"},
+            DOM_CONTENT_LOADED_MS: {label: "DOMContentLoaded", suffix: "от начала навигации"},
+            FRONTEND_LOAD_EVENT_MS: {label: "Load Event", suffix: "от начала навигации"},
+            LOAD_EVENT_MS: {label: "Load Event", suffix: "от начала навигации"},
+            FRONTEND_LCP_MS: {label: "LCP", suffix: "от начала навигации"},
+            LCP_MS: {label: "LCP", suffix: "от начала навигации"},
+            LCP: {label: "LCP", suffix: "от начала навигации"},
+            FRONTEND_INP_MS: {label: "INP", suffix: "задержка взаимодействия"},
+            INP_MS: {label: "INP", suffix: "задержка взаимодействия"},
+            INP: {label: "INP", suffix: "задержка взаимодействия"}
+        };
+        return meta[code] || null;
+    }
+
+    function renderBrowserNavigationMetric(metric) {
+        const meta = browserNavigationMetricMeta(metric?.metricTypeCode);
+        const rawValue = metric?.metricValueNum != null ? Number(metric.metricValueNum) : Number(metric?.metricValueText);
+        const value = Number.isFinite(rawValue)
+            ? `${formatDecimal(rawValue)} мс`
+            : String(metric?.metricValueText || "—");
+        const tooltip = meta?.tooltip || "Метрика браузера от начала навигации, не равна длительности frontend-этапа.";
+        return `
+            <div class="analytics-event-browser-metric" title="${escapeHtml(tooltip)}">
+                <span>${escapeHtml(meta?.label || metric?.metricTypeName || metric?.metricTypeCode || "Метрика")}</span>
+                <strong>${escapeHtml(value)}</strong>
+                <small>${escapeHtml(meta?.suffix || "метрика браузера")}</small>
+            </div>
+        `;
+    }
+
+    function renderStageInlineLogs(logs) {
+        const rows = (Array.isArray(logs) ? logs : [])
+            .slice()
+            .sort((left, right) => logEntryTime(left) - logEntryTime(right));
+        if (!rows.length) {
+            return "";
+        }
+        const visibleRows = rows.slice(0, 5);
+        const hiddenRows = rows.slice(5);
+        const normalizeLogText = (value) => {
+            const text = value == null || value === "" ? "—" : String(value);
+            return text.replace(/\s+/g, " ").trim() || "—";
+        };
+        const logCell = (value, className = "") => {
+            const text = normalizeLogText(value);
+            return `<span class="${className}" title="${escapeHtml(text)}">${escapeHtml(text)}</span>`;
+        };
+        const statusCell = (entry) => {
+            const status = normalizeLogText(entry.status || entry.level || "INFO").toUpperCase();
+            return `<span class="analytics-status-badge ${logStatusBadgeClass(status)}">${escapeHtml(status)}</span>`;
+        };
+        const durationCell = (entry) => {
+            if (entry.durationMs == null) {
+                return "—";
+            }
+            return `${formatInt(entry.durationMs)} ms`;
+        };
+        const renderRows = (items) => items.map((entry) => `
+            <div class="analytics-event-stage-log-row">
+                <span class="analytics-event-stage-log-time">${escapeHtml(formatEventDetailsDateTime(entry.timestamp))}</span>
+                ${statusCell(entry)}
+                ${logCell(entry.layer)}
+                ${logCell(entry.source)}
+                ${logCell(entry.operation)}
+                ${logCell(durationCell(entry))}
+                <code class="analytics-event-stage-log-message" title="${escapeHtml(normalizeLogText(entry.message || entry.rawMessage))}">${escapeHtml(normalizeLogText(entry.message || entry.rawMessage))}</code>
+            </div>
+        `).join("");
+        return `
+            <div class="analytics-event-stage-log-list">
+                <div class="analytics-event-stage-log-row is-head">
+                    <span>Время</span>
+                    <span>Статус</span>
+                    <span>Слой</span>
+                    <span>Источник</span>
+                    <span>Операция</span>
+                    <span>Длит.</span>
+                    <span>Сообщение</span>
+                </div>
+                ${renderRows(visibleRows)}
+                ${hiddenRows.length ? `
+                    <details class="analytics-event-stage-log-more">
+                        <summary>Показать ещё ${formatInt(hiddenRows.length)}</summary>
+                        ${renderRows(hiddenRows)}
+                    </details>
+                ` : ""}
+            </div>
+        `;
+    }
+
+    function logEntryTime(entry) {
+        const timestamp = entry?.timestamp || entry?.createdAt || entry?.time;
+        const parsed = timestamp ? Date.parse(timestamp) : NaN;
+        return Number.isFinite(parsed) ? parsed : 0;
+    }
+
+    function renderEventLogsTab(traceLogs, traceLogStatus, traceId) {
+        const rows = Array.isArray(traceLogs) ? traceLogs : [];
+        return `
+            <section class="analytics-event-tab-section analytics-event-logs-tab">
+                ${renderTraceLogStatus(traceLogStatus, rows.length)}
+                <div class="analytics-event-tab-toolbar">
+                    <div>
+                        <h3>Логи и трассировка</h3>
+                        <p>Trace: <code>${escapeHtml(traceId || "—")}</code></p>
+                    </div>
+                    ${rows.length ? `<input type="search" class="form-control analytics-event-search" data-event-log-search placeholder="Поиск по логам">` : ""}
+                </div>
+                ${rows.length ? renderNormalizedLogsTable(rows, "Логи не найдены.", true, {timestampFormatter: formatEventDetailsDateTime}) : renderEventLogEmptyState()}
+            </section>
+        `;
+    }
+
+    function renderEventLogEmptyState() {
+        return `
+            <div class="glass-card analytics-event-empty-state analytics-event-log-empty">
+                <i class="bi bi-file-earmark-text"></i>
+                <h3>Логи не найдены</h3>
+                <p>Возможные причины:</p>
+                <ul>
+                    <li>логирование выключено;</li>
+                    <li>trace отсутствует или не попал в MDC;</li>
+                    <li>истёк retention текущих логов и архивов.</li>
+                </ul>
+            </div>
+        `;
+    }
+
+    async function copyEventDetailsValue(button) {
+        const value = button.getAttribute("data-event-copy-value") || "";
+        if (!value) {
+            return;
+        }
+        try {
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(value);
+            } else {
+                const textarea = document.createElement("textarea");
+                textarea.value = value;
+                textarea.setAttribute("readonly", "readonly");
+                textarea.style.position = "absolute";
+                textarea.style.left = "-9999px";
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand("copy");
+                document.body.removeChild(textarea);
+            }
+            button.classList.add("is-copied");
+            const icon = button.querySelector("i");
+            const original = icon?.className || "";
+            if (icon) {
+                icon.className = "bi bi-check2";
+            }
+            setTimeout(() => {
+                button.classList.remove("is-copied");
+                if (icon) {
+                    icon.className = original;
+                }
+            }, 1000);
+        } catch (error) {
+            console.error("Copy failed", error);
+        }
+    }
+
+    function filterEventAttributeCards(input) {
+        const root = input.closest(".analytics-event-attributes-tab");
+        if (!root) {
+            return;
+        }
+        const query = String(input.value || "").trim().toLowerCase();
+        root.querySelectorAll("[data-event-attribute-section]").forEach((section) => {
+            let visibleCount = 0;
+            section.querySelectorAll("[data-event-attribute-item]").forEach((item) => {
+                const text = item.getAttribute("data-search-text") || item.textContent || "";
+                const visible = !query || text.toLowerCase().includes(query);
+                item.hidden = !visible;
+                if (visible) {
+                    visibleCount += 1;
+                }
+            });
+            section.hidden = visibleCount === 0;
+        });
+    }
+
+    function filterEventLogRows(input) {
+        const root = input.closest(".analytics-event-logs-tab");
+        if (!root) {
+            return;
+        }
+        const query = String(input.value || "").trim().toLowerCase();
+        root.querySelectorAll(".analytics-event-log-table tbody tr.analytics-log-row").forEach((row) => {
+            const visible = !query || (row.textContent || "").toLowerCase().includes(query);
+            row.hidden = !visible;
+            const nextRaw = row.nextElementSibling;
+            if (nextRaw?.classList.contains("analytics-log-raw-row")) {
+                nextRaw.hidden = true;
+            }
+        });
+    }
+
+    function handleTimelineTooltipPointer(event) {
+        const segment = event.target.closest("[data-timeline-tooltip]");
+        if (!segment || !refs.eventDetailsBody?.contains(segment)) {
+            hideTimelineTooltip();
+            return;
+        }
+        const text = segment.getAttribute("data-timeline-tooltip") || "";
+        if (!text) {
+            hideTimelineTooltip();
+            return;
+        }
+        showTimelineTooltip(text, event);
+    }
+
+    function ensureTimelineTooltip() {
+        let tooltip = document.querySelector(".analytics-event-timeline-tooltip");
+        if (!tooltip) {
+            tooltip = document.createElement("div");
+            tooltip.className = "analytics-event-timeline-tooltip";
+            tooltip.setAttribute("role", "tooltip");
+            document.body.appendChild(tooltip);
+        }
+        return tooltip;
+    }
+
+    function showTimelineTooltip(text, event) {
+        const tooltip = ensureTimelineTooltip();
+        tooltip.textContent = text;
+        tooltip.classList.add("is-visible");
+        const margin = 12;
+        const cursorGap = 14;
+        tooltip.style.left = "0px";
+        tooltip.style.top = "0px";
+        const rect = tooltip.getBoundingClientRect();
+        let left = event.clientX + cursorGap;
+        if (left + rect.width > window.innerWidth - margin) {
+            left = event.clientX - rect.width - cursorGap;
+        }
+        left = Math.max(margin, Math.min(left, window.innerWidth - rect.width - margin));
+        let top = event.clientY - rect.height - cursorGap;
+        if (top < margin) {
+            top = event.clientY + cursorGap;
+        }
+        top = Math.max(margin, Math.min(top, window.innerHeight - rect.height - margin));
+        // The Analytics Admin body uses CSS zoom, while PointerEvent coordinates
+        // remain in viewport pixels. Convert them back to the zoomed layout space.
+        const bodyZoom = Number.parseFloat(window.getComputedStyle(document.body).zoom) || 1;
+        tooltip.style.left = `${left / bodyZoom}px`;
+        tooltip.style.top = `${top / bodyZoom}px`;
+    }
+
+    function hideTimelineTooltip() {
+        const tooltip = document.querySelector(".analytics-event-timeline-tooltip");
+        if (!tooltip) {
+            return;
+        }
+        tooltip.classList.remove("is-visible");
+    }
+
+    function sortEventDetailsTable(button) {
+        const key = button.getAttribute("data-event-sort-key") || "";
+        const table = button.closest("table");
+        const tbody = table?.querySelector("tbody");
+        if (!table || !tbody || !key) {
+            return;
+        }
+        const headerButtons = Array.from(table.querySelectorAll("[data-event-sort-key]"));
+        const columnIndex = headerButtons.indexOf(button);
+        if (columnIndex < 0) {
+            return;
+        }
+        const nextDir = button.getAttribute("data-sort-dir") === "asc" ? "desc" : "asc";
+        headerButtons.forEach((item) => {
+            item.removeAttribute("data-sort-dir");
+            item.classList.remove("is-active");
+        });
+        button.setAttribute("data-sort-dir", nextDir);
+        button.classList.add("is-active");
+        const rows = Array.from(tbody.querySelectorAll("tr"));
+        rows.sort((left, right) => {
+            const leftCell = left.children[columnIndex];
+            const rightCell = right.children[columnIndex];
+            const leftValue = leftCell?.getAttribute("data-sort-value") ?? leftCell?.textContent ?? "";
+            const rightValue = rightCell?.getAttribute("data-sort-value") ?? rightCell?.textContent ?? "";
+            const leftNum = Number(String(leftValue).replace(",", "."));
+            const rightNum = Number(String(rightValue).replace(",", "."));
+            const delta = Number.isFinite(leftNum) && Number.isFinite(rightNum)
+                ? leftNum - rightNum
+                : String(leftValue).localeCompare(String(rightValue), "ru");
+            return nextDir === "asc" ? delta : -delta;
+        });
+        rows.forEach((row) => tbody.appendChild(row));
+    }
+
+    function renderTraceLogStatus(status, rowCount = 0) {
         const code = String(status?.status || "").trim().toUpperCase();
         if (!code || code === "CURRENT_FOUND") {
+            return "";
+        }
+        if (code === "NOT_FOUND" && Number(rowCount || 0) <= 0) {
             return "";
         }
         const fileName = status?.fileName || "";
@@ -12380,7 +14467,7 @@
                 <div class="analytics-log-excerpt-list">
                     ${excerpts.map((item) => `
                         <div class="analytics-log-excerpt-item">
-                            <div class="small text-muted">${escapeHtml(formatDateTime(item.timestamp))} · ${escapeHtml(item.level || "-")} · ${escapeHtml(item.source || "-")} · line ${escapeHtml(item.lineNumber || "-")}</div>
+                            <div class="small text-muted">${escapeHtml(formatEventDetailsDateTime(item.timestamp))} · ${escapeHtml(item.level || "-")} · ${escapeHtml(item.source || "-")} · line ${escapeHtml(item.lineNumber || "-")}</div>
                             <div class="small">${escapeHtml(item.messageShort || item.excerpt || "-")}</div>
                         </div>
                     `).join("")}
@@ -12507,10 +14594,10 @@
                     <div>
                         <div class="fw-semibold">${escapeHtml(group.stageTypeName)} · ${escapeHtml(group.source || "—")}</div>
                         <div class="small text-muted">Вызовы: ${formatInt(items.length)} · ${escapeHtml(group.operation || "—")}</div>
-                        <div class="small text-muted">${formatDateTime(firstStage?.startedAt)} - ${formatDateTime(lastStage?.endedAt)}</div>
+                        <div class="small text-muted">${formatEventDetailsDateTime(firstStage?.startedAt)} - ${formatEventDetailsDateTime(lastStage?.endedAt)}</div>
                     </div>
                     <div class="text-end">
-                        <div class="fw-semibold">ОЈ ${formatInt(totalDuration)} ms</div>
+                        <div class="fw-semibold">Итого ${formatInt(totalDuration)} ms</div>
                         <div class="small text-muted">avg ${formatInt(avgDuration)} · max ${formatInt(maxDuration)}</div>
                         <span class="analytics-status-badge ${hasErrors ? "analytics-badge-error" : "analytics-badge-success"}">
                             ${hasErrors ? "Есть ошибки" : "OK"}
@@ -12544,7 +14631,7 @@
                     </button>
                     <div class="collapse mt-2" id="${collapseId}">
                         <div class="analytics-stage-log-panel">
-                            ${renderNormalizedLogsTable(stageLogs, "Для этого вызова логов не найдено.", true)}
+                            ${renderNormalizedLogsTable(stageLogs, "Для этого вызова логов не найдено.", true, {timestampFormatter: formatEventDetailsDateTime})}
                         </div>
                     </div>
                 </div>
@@ -12556,7 +14643,7 @@
                 <div class="d-flex justify-content-between gap-2 align-items-start">
                     <div>
                         <div class="fw-semibold">${escapeHtml(stage?.stageTypeName || stage?.stageTypeCode)}</div>
-                        <div class="small text-muted">#${formatInt(stage?.stageOrder || 0)} · ${formatDateTime(stage?.startedAt)} - ${formatDateTime(stage?.endedAt)}</div>
+                        <div class="small text-muted">#${formatInt(stage?.stageOrder || 0)} · ${formatEventDetailsDateTime(stage?.startedAt)} - ${formatEventDetailsDateTime(stage?.endedAt)}</div>
                     </div>
                     <div class="text-end">
                         <div class="fw-semibold">${formatInt(stage?.durationMs || 0)} ms</div>
@@ -12665,8 +14752,8 @@
                     ${interval.nested ? `<span class="badge text-bg-light ms-1" title="Интервал вложен в этап #${escapeHtml(String(interval.parentStageOrder ?? "-"))}">вложен</span>` : ""}
                 </td>
                 <td class="text-end">#${formatInt(interval.stageOrder || 0)}</td>
-                <td>${escapeHtml(formatDateTime(interval.startedAt))}</td>
-                <td>${escapeHtml(formatDateTime(interval.endedAt))}</td>
+                <td>${escapeHtml(formatEventDetailsDateTime(interval.startedAt))}</td>
+                <td>${escapeHtml(formatEventDetailsDateTime(interval.endedAt))}</td>
                 <td class="text-end">${formatInt(interval.durationMs || 0)} ms</td>
                 <td class="text-end">+${formatInt(interval.offsetFromEventStartMs || 0)} ms</td>
             </tr>
@@ -12674,8 +14761,8 @@
         const unaccountedIntervalsHtml = unaccountedIntervals.map((interval) => `
             <tr>
                 <td>${escapeHtml(interval.label || interval.type || "Время вне инструментированных этапов")}</td>
-                <td>${interval.startedAt ? escapeHtml(formatDateTime(interval.startedAt)) : "—"}</td>
-                <td>${interval.endedAt ? escapeHtml(formatDateTime(interval.endedAt)) : "—"}</td>
+                <td>${interval.startedAt ? escapeHtml(formatEventDetailsDateTime(interval.startedAt)) : "—"}</td>
+                <td>${interval.endedAt ? escapeHtml(formatEventDetailsDateTime(interval.endedAt)) : "—"}</td>
                 <td class="text-end">${formatInt(interval.durationMs || 0)} ms</td>
                 <td class="text-end">+${formatInt(interval.offsetFromEventStartMs || 0)} ms</td>
             </tr>
@@ -12740,8 +14827,8 @@
             return `
                 <tr>
                     <td>${escapeHtml(interval.label || interval.type || "Время вне инструментированных этапов")}</td>
-                    <td>${interval.startedAt ? escapeHtml(formatDateTime(interval.startedAt)) : "—"}</td>
-                    <td>${interval.endedAt ? escapeHtml(formatDateTime(interval.endedAt)) : "—"}</td>
+                    <td>${interval.startedAt ? escapeHtml(formatEventDetailsDateTime(interval.startedAt)) : "—"}</td>
+                    <td>${interval.endedAt ? escapeHtml(formatEventDetailsDateTime(interval.endedAt)) : "—"}</td>
                     <td class="text-end">${formatInt(interval.durationMs || 0)} ms</td>
                     <td class="text-end">+${formatInt(interval.offsetFromEventStartMs || 0)} ms</td>
                     <td class="small">${escapeHtml(reason)}</td>
@@ -13340,6 +15427,8 @@
     }
 
     async function loadCompare() {
+        const requestScreen = "compare";
+        const requestScreenGeneration = currentAnalyticsScreenGeneration(requestScreen);
         state.compareLoaded = true;
         const requestId = ++state.compareRequestId;
         if (state.compareAbortController) {
@@ -13352,10 +15441,7 @@
         if (moduleCode) {
             params.set("moduleCode", moduleCode);
         }
-        const eventType = refs.eventType.value?.trim();
-        if (eventType) {
-            params.set("eventTypeCode", eventType);
-        }
+        appendMainEventTypeParams(params, true);
         const requestPath = refs.analyticsRequestPath?.value?.trim();
         if (requestPath) {
             params.set("requestPath", requestPath);
@@ -13367,11 +15453,22 @@
         setIfPresent(params, "targetTo", toIso(refs.compareTargetTo.value));
 
         let data;
+        const compareLoaderToken = showCompareLoaders();
         try {
             data = await fetchJson(`${api("/compare")}?${params.toString()}`, {
                 signal: controller.signal
             });
-            if (requestId !== state.compareRequestId) {
+            if (requestId !== state.compareRequestId
+                || !isCurrentAnalyticsScreenRequest(requestScreen, requestScreenGeneration)) {
+                logAnalyticsNavigation("compare-stale-response", {
+                    requestId,
+                    activeRequestId: state.compareRequestId,
+                    requestScreen,
+                    requestScreenGeneration,
+                    activeScreen: activeAnalyticsScreen(),
+                    activeScreenGeneration: currentAnalyticsScreenGeneration(requestScreen),
+                    appliedToUi: false
+                });
                 return;
             }
             refs.compareCards.innerHTML = renderCompareCards(data);
@@ -13379,12 +15476,16 @@
             syncCompareResetVisibility();
             return;
         } catch (error) {
-            if (controller.signal.aborted || requestId !== state.compareRequestId) {
+            if (controller.signal.aborted
+                || requestId !== state.compareRequestId
+                || !isCurrentAnalyticsScreenRequest(requestScreen, requestScreenGeneration)) {
                 return;
             }
             throw error;
         } finally {
-            if (state.compareAbortController === controller) {
+            hideCompareLoaders(compareLoaderToken);
+            if (state.compareAbortController === controller
+                && isCurrentAnalyticsScreenRequest(requestScreen, requestScreenGeneration)) {
                 state.compareAbortController = null;
             }
         }
@@ -13412,6 +15513,12 @@
                 }]
             },
             options: barChartOptions("%")
+        });
+        logAnalyticsNavigation("render-end", {
+            group: "stages",
+            requestScreen,
+            requestScreenGeneration,
+            appliedToUi: true
         });
     }
 
@@ -13480,6 +15587,26 @@
         if (refs.compareErrorsTable) {
             refs.compareErrorsTable.innerHTML = renderCompareErrorTable(compareErrorRows(rows));
         }
+        setCompareInsightTab(state.compareInsightTab || "degraded");
+    }
+
+    function setCompareInsightTab(tabKey) {
+        const nextTab = String(tabKey || "degraded").trim() || "degraded";
+        const root = document.getElementById("compare-insight-tabs");
+        if (!root) {
+            return;
+        }
+        state.compareInsightTab = nextTab;
+        root.querySelectorAll("[data-compare-insight-tab]").forEach((button) => {
+            const active = button.getAttribute("data-compare-insight-tab") === nextTab;
+            button.classList.toggle("active", active);
+            button.setAttribute("aria-selected", active ? "true" : "false");
+        });
+        root.querySelectorAll("[data-compare-insight-panel]").forEach((panel) => {
+            const active = panel.getAttribute("data-compare-insight-panel") === nextTab;
+            panel.classList.toggle("active", active);
+            panel.hidden = !active;
+        });
     }
 
     function normalizeCompareEventRow(row) {
@@ -13737,10 +15864,7 @@
         if (moduleCode) {
             params.set("moduleCode", moduleCode);
         }
-        const eventType = refs.eventType.value?.trim();
-        if (includeEventType && eventType) {
-            params.set("eventTypeCode", eventType);
-        }
+        appendMainEventTypeParams(params, includeEventType);
         const requestPath = refs.analyticsRequestPath?.value?.trim();
         if (requestPath) {
             params.set("requestPath", requestPath);
@@ -13751,6 +15875,62 @@
         }
         appendGlobalMetricFilterParams(params);
         return params;
+    }
+
+    function selectedGlobalEventCodes() {
+        return Array.from(new Set((Array.isArray(state.globalEventCodes) ? state.globalEventCodes : [])
+            .map((code) => String(code || "").trim())
+            .filter(Boolean)));
+    }
+
+    function appendMainEventTypeParams(params, includeEventType = true) {
+        if (!includeEventType) {
+            return;
+        }
+        const selectedCodes = selectedGlobalEventCodes();
+        if (selectedCodes.length > 0) {
+            selectedCodes.forEach((code) => params.append("eventTypeCode", code));
+            return;
+        }
+        const eventTypeCode = refs.eventType?.value?.trim();
+        if (eventTypeCode && eventTypeCode !== "__analytics_global_event_set__") {
+            params.set("eventTypeCode", eventTypeCode);
+        }
+    }
+
+    function clearGlobalEventSetOption() {
+        if (!refs.eventType) {
+            return;
+        }
+        Array.from(refs.eventType.options || []).forEach((option) => {
+            if (option.value === "__analytics_global_event_set__") {
+                option.remove();
+            }
+        });
+        delete refs.eventType.dataset.appliedEventCodes;
+        refs.eventType.title = "";
+    }
+
+    function setGlobalEventCodesFromScenario(eventCodes) {
+        state.globalEventCodes = Array.from(new Set((Array.isArray(eventCodes) ? eventCodes : [])
+            .map((code) => String(code || "").trim())
+            .filter(Boolean)));
+        if (refs.eventType) {
+            clearGlobalEventSetOption();
+            if (state.globalEventCodes.length > 1) {
+                const option = document.createElement("option");
+                option.value = "__analytics_global_event_set__";
+                option.textContent = `\u0421\u043e\u0431\u044b\u0442\u0438\u044f: ${state.globalEventCodes.length}`;
+                refs.eventType.prepend(option);
+                refs.eventType.value = option.value;
+            } else {
+                refs.eventType.value = state.globalEventCodes[0] || "";
+            }
+            refs.eventType.dataset.appliedEventCodes = state.globalEventCodes.join(",");
+            refs.eventType.title = state.globalEventCodes.length > 1
+                ? `\u0421\u043e\u0431\u044b\u0442\u0438\u044f: ${state.globalEventCodes.length}`
+                : "";
+        }
     }
 
     async function refreshEventTypeOptionsByScope() {
@@ -13824,10 +16004,7 @@
         if (moduleCode) {
             params.set("moduleCode", moduleCode);
         }
-        const eventType = refs.eventType.value?.trim();
-        if (eventType) {
-            params.set("eventTypeCode", eventType);
-        }
+        appendMainEventTypeParams(params, true);
         const globalPath = refs.analyticsRequestPath?.value?.trim();
         const effectivePath = globalPath;
         if (effectivePath) {
@@ -13849,10 +16026,7 @@
         if (moduleCode) {
             params.set("moduleCode", moduleCode);
         }
-        const eventType = refs.eventType?.value?.trim();
-        if (eventType) {
-            params.set("eventTypeCode", eventType);
-        }
+        appendMainEventTypeParams(params, true);
         const requestPath = refs.analyticsRequestPath?.value?.trim();
         if (requestPath) {
             params.set("requestPath", requestPath);
@@ -13908,10 +16082,78 @@
         syncEventsRangeField("from", refs.eventsFrom, refs.from?.value || "", force);
         syncEventsRangeField("to", refs.eventsTo, refs.to?.value || "", force);
         syncEventsQuickRangeFromInputs();
+        if (force) {
+            state.eventsLocalDirty = false;
+        }
+        syncEventsResetVisibility();
     }
 
     function syncEventsQuickRangeFromInputs() {
         syncQuickRangeSelectFromRange(refs.eventsQuickRange, refs.eventsFrom?.value || "", refs.eventsTo?.value || "");
+    }
+
+    function markEventsLocalDirty() {
+        state.eventsLocalDirty = true;
+        syncEventsResetVisibility();
+    }
+
+    function hasEventsFilterOverride() {
+        if (state.eventsLocalDirty) {
+            return true;
+        }
+        const mainFrom = refs.from?.value || "";
+        const mainTo = refs.to?.value || "";
+        if ((refs.eventsFrom?.value || "") !== mainFrom || (refs.eventsTo?.value || "") !== mainTo) {
+            return true;
+        }
+        return !!(
+            (refs.eventsIsError?.value || "")
+            || (refs.eventsErrorClass?.value || "")
+            || selectedRawEventTypeCodes().length > 0
+            || (refs.eventsMetricType?.value || "")
+            || (refs.eventsMetricMin?.value || "")
+            || (refs.eventsMetricMax?.value || "")
+            || (refs.eventsMinDuration?.value || "")
+            || (refs.eventsAttributeCode?.value || "")
+            || (refs.eventsAttributeValue?.value || "")
+            || (refs.eventsSortBy?.value || "startedAt") !== "startedAt"
+            || (refs.eventsSortDir?.value || "desc") !== "desc"
+        );
+    }
+
+    function syncEventsResetVisibility() {
+        refs.eventsFilterReset?.classList.toggle("d-none", !hasEventsFilterOverride());
+    }
+
+    async function resetEventsFiltersToMain() {
+        if (refs.eventsFrom) refs.eventsFrom.value = refs.from?.value || "";
+        if (refs.eventsTo) refs.eventsTo.value = refs.to?.value || "";
+        syncEventsQuickRangeFromInputs();
+        if (refs.eventsIsError) refs.eventsIsError.value = "";
+        if (refs.eventsErrorClass) refs.eventsErrorClass.value = "";
+        updateEventsErrorClassVisibility();
+        if (refs.eventsEventTypeAll) refs.eventsEventTypeAll.checked = true;
+        Array.from(refs.eventsEventType?.options || []).forEach((option) => {
+            option.selected = false;
+        });
+        updateRawEventTypeToggleLabel();
+        if (refs.eventsMetricType) refs.eventsMetricType.value = "";
+        if (refs.eventsMetricMin) refs.eventsMetricMin.value = "";
+        if (refs.eventsMetricMax) refs.eventsMetricMax.value = "";
+        if (refs.eventsMinDuration) refs.eventsMinDuration.value = "";
+        if (refs.eventsAttributeCode) refs.eventsAttributeCode.value = "";
+        if (refs.eventsAttributeValue) refs.eventsAttributeValue.value = "";
+        if (refs.eventsSortBy) refs.eventsSortBy.value = "startedAt";
+        if (refs.eventsSortDir) refs.eventsSortDir.value = "desc";
+        state.eventsSortBy = "startedAt";
+        state.eventsSortDir = "desc";
+        state.eventsForcedEventCodes = null;
+        state.eventsForcedErrorKey = "";
+        state.eventsForcedModuleCode = "";
+        state.eventsForcedStageTypeCode = "";
+        state.eventsLocalDirty = false;
+        syncEventsResetVisibility();
+        await loadEvents(true);
     }
 
     function syncEventsRangeField(key, input, targetValue, force) {
@@ -14490,6 +16732,459 @@
         syncQuickRangeSelectFromRange(refs.compareQuickRange, toDateTimeLocalString(targetFrom), toDateTimeLocalString(targetTo));
     }
 
+    function trimTrailingEmptyTimeSeriesConfig(config) {
+        const labels = Array.isArray(config?.data?.labels) ? config.data.labels : [];
+        const timePoints = Array.isArray(config?.__analyticsTimePoints) ? config.__analyticsTimePoints : [];
+        const datasets = Array.isArray(config?.data?.datasets) ? config.data.datasets : [];
+        if (!labels.length || !timePoints.length || !datasets.length) {
+            return config;
+        }
+        const maxLength = labels.length;
+        let lastDataIndex = -1;
+        for (let index = maxLength - 1; index >= 0; index -= 1) {
+            const hasValue = datasets.some((dataset) => {
+                const values = Array.isArray(dataset?.data) ? dataset.data : [];
+                const value = values[index];
+                if (value === null || value === undefined) {
+                    return false;
+                }
+                const numeric = typeof value === "object" ? Number(value.y) : Number(value);
+                return Number.isFinite(numeric);
+            });
+            if (hasValue) {
+                lastDataIndex = index;
+                break;
+            }
+        }
+        if (lastDataIndex < 0 || lastDataIndex >= maxLength - 1) {
+            return config;
+        }
+        const keepLength = lastDataIndex + 1;
+        config.data.labels = labels.slice(0, keepLength);
+        if (timePoints.length === maxLength) {
+            config.__analyticsTimePoints = timePoints.slice(0, keepLength);
+        }
+        config.data.datasets = datasets.map((dataset) => {
+            if (!Array.isArray(dataset?.data)) {
+                return dataset;
+            }
+            return {
+                ...dataset,
+                data: dataset.data.slice(0, keepLength)
+            };
+        });
+        config.__analyticsTrimmedTrailingEmptyPoints = maxLength - keepLength;
+        return config;
+    }
+
+    function alignTimeSeriesConfig(config) {
+        const labels = Array.isArray(config?.data?.labels) ? config.data.labels : [];
+        const datasets = Array.isArray(config?.data?.datasets) ? config.data.datasets : [];
+        const timePoints = Array.isArray(config?.__analyticsTimePoints) ? config.__analyticsTimePoints : [];
+        if (!labels.length || !datasets.length) {
+            return false;
+        }
+        config.data.datasets = datasets.map((dataset) => {
+            if (!Array.isArray(dataset?.data)) {
+                return dataset;
+            }
+            const alignedData = dataset.data.slice(0, labels.length);
+            while (alignedData.length < labels.length) {
+                alignedData.push(null);
+            }
+            return {...dataset, data: alignedData};
+        });
+        if (!timePoints.length) {
+            return false;
+        }
+        const alignedTimePoints = timePoints.slice(0, labels.length);
+        while (alignedTimePoints.length < labels.length) {
+            alignedTimePoints.push(null);
+        }
+        config.__analyticsTimePoints = alignedTimePoints;
+        let previousTimestamp = null;
+        let strictlyIncreasing = true;
+        for (const point of alignedTimePoints) {
+            if (point === null || point === undefined || point === "") {
+                strictlyIncreasing = false;
+                continue;
+            }
+            const timestamp = new Date(point).getTime();
+            if (!Number.isFinite(timestamp)) {
+                strictlyIncreasing = false;
+                continue;
+            }
+            if (previousTimestamp !== null && timestamp <= previousTimestamp) {
+                strictlyIncreasing = false;
+            }
+            previousTimestamp = timestamp;
+        }
+        config.options = config.options || {};
+        config.options.normalized = strictlyIncreasing;
+        return true;
+    }
+
+    function parseTimeSeriesYValue(value) {
+        if (value === null || value === undefined) {
+            return null;
+        }
+        const rawValue = value && typeof value === "object" && Object.prototype.hasOwnProperty.call(value, "y")
+            ? value.y
+            : value;
+        if (rawValue === null || rawValue === undefined) {
+            return null;
+        }
+        const numeric = Number(rawValue);
+        return Number.isFinite(numeric) ? numeric : null;
+    }
+
+    function formatChartTimeLabel(value, includeSeconds = true) {
+        const normalizedValue = value instanceof Date || typeof value === "number" || typeof value === "string"
+            ? value
+            : "";
+        const date = normalizedValue instanceof Date
+            ? normalizedValue
+            : new Date(normalizedValue === null || normalizedValue === undefined ? "" : normalizedValue);
+        if (Number.isNaN(date.getTime())) {
+            return normalizedValue === "" ? "-" : String(normalizedValue);
+        }
+        const pad2 = (item) => String(item).padStart(2, "0");
+        const base = `${pad2(date.getDate())}.${pad2(date.getMonth() + 1)} ${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+        return includeSeconds ? `${base}:${pad2(date.getSeconds())}` : base;
+    }
+
+    function adaptiveLinearTimeTickLabel(value, index, ticks) {
+        return formatChartTimeLabel(value, false);
+    }
+
+    function timeAxisTickLimitFromTicks(ticks, expanded = false) {
+        const current = Number(ticks?.maxTicksLimit);
+        if (Number.isFinite(current) && current >= 40) {
+            return TIME_AXIS_TICKS_EXPANDED;
+        }
+        return expanded ? TIME_AXIS_TICKS_EXPANDED : TIME_AXIS_TICKS_DEFAULT;
+    }
+
+    function timeAxisTickOptions(ticks = {}, expanded = false, callback = adaptiveTimeTickLabel) {
+        return {
+            ...ticks,
+            autoSkip: true,
+            maxTicksLimit: timeAxisTickLimitFromTicks(ticks, expanded),
+            callback
+        };
+    }
+
+    function applyTimeAxisTickOptionsToConfig(config, expanded = false) {
+        const xScale = config?.options?.scales?.x;
+        if (!xScale) {
+            return;
+        }
+        xScale.ticks = timeAxisTickOptions(
+            xScale.ticks || {},
+            expanded,
+            xScale.type === "linear" ? adaptiveLinearTimeTickLabel : adaptiveTimeTickLabel
+        );
+    }
+
+    function convertTimeSeriesChartConfig(config) {
+        const labels = Array.isArray(config?.data?.labels) ? config.data.labels : [];
+        const datasets = Array.isArray(config?.data?.datasets) ? config.data.datasets : [];
+        const timePoints = Array.isArray(config?.__analyticsTimePoints) ? config.__analyticsTimePoints : [];
+        if (!labels.length || !datasets.length || !timePoints.length) {
+            return false;
+        }
+        const entries = timePoints
+            .map((point, index) => {
+                const timestamp = new Date(point).getTime();
+                return Number.isFinite(timestamp)
+                    ? {index, timestamp, label: labels[index] ?? formatComparePeriodTime(timestamp)}
+                    : null;
+            })
+            .filter(Boolean)
+            .sort((left, right) => left.timestamp - right.timestamp || left.index - right.index);
+        if (!entries.length) {
+            return false;
+        }
+        config.__analyticsPointLabels = entries.map((entry) => entry.label);
+        config.data.labels = [];
+        config.__analyticsTimePoints = entries.map((entry) => entry.timestamp);
+        config.__analyticsTimeSeries = true;
+        config.data.datasets = datasets.map((dataset) => {
+            if (!Array.isArray(dataset?.data)) {
+                return dataset;
+            }
+            return {
+                ...dataset,
+                data: entries.map((entry) => ({
+                    x: entry.timestamp,
+                    y: parseTimeSeriesYValue(dataset.data[entry.index])
+                }))
+            };
+        });
+        return true;
+    }
+
+    function normalizeChartHoverOptions(config) {
+        if (!config || typeof config !== "object") {
+            return config;
+        }
+        let isTimeSeries = config.__analyticsTimeSeries === true;
+        if (!isTimeSeries) {
+            trimTrailingEmptyTimeSeriesConfig(config);
+            isTimeSeries = alignTimeSeriesConfig(config);
+        }
+        if (isTimeSeries && config.__analyticsTimeSeries !== true) {
+            isTimeSeries = convertTimeSeriesChartConfig(config);
+        }
+        config.options = config.options || {};
+        config.options.layout = config.options.layout || {};
+        const existingPadding = config.options.layout.padding;
+        const padding = typeof existingPadding === "number"
+            ? {top: existingPadding, right: existingPadding, bottom: existingPadding, left: existingPadding}
+            : {...(existingPadding || {})};
+        const rightPadding = Number(padding.right);
+        padding.right = Number.isFinite(rightPadding) ? Math.max(rightPadding, 36) : 36;
+        config.options.layout.padding = padding;
+        config.options.events = ["mousemove", "mouseout", "click", "touchstart", "touchmove"];
+        config.options.interaction = {
+            ...(config.options.interaction || {}),
+            mode: "nearest",
+            axis: "x",
+            intersect: false,
+        };
+        config.options.hover = {
+            ...(config.options.hover || {}),
+            mode: "nearest",
+            axis: "x",
+            intersect: false
+        };
+        config.options.elements = config.options.elements || {};
+        const existingPoint = config.options.elements.point || {};
+        const existingPointRadius = Number(existingPoint.radius);
+        const existingHitRadius = Number(existingPoint.hitRadius);
+        const existingHoverRadius = Number(existingPoint.hoverRadius);
+        const existingHoverBorderWidth = Number(existingPoint.hoverBorderWidth);
+        config.options.elements.point = {
+            ...existingPoint,
+            radius: Number.isFinite(existingPointRadius) ? existingPointRadius : 2,
+            hitRadius: Number.isFinite(existingHitRadius) ? Math.max(existingHitRadius, 12) : 12,
+            hoverRadius: Number.isFinite(existingHoverRadius) ? Math.max(existingHoverRadius, 5) : 5,
+            hoverBorderWidth: Number.isFinite(existingHoverBorderWidth) ? Math.max(existingHoverBorderWidth, 2) : 2
+        };
+        config.options.plugins = config.options.plugins || {};
+        config.options.plugins.tooltip = {
+            ...(config.options.plugins.tooltip || {}),
+            enabled: true,
+            mode: "nearest",
+            axis: "x",
+            intersect: false,
+            position: "nearest"
+        };
+        if (isTimeSeries) {
+            config.options.scales = config.options.scales || {};
+            const existingXScale = config.options.scales.x || {};
+            config.options.scales.x = {
+                ...existingXScale,
+                type: "linear",
+                bounds: "data",
+                ticks: timeAxisTickOptions(existingXScale.ticks || {}, false, adaptiveLinearTimeTickLabel)
+            };
+            config.options.plugins.tooltip.callbacks = {
+                ...(config.options.plugins.tooltip.callbacks || {}),
+                title: (tooltipItems) => {
+                    const item = Array.isArray(tooltipItems) ? tooltipItems[0] : null;
+                    return item ? tooltipPointTimeLabel(item) : "";
+                }
+            };
+        }
+        const chartType = String(config.type || "").toLowerCase();
+        const datasets = Array.isArray(config.data?.datasets) ? config.data.datasets : [];
+        datasets.forEach((dataset) => {
+            const datasetType = String(dataset?.type || chartType).toLowerCase();
+            if (datasetType === "line") {
+                const pointRadius = Number(dataset.pointRadius);
+                const pointHoverRadius = Number(dataset.pointHoverRadius);
+                const pointHitRadius = Number(dataset.pointHitRadius);
+                const hoverBorderWidth = Number(dataset.hoverBorderWidth);
+                dataset.pointRadius = Number.isFinite(pointRadius) ? pointRadius : 2;
+                dataset.pointHoverRadius = Number.isFinite(pointHoverRadius) ? Math.max(pointHoverRadius, 5) : 5;
+                dataset.pointHitRadius = Number.isFinite(pointHitRadius) ? Math.max(pointHitRadius, 12) : 12;
+                dataset.hoverBorderWidth = Number.isFinite(hoverBorderWidth) ? Math.max(hoverBorderWidth, 2) : 2;
+            } else if (datasetType === "bar") {
+                const hoverBorderWidth = Number(dataset.hoverBorderWidth);
+                dataset.hoverBorderWidth = Number.isFinite(hoverBorderWidth) ? Math.max(hoverBorderWidth, 2) : 2;
+                if (!Number.isFinite(Number(dataset.categoryPercentage))) {
+                    dataset.categoryPercentage = 0.8;
+                }
+                if (!Number.isFinite(Number(dataset.barPercentage))) {
+                    dataset.barPercentage = 0.9;
+                }
+            }
+        });
+        return config;
+    }
+
+    function describeChartHoverElement(chart, element) {
+        const index = Number(element?.index);
+        if (!Number.isInteger(index)) {
+            return null;
+        }
+        const dataset = chart.data?.datasets?.[element.datasetIndex];
+        const raw = dataset?.data?.[index];
+        const rawX = raw && typeof raw === "object" ? Number(raw.x) : NaN;
+        const pointElement = chart.getDatasetMeta(element.datasetIndex)?.data?.[index];
+        return {
+            datasetIndex: element.datasetIndex,
+            index,
+            label: chart.data?.labels?.[index]
+                || chart.config?._config?.__analyticsPointLabels?.[index]
+                || (Number.isFinite(rawX) ? formatComparePeriodTime(rawX) : ""),
+            rawX,
+            formattedTime: Number.isFinite(rawX) ? formatComparePeriodTime(rawX) : "",
+            pointX: pointElement?.x,
+            pointPixel: Number.isFinite(rawX) && chart.scales?.x
+                ? chart.scales.x.getPixelForValue(rawX)
+                : null,
+            values: (chart.data?.datasets || []).map((item) => item?.data?.[index])
+        };
+    }
+
+    function logChartHoverDebug(canvasId, chart, event) {
+        if (!CHART_HOVER_DEBUG_ENABLED || !chart?.canvas) {
+            return;
+        }
+        const canvas = chart.canvas;
+        const rect = canvas.getBoundingClientRect();
+        const helperPosition = typeof Chart?.helpers?.getRelativePosition === "function"
+            ? Chart.helpers.getRelativePosition(event, chart)
+            : null;
+        const relativeX = helperPosition?.x
+            ?? ((event.clientX - rect.left) * (chart.width / Math.max(rect.width, 1)));
+        const relativeY = helperPosition?.y
+            ?? ((event.clientY - rect.top) * (chart.height / Math.max(rect.height, 1)));
+        const nearestElements = chart.getElementsAtEventForMode(
+            event,
+            "nearest",
+            {intersect: false, axis: "x"},
+            false
+        );
+        const nearest = nearestElements.map((element) => describeChartHoverElement(chart, element)).find(Boolean);
+        const distancePx = nearest && Number.isFinite(nearest.pointX)
+            ? Math.abs(nearest.pointX - relativeX)
+            : null;
+        const computedBody = window.getComputedStyle(document.body);
+        console.log("[Analytics chart hover debug]", canvasId || canvas.id || "(canvas)");
+        console.table([{
+            canvasId: canvasId || canvas.id || "",
+            clientX: event.clientX,
+            relativeX,
+            chartAreaLeft: chart.chartArea?.left,
+            chartAreaRight: chart.chartArea?.right,
+            canvasRectWidth: rect.width,
+            canvasClientWidth: canvas.clientWidth,
+            chartWidth: chart.width,
+            currentDevicePixelRatio: chart.currentDevicePixelRatio,
+            windowDevicePixelRatio: window.devicePixelRatio,
+            bodyStyleZoom: document.body.style.zoom || "",
+            computedZoom: computedBody.zoom || "",
+            xScaleMin: chart.scales?.x?.min,
+            xScaleMax: chart.scales?.x?.max,
+            valueForPixel: chart.scales?.x?.getValueForPixel(relativeX),
+            nearestIndex: nearest?.index ?? null,
+            nearestElementX: nearest?.pointX ?? null,
+            distancePx,
+            rawX: nearest?.rawX ?? null,
+            formattedTime: nearest?.formattedTime ?? ""
+        }]);
+        console.debug("[Analytics chart hover debug detail]", {
+            elementFromPoint: document.elementFromPoint(event.clientX, event.clientY),
+            client: {x: event.clientX, y: event.clientY},
+            relative: {x: relativeX, y: relativeY},
+            canvasRect: {
+                left: rect.left,
+                right: rect.right,
+                top: rect.top,
+                bottom: rect.bottom,
+                width: rect.width,
+                height: rect.height
+            },
+            chartArea: chart.chartArea ? {...chart.chartArea} : null,
+            xScale: chart.scales?.x ? {
+                min: chart.scales.x.min,
+                max: chart.scales.x.max,
+                valueForPixel: chart.scales.x.getValueForPixel(relativeX)
+            } : null,
+            nearestElements: nearestElements.map((element) => describeChartHoverElement(chart, element)),
+            activeElements: chart.getActiveElements().map((element) => describeChartHoverElement(chart, element)),
+            tooltipElements: (typeof chart.tooltip?.getActiveElements === "function"
+                ? chart.tooltip.getActiveElements()
+                : (chart.tooltip?._active || [])).map((element) => describeChartHoverElement(chart, element)),
+            labelsLength: chart.data?.labels?.length || 0,
+            pointLabelsLength: chart.config?._config?.__analyticsPointLabels?.length || 0,
+            datasetLengths: (chart.data?.datasets || []).map((dataset) => dataset?.data?.length || 0)
+        });
+    }
+
+    function installGlobalChartHoverDebug() {
+        if (!CHART_HOVER_DEBUG_ENABLED || document.documentElement.dataset.analyticsChartHoverDebugBound === "1") {
+            return;
+        }
+        document.documentElement.dataset.analyticsChartHoverDebugBound = "1";
+        let lastLoggedAt = 0;
+        document.addEventListener("mousemove", (event) => {
+            const now = performance.now();
+            if (now - lastLoggedAt < 120) {
+                return;
+            }
+            lastLoggedAt = now;
+            const canvas = event.target?.closest?.("canvas") || findChartCanvasAtPoint(event.clientX, event.clientY);
+            if (!canvas) {
+                return;
+            }
+            const chart = typeof Chart?.getChart === "function"
+                ? Chart.getChart(canvas)
+                : (state.charts[canvas.id] || null);
+            if (!chart) {
+                console.log("[Analytics chart hover debug] no Chart instance for canvas", canvas.id || canvas);
+                return;
+            }
+            logChartHoverDebug(canvas.id, chart, event);
+        }, {passive: true});
+    }
+
+    function installChartHoverDebug(_canvasId, _chart) {
+        installGlobalChartHoverDebug();
+    }
+
+    function findChartCanvasAtPoint(clientX, clientY) {
+        const candidates = Array.from(document.querySelectorAll("canvas"));
+        return candidates.find((canvas) => {
+            const rect = canvas.getBoundingClientRect();
+            return clientX >= rect.left
+                && clientX <= rect.right
+                && clientY >= rect.top
+                && clientY <= rect.bottom
+                && (typeof Chart?.getChart !== "function" || Chart.getChart(canvas));
+        }) || null;
+    }
+
+    function resizeAllAnalyticsCharts() {
+        if (!state?.charts || typeof state.charts !== "object") {
+            return;
+        }
+        Object.values(state.charts).forEach((chart) => {
+            if (typeof chart?.resize === "function") {
+                chart.resize();
+            }
+        });
+        if (typeof state.expandedChart?.instance?.resize === "function") {
+            state.expandedChart.instance.resize();
+        }
+        if (typeof state.expandedChart?.compareInstance?.resize === "function") {
+            state.expandedChart.compareInstance.resize();
+        }
+    }
+
     function upsertChart(canvasId, config) {
         const canvas = document.getElementById(canvasId);
         if (!canvas) {
@@ -14500,7 +17195,7 @@
             return;
         }
         state.chartScenarioBaseConfigs[canvasId] = cloneChartConfig(config);
-        let configToRender = applyScenarioToChartConfig(canvasId, cloneChartConfig(config));
+        let configToRender = normalizeChartHoverOptions(applyScenarioToChartConfig(canvasId, cloneChartConfig(config)));
         if (canvasId === "chart-event-kpi" || canvasId === "chart-event-kpi-compare-inline") {
             ensureKpiMiniWrap(canvas);
             if (canvasId === "chart-event-kpi") {
@@ -14538,8 +17233,9 @@
             const currentType = existingChart.config.type;
             if (requestedType !== currentType) {
                 existingChart.destroy();
-                state.charts[canvasId] = new Chart(canvas.getContext("2d"), configToRender);
+                state.charts[canvasId] = new Chart(canvas.getContext("2d"), normalizeChartHoverOptions(configToRender));
                 setChartExpandedTicks(state.charts[canvasId], false);
+                installChartHoverDebug(canvasId, state.charts[canvasId]);
                 queueInitialKpiCompareScrollOffsets(canvasId);
                 return;
             }
@@ -14548,19 +17244,24 @@
             if (Array.isArray(configToRender.__analyticsTimePoints)) {
                 existingChart.config._config.__analyticsTimePoints = [...configToRender.__analyticsTimePoints];
             }
+            if (Array.isArray(configToRender.__analyticsPointLabels)) {
+                existingChart.config._config.__analyticsPointLabels = [...configToRender.__analyticsPointLabels];
+            }
             if (configToRender.__analyticsEffectiveBucketMinutes != null) {
                 existingChart.config._config.__analyticsEffectiveBucketMinutes = configToRender.__analyticsEffectiveBucketMinutes;
             }
             setChartExpandedTicks(existingChart, false);
             existingChart.update("none");
+            installChartHoverDebug(canvasId, existingChart);
             queueInitialKpiCompareScrollOffsets(canvasId);
             if (isExpandedChartRelated(canvasId)) {
                 renderExpandedChartClone(state.expandedChart.sourceCanvasId);
             }
             return;
         }
-        state.charts[canvasId] = new Chart(canvas.getContext("2d"), configToRender);
+        state.charts[canvasId] = new Chart(canvas.getContext("2d"), normalizeChartHoverOptions(configToRender));
         setChartExpandedTicks(state.charts[canvasId], false);
+        installChartHoverDebug(canvasId, state.charts[canvasId]);
         queueInitialKpiCompareScrollOffsets(canvasId);
         if (isExpandedChartRelated(canvasId)) {
             renderExpandedChartClone(state.expandedChart.sourceCanvasId);
@@ -14746,6 +17447,11 @@
         if (!targetEl) {
             return;
         }
+        if (mode === "mini-single") {
+            targetEl.style.width = "100%";
+            targetEl.style.minWidth = "0";
+            return;
+        }
         const scrollHost = resolveKpiMiniScrollHost(targetEl);
         const viewportWidth = Math.max(
             0,
@@ -14907,29 +17613,37 @@
 
     function adaptiveTimeTickLabel(value, index, ticks) {
         const scale = this;
-        const label = typeof scale?.getLabelForValue === "function"
+        const rawLabel = typeof scale?.getLabelForValue === "function"
             ? scale.getLabelForValue(value)
             : String(value ?? "");
-        const count = Array.isArray(ticks) ? ticks.length : 0;
-        if (count <= 0) {
-            return label;
-        }
-        const chartWidth = Number(scale?.chart?.width || scale?.width || 0);
-        const maxLabels = Math.max(3, Math.floor((chartWidth || 520) / 78));
-        const step = Math.max(1, Math.ceil(count / maxLabels));
-        return index % step === 0 || index === count - 1 ? label : "";
+        const label = typeof rawLabel === "string"
+            ? rawLabel
+            : (rawLabel == null ? "" : String(rawLabel));
+        const numericValue = Number(value);
+        return Number.isFinite(numericValue) && numericValue > 100000000000
+            ? formatChartTimeLabel(numericValue, false)
+            : label;
     }
 
     function tooltipPointTimeLabel(tooltipItem) {
+        const rawX = tooltipItem?.raw && typeof tooltipItem.raw === "object"
+            ? Number(tooltipItem.raw.x)
+            : NaN;
+        if (Number.isFinite(rawX)) {
+            return formatChartTimeLabel(rawX);
+        }
         const index = Number(tooltipItem?.dataIndex);
         const chart = tooltipItem?.chart;
         const config = chart?.config?._config || chart?.config || {};
         const points = Array.isArray(config.__analyticsTimePoints) ? config.__analyticsTimePoints : [];
         const pointTime = Number.isInteger(index) ? points[index] : "";
         if (pointTime) {
-            return formatComparePeriodTime(pointTime);
+            return formatChartTimeLabel(pointTime);
         }
-        return tooltipItem?.label || "";
+        const fallbackLabel = tooltipItem?.label;
+        return typeof fallbackLabel === "string"
+            ? fallbackLabel
+            : (fallbackLabel == null ? "" : String(fallbackLabel));
     }
 
     function baseChartOptions(yTitle) {
@@ -14971,18 +17685,18 @@
             maintainAspectRatio: false,
             animation: false,
             normalized: true,
-            interaction: { intersect: true, mode: "nearest" },
+            interaction: { intersect: false, mode: "nearest", axis: "x" },
             plugins: {
                 legend: { labels: { color: "#334155" } },
                 tooltip: {
+                    enabled: true,
                     mode: "nearest",
-                    intersect: true,
+                    axis: "x",
+                    intersect: false,
+                    position: "nearest",
                     filter: (tooltipItem) => {
                         const numeric = resolveTooltipNumeric(tooltipItem);
-                        if (!Number.isFinite(numeric)) {
-                            return false;
-                        }
-                        return Math.abs(numeric) > 0.0001;
+                        return Number.isFinite(numeric);
                     },
                     callbacks: {
                         title: (tooltipItems) => {
@@ -14991,7 +17705,7 @@
                         },
                         label: (tooltipItem) => {
                             const numeric = resolveTooltipNumeric(tooltipItem);
-                            if (!Number.isFinite(numeric) || Math.abs(numeric) <= 0.0001) {
+                            if (!Number.isFinite(numeric)) {
                                 return null;
                             }
                             const label = tooltipItem?.dataset?.label || "";
@@ -15009,7 +17723,7 @@
             scales: {
                 x: {
                     grid: { color: "rgba(148,163,184,0.12)" },
-                    ticks: { color: "#64748b", autoSkip: false, maxTicksLimit: 1000, callback: adaptiveTimeTickLabel }
+                    ticks: timeAxisTickOptions({ color: "#64748b" }, false, adaptiveTimeTickLabel)
                 },
                 y: {
                     grid: { color: "rgba(148,163,184,0.14)" },
@@ -15022,20 +17736,207 @@
 
     function barChartOptions(yTitle) {
         const options = baseChartOptions(yTitle);
-        options.interaction = {intersect: true, mode: "nearest"};
-        options.plugins = options.plugins || {};
-        options.plugins.tooltip = options.plugins.tooltip || {};
-        options.plugins.tooltip.mode = "nearest";
-        options.plugins.tooltip.intersect = true;
         return options;
+    }
+
+    function analyticsNowMs() {
+        return typeof performance !== "undefined" ? performance.now() : Date.now();
+    }
+
+    function analyticsDebugTimestamp() {
+        try {
+            return new Date().toISOString();
+        } catch (_error) {
+            return "";
+        }
+    }
+
+    function analyticsRequestPath(url) {
+        try {
+            return new URL(String(url || ""), window.location.origin).pathname;
+        } catch (_error) {
+            return String(url || "").split("?")[0] || "";
+        }
+    }
+
+    function analyticsRequestGroup(url) {
+        const path = analyticsRequestPath(url);
+        if (path.includes("/events")) {
+            return "events";
+        }
+        if (path.includes("/stages")) {
+            return "stages";
+        }
+        if (path.includes("/stage-metrics")) {
+            return "stage-metrics";
+        }
+        if (path.includes("/universal")) {
+            return "universal";
+        }
+        if (path.includes("/overview")) {
+            return "overview";
+        }
+        if (path.includes("/compare")) {
+            return "compare";
+        }
+        if (path.includes("/filter-options")) {
+            return "filter-options";
+        }
+        return "other";
+    }
+
+    function analyticsApproxResponseBytes(response, payload, textBody) {
+        const headerSize = Number(response?.headers?.get?.("content-length") || 0);
+        if (Number.isFinite(headerSize) && headerSize > 0) {
+            return headerSize;
+        }
+        if (typeof textBody === "string") {
+            return textBody.length;
+        }
+        try {
+            return payload == null ? null : JSON.stringify(payload).length;
+        } catch (_error) {
+            return null;
+        }
+    }
+
+    function activeAnalyticsScreen() {
+        return state.currentDashboardTab || "overview";
+    }
+
+    function currentAnalyticsScreenGeneration(screen = activeAnalyticsScreen()) {
+        return Number(state.screenGenerationByTab?.[screen] || 0);
+    }
+
+    function nextAnalyticsScreenGeneration(screen = activeAnalyticsScreen()) {
+        const next = Number(state.screenGeneration || 0) + 1;
+        state.screenGeneration = next;
+        state.screenGenerationByTab = state.screenGenerationByTab || {};
+        state.screenGenerationByTab[screen] = next;
+        logAnalyticsNavigation("screen-generation", {screen, generation: next});
+        return next;
+    }
+
+    function isCurrentAnalyticsScreenRequest(screen, generation) {
+        return activeAnalyticsScreen() === screen
+            && currentAnalyticsScreenGeneration(screen) === Number(generation || 0);
+    }
+
+    function screenForEventsMode(systemOnly) {
+        return systemOnly ? "system" : "raw";
+    }
+
+    function abortOffscreenAnalyticsRequests(activeScreen, previousScreen) {
+        if (!previousScreen || previousScreen === activeScreen) {
+            return;
+        }
+        const abortEvents = () => {
+            state.eventsRequestId = Number(state.eventsRequestId || 0) + 1;
+            state.eventsAbortController?.abort?.();
+            state.eventsAbortController = null;
+            state.eventsLoading = false;
+            clearEventsLoadingTimers();
+            setEventsLoadMoreVisible(false);
+        };
+        if ((previousScreen === "raw" || previousScreen === "system")
+            && activeScreen !== "raw"
+            && activeScreen !== "system") {
+            abortEvents();
+            logAnalyticsNavigation("screen-abort-events", {from: previousScreen, to: activeScreen});
+        }
+        if (previousScreen === "raw" && activeScreen === "system") {
+            abortEvents();
+        }
+        if (previousScreen === "system" && activeScreen === "raw") {
+            abortEvents();
+            state.systemChartRequestId = Number(state.systemChartRequestId || 0) + 1;
+            state.systemChartAbortController?.abort?.();
+            state.systemChartAbortController = null;
+        }
+        if (previousScreen === "system" && activeScreen !== "system") {
+            state.systemChartRequestId = Number(state.systemChartRequestId || 0) + 1;
+            state.systemChartAbortController?.abort?.();
+            state.systemChartAbortController = null;
+            logAnalyticsNavigation("screen-abort-system-chart", {from: previousScreen, to: activeScreen});
+        }
+        if (previousScreen === "metrics" && activeScreen !== "metrics") {
+            state.stageMetricsRequestId = Number(state.stageMetricsRequestId || 0) + 1;
+            state.stageMetricsAbortController?.abort?.();
+            state.stageMetricsAbortController = null;
+            logAnalyticsNavigation("screen-abort-stage-metrics", {from: previousScreen, to: activeScreen});
+        }
+        if (previousScreen === "compare" && activeScreen !== "compare") {
+            state.compareRequestId = Number(state.compareRequestId || 0) + 1;
+            state.compareAbortController?.abort?.();
+            state.compareAbortController = null;
+            logAnalyticsNavigation("screen-abort-compare", {from: previousScreen, to: activeScreen});
+        }
+        if (previousScreen === "universal" && activeScreen !== "universal") {
+            state.universalRequestId = Number(state.universalRequestId || 0) + 1;
+            state.universalAttributeRequestId = Number(state.universalAttributeRequestId || 0) + 1;
+            state.universalEventRootCauseRequestId = Number(state.universalEventRootCauseRequestId || 0) + 1;
+            state.universalRootCauseRequestId = Number(state.universalRootCauseRequestId || 0) + 1;
+            state.universalErrorRequestId = Number(state.universalErrorRequestId || 0) + 1;
+            state.universalErrorRootCauseRequestId = Number(state.universalErrorRootCauseRequestId || 0) + 1;
+            state.universalModuleRequestId = Number(state.universalModuleRequestId || 0) + 1;
+            state.universalModuleRootCauseRequestId = Number(state.universalModuleRootCauseRequestId || 0) + 1;
+            state.universalAttributeAbortController?.abort?.();
+            state.universalAttributeAbortController = null;
+            state.universalEventRootCauseAbortController?.abort?.();
+            state.universalEventRootCauseAbortController = null;
+            state.universalRootCauseAbortController?.abort?.();
+            state.universalRootCauseAbortController = null;
+            state.universalErrorRootCauseAbortController?.abort?.();
+            state.universalErrorRootCauseAbortController = null;
+            state.universalModuleRootCauseAbortController?.abort?.();
+            state.universalModuleRootCauseAbortController = null;
+            logAnalyticsNavigation("screen-abort-universal", {from: previousScreen, to: activeScreen});
+        }
+        if (previousScreen === "overview" && activeScreen !== "overview") {
+            state.mainReloadRequestId = Number(state.mainReloadRequestId || 0) + 1;
+            state.mainReloadAbortController?.abort?.();
+            state.mainReloadAbortController = null;
+            logAnalyticsNavigation("screen-abort-overview", {from: previousScreen, to: activeScreen});
+        }
+    }
+
+    function logAnalyticsLoadDebug(row) {
+        if (!ANALYTICS_LOAD_DEBUG_ENABLED) {
+            return;
+        }
+        const payload = {
+            at: analyticsDebugTimestamp(),
+            screen: state.currentDashboardTab || "overview",
+            ...row
+        };
+        if (typeof console.table === "function") {
+            console.table([payload]);
+        } else {
+            console.log("[analytics-load-debug]", payload);
+        }
+    }
+
+    function logAnalyticsNavigation(event, details = {}) {
+        logAnalyticsLoadDebug({
+            type: "navigation",
+            event,
+            ...details
+        });
     }
 
     async function fetchJson(url, options = {}) {
         const signal = options?.signal;
         const silent = options?.silent === true || options?.background === true;
         const perfLabel = String(options?.perfLabel || "").trim();
-        const perfStarted = typeof performance !== "undefined" ? performance.now() : Date.now();
+        const perfStarted = analyticsNowMs();
+        const requestId = Number(state.analyticsFetchRequestId || 0) + 1;
+        state.analyticsFetchRequestId = requestId;
+        const activeScreenAtStart = activeAnalyticsScreen();
+        const screenGenerationAtStart = currentAnalyticsScreenGeneration(activeScreenAtStart);
         const loadingToken = silent ? null : beginAnalyticsApiLoading();
+        let status = null;
+        let responseBytes = null;
+        let aborted = false;
         try {
         const response = await fetch(url, {
             headers: {
@@ -15045,13 +17946,15 @@
             credentials: "same-origin",
             signal
         });
-        const headersMs = Math.round((typeof performance !== "undefined" ? performance.now() : Date.now()) - perfStarted);
+        status = response.status;
+        const headersMs = Math.round(analyticsNowMs() - perfStarted);
         const contentType = (response.headers.get("content-type") || "").toLowerCase();
         const expectsJson = contentType.includes("application/json");
         const redirectedToAdminLogin = response.redirected
             && String(response.url || "").includes("/analytics-admin/login");
         if (!response.ok) {
             const text = await response.text();
+            responseBytes = analyticsApproxResponseBytes(response, null, text);
             let detail = text;
             if (expectsJson) {
                 try {
@@ -15077,6 +17980,7 @@
         }
         if (!expectsJson) {
             const body = await response.text();
+            responseBytes = analyticsApproxResponseBytes(response, null, body);
             if (redirectedToAdminLogin
                 || (response.redirected && response.url.includes("/login"))
                 || /action="\/analytics-admin\/login"/i.test(body || "")) {
@@ -15090,13 +17994,14 @@
                 .slice(0, 260);
             throw new Error(`Сервер вернул не JSON (${response.status}). ${compactBody || "Пустой ответ"}`);
         }
-        const jsonStarted = typeof performance !== "undefined" ? performance.now() : Date.now();
+        const jsonStarted = analyticsNowMs();
         const payload = await response.json();
-        const jsonMs = Math.round((typeof performance !== "undefined" ? performance.now() : Date.now()) - jsonStarted);
+        responseBytes = analyticsApproxResponseBytes(response, payload, null);
+        const jsonMs = Math.round(analyticsNowMs() - jsonStarted);
         if (perfLabel) {
             console.info("[UNIVERSAL_PERF] frontend fetchJson", {
                 label: perfLabel,
-                totalMs: Math.round((typeof performance !== "undefined" ? performance.now() : Date.now()) - perfStarted),
+                totalMs: Math.round(analyticsNowMs() - perfStarted),
                 waitMs: headersMs,
                 jsonMs,
                 status: response.status,
@@ -15104,15 +18009,71 @@
                 url: String(url || "").replace(window.location.origin, "")
             });
         }
-        notifyPartialAnalyticsPayload(payload);
+        const activeScreenAtFinish = activeAnalyticsScreen();
+        const screenGenerationAtFinish = currentAnalyticsScreenGeneration(activeScreenAtFinish);
+        logAnalyticsLoadDebug({
+            type: "request",
+            requestId,
+            group: String(options?.requestGroup || analyticsRequestGroup(url)),
+            url: String(url || "").replace(window.location.origin, ""),
+            startedAt: Math.round(perfStarted),
+            finishedAt: Math.round(analyticsNowMs()),
+            durationMs: Math.round(analyticsNowMs() - perfStarted),
+            waitMs: headersMs,
+            jsonMs,
+            status: response.status,
+            aborted: false,
+            isStale: activeScreenAtStart !== activeScreenAtFinish
+                || screenGenerationAtStart !== screenGenerationAtFinish,
+            activeScreenAtStart,
+            activeScreenAtFinish,
+            screenGenerationAtStart,
+            screenGenerationAtFinish,
+            appliedToUi: null,
+            silent,
+            bytes: responseBytes,
+            responseSize: responseBytes
+        });
+        notifyPartialAnalyticsPayload(payload, {
+            requestGroup: String(options?.requestGroup || analyticsRequestGroup(url)),
+            activeScreenAtStart,
+            activeScreenAtFinish,
+            screenGenerationAtStart,
+            screenGenerationAtFinish
+        });
         if (!silent) {
             state.analyticsApiSuccessPending = true;
         }
         return payload;
         } catch (error) {
+            aborted = error?.name === "AbortError";
             if (!silent && error?.name !== "AbortError") {
                 state.analyticsApiHadError = true;
             }
+            const activeScreenAtFinish = activeAnalyticsScreen();
+            const screenGenerationAtFinish = currentAnalyticsScreenGeneration(activeScreenAtFinish);
+            logAnalyticsLoadDebug({
+                type: "request",
+                requestId,
+                group: String(options?.requestGroup || analyticsRequestGroup(url)),
+                url: String(url || "").replace(window.location.origin, ""),
+                startedAt: Math.round(perfStarted),
+                finishedAt: Math.round(analyticsNowMs()),
+                durationMs: Math.round(analyticsNowMs() - perfStarted),
+                status,
+                aborted,
+                isStale: aborted || activeScreenAtStart !== activeScreenAtFinish
+                    || screenGenerationAtStart !== screenGenerationAtFinish,
+                activeScreenAtStart,
+                activeScreenAtFinish,
+                screenGenerationAtStart,
+                screenGenerationAtFinish,
+                appliedToUi: false,
+                silent,
+                bytes: responseBytes,
+                responseSize: responseBytes,
+                error: error instanceof Error ? error.message : String(error)
+            });
             throw error;
         } finally {
             if (!silent) {
@@ -15132,7 +18093,7 @@
             state.analyticsApiLoadingTimer = setTimeout(() => {
                 state.analyticsApiLongLoadingShown = true;
                 showAnalyticsApiToast("Загрузка аналитики, выполняется обработка большого объёма данных...", false);
-            }, 2000);
+            }, 500);
         }
         return {};
     }
@@ -15146,8 +18107,10 @@
         state.analyticsApiLoadingTimer = null;
         if (state.analyticsApiHadError) {
             showAnalyticsApiToast("Не удалось загрузить данные", true);
-        } else if (state.analyticsApiSuccessPending) {
-            showAnalyticsApiToast("Данные обновлены", false);
+        } else if (state.analyticsApiSuccessPending && state.analyticsApiLongLoadingShown) {
+            requestAnimationFrame(() => {
+                setTimeout(() => showAnalyticsApiToast("Данные обновлены", false), 0);
+            });
         }
     }
 
@@ -15180,12 +18143,37 @@
         void disabled;
     }
 
-    function notifyPartialAnalyticsPayload(payload) {
+    function notifyPartialAnalyticsPayload(payload, context = {}) {
         const warning = partialAnalyticsWarning(payload);
         if (!warning) {
             return;
         }
+        const requestGroup = String(context?.requestGroup || "").trim();
+        const requestScreen = String(context?.activeScreenAtStart || "").trim();
+        const finishScreen = String(context?.activeScreenAtFinish || "").trim();
+        const stale = requestScreen !== finishScreen
+            || Number(context?.screenGenerationAtStart || 0) !== Number(context?.screenGenerationAtFinish || 0);
+        if (stale || requestGroup === "events") {
+            return;
+        }
         console.debug("[Analytics] partial read-side payload", warning);
+        const bootstrapFailed = String(warning || "").startsWith("Rollup bootstrap failed:");
+        showDashboardDataStatus(warning, bootstrapFailed);
+        if (warning === "Rollup initializing. Analytics data will appear after background aggregation completes.") {
+            scheduleRollupBootstrapRetry();
+        }
+    }
+
+    function scheduleRollupBootstrapRetry() {
+        if (state.rollupBootstrapRetryTimer) {
+            return;
+        }
+        state.rollupBootstrapRetryTimer = window.setTimeout(() => {
+            state.rollupBootstrapRetryTimer = null;
+            void reloadAll().catch((error) => {
+                console.error("Rollup bootstrap retry failed", error);
+            });
+        }, 3000);
     }
 
     function partialAnalyticsWarning(payload) {
@@ -15264,12 +18252,37 @@
 
     function nextMainReloadRequestId() {
         state.mainReloadRequestId = Number(state.mainReloadRequestId || 0) + 1;
+        state.mainReloadAbortController?.abort?.();
+        state.mainReloadAbortController = typeof AbortController === "function"
+            ? new AbortController()
+            : null;
         return state.mainReloadRequestId;
     }
 
     function isStaleMainReloadRequest(requestId) {
         return Number.isFinite(Number(requestId))
             && Number(requestId) !== Number(state.mainReloadRequestId || 0);
+    }
+
+    function mainReloadFetchOptions(requestGroup) {
+        return {
+            signal: state.mainReloadAbortController?.signal,
+            requestGroup
+        };
+    }
+
+    function nextExpandedChartRequestId() {
+        state.expandedChartRequestId = Number(state.expandedChartRequestId || 0) + 1;
+        return state.expandedChartRequestId;
+    }
+
+    function isStaleExpandedChartRequest(requestId, canvasId) {
+        return Number.isFinite(Number(requestId))
+            && (
+                Number(requestId) !== Number(state.expandedChartRequestId || 0)
+                || state.expandedChart.sourceCanvasId !== canvasId
+                || !state.expandedChart.containerEl
+            );
     }
 
     function readStageMetricSeriesCache(key) {
@@ -15456,10 +18469,42 @@
         }
     }
 
+    function setLoaderMessage(loader, message) {
+        const label = loader?.querySelector?.("[data-analytics-loader-message]")
+            || loader?.querySelector?.("span");
+        if (label) {
+            label.textContent = message || ANALYTICS_LOADING_TEXT;
+        }
+    }
+
+    function clearLoaderSlowTimer(timerMap, hostEl) {
+        if (!timerMap || !hostEl) {
+            return;
+        }
+        const timer = timerMap.get(hostEl);
+        if (timer) {
+            clearTimeout(timer);
+        }
+        timerMap.delete(hostEl);
+    }
+
+    function scheduleLoaderSlowMessage(timerMap, hostEl, loader) {
+        clearLoaderSlowTimer(timerMap, hostEl);
+        if (!timerMap || !hostEl || !loader) {
+            return;
+        }
+        const timer = setTimeout(() => {
+            setLoaderMessage(loader, ANALYTICS_SLOW_LOADING_TEXT);
+            timerMap.delete(hostEl);
+        }, 3000);
+        timerMap.set(hostEl, timer);
+    }
+
     function setPanelLoading(panelEl, isLoading) {
         if (!panelEl) {
             return;
         }
+        panelEl.classList.add("analytics-loading-host");
         const depthMap = state.panelLoadingDepthByElement;
         const prevDepth = depthMap.get(panelEl) || 0;
         const nextDepth = Math.max(0, prevDepth + (isLoading ? 1 : -1));
@@ -15477,6 +18522,13 @@
         `;
             panelEl.appendChild(loader);
         }
+        if (nextDepth > 0) {
+            setLoaderMessage(loader, ANALYTICS_LOADING_TEXT);
+            scheduleLoaderSlowMessage(state.panelLoadingSlowTimerByElement, panelEl, loader);
+        } else {
+            clearLoaderSlowTimer(state.panelLoadingSlowTimerByElement, panelEl);
+        }
+        panelEl.classList.toggle("is-analytics-loading", nextDepth > 0);
         loader.classList.toggle("is-visible", nextDepth > 0);
     }
 
@@ -15485,6 +18537,8 @@
             return;
         }
         state.panelLoadingDepthByElement.set(panelEl, 0);
+        clearLoaderSlowTimer(state.panelLoadingSlowTimerByElement, panelEl);
+        panelEl.classList.remove("is-analytics-loading");
         panelEl.querySelector(".analytics-panel-loader")?.classList.remove("is-visible");
     }
 
@@ -15535,6 +18589,8 @@
         if (!hostEl) {
             return;
         }
+        message = message || ANALYTICS_LOADING_TEXT;
+        hostEl.classList.add("analytics-loading-host");
         const depthMap = state.sectionLocalLoadingDepthByElement;
         const prevDepth = depthMap.get(hostEl) || 0;
         const nextDepth = Math.max(0, prevDepth + (isLoading ? 1 : -1));
@@ -15553,11 +18609,14 @@
         `;
             hostEl.appendChild(loader);
         }
-        const messageEl = loader.querySelector("span");
-        if (messageEl) {
-            messageEl.textContent = message;
+        setLoaderMessage(loader, message);
+        if (nextDepth > 0) {
+            scheduleLoaderSlowMessage(state.sectionLocalLoadingSlowTimerByElement, hostEl, loader);
+        } else {
+            clearLoaderSlowTimer(state.sectionLocalLoadingSlowTimerByElement, hostEl);
         }
         updateSectionLocalLoadingBounds(hostEl, boundsEls);
+        hostEl.classList.toggle("is-analytics-loading", nextDepth > 0);
         loader.classList.toggle("is-visible", nextDepth > 0);
     }
 
@@ -15680,11 +18739,11 @@
             state.sectionLoaderHostsByScope[scopeKey].map((host) => [host, [host]])
         );
         if (!wasActive) {
-            resolvedHosts.forEach((host) => setSectionLocalLoading(host, [host], true));
+            resolvedHosts.forEach((host) => setSectionLocalLoading(host, [host], true, ANALYTICS_LOADING_TEXT));
         } else {
             resolvedHosts.forEach((host) => {
                 if (!previousHosts.includes(host)) {
-                    setSectionLocalLoading(host, [host], true);
+                    setSectionLocalLoading(host, [host], true, ANALYTICS_LOADING_TEXT);
                     return;
                 }
                 updateSectionLocalLoadingBounds(host, [host]);
@@ -15718,6 +18777,90 @@
         }
     }
 
+    function closestLoaderHost(element, selector) {
+        return element?.closest?.(selector || ".glass-card, .analytics-panel") || null;
+    }
+
+    function getOverviewKpiLoaderHosts() {
+        return uniqueElements([
+            closestLoaderHost(refs.kpiTotalEvents, ".analytics-kpi-card"),
+            closestLoaderHost(refs.kpiAvgMs, ".analytics-kpi-card"),
+            closestLoaderHost(refs.kpiP95Ms, ".analytics-kpi-card"),
+            closestLoaderHost(refs.kpiP99Ms, ".analytics-kpi-card"),
+            closestLoaderHost(refs.kpiErrorRate, ".analytics-kpi-card"),
+            closestLoaderHost(refs.kpiErrors, ".analytics-kpi-card")
+        ]);
+    }
+
+    function showOverviewLoaders() {
+        const cardToken = showScopedCardLoaders("overview-kpi", getOverviewKpiLoaderHosts());
+        ["chart-events-count", "chart-latency", "chart-error-rate", "chart-event-kpi"]
+            .forEach((canvasId) => setChartActionLoading(canvasId, true));
+        return {cardToken};
+    }
+
+    function hideOverviewLoaders(token) {
+        hideScopedCardLoaders("overview-kpi", token?.cardToken);
+        ["chart-events-count", "chart-latency", "chart-error-rate", "chart-event-kpi"]
+            .forEach((canvasId) => setChartActionLoading(canvasId, false));
+    }
+
+    function getStageOverviewLoaderHosts() {
+        return uniqueElements([
+            refs.stageTableBody?.closest?.(".analytics-panel")
+        ]);
+    }
+
+    function showStageOverviewLoaders() {
+        return showScopedSectionLoader("overview-stage-breakdown", getStageOverviewLoaderHosts());
+    }
+
+    function hideStageOverviewLoaders(token) {
+        hideScopedSectionLoader("overview-stage-breakdown", token);
+    }
+
+    function showDashboardReloadLoadersForCurrentTab() {
+        const tab = state.currentDashboardTab || "overview";
+        if (tab !== "overview") {
+            return null;
+        }
+        return {
+            tab,
+            overview: showOverviewLoaders(),
+            stages: showStageOverviewLoaders()
+        };
+    }
+
+    function hideDashboardReloadLoaders(loaders) {
+        if (!loaders || loaders.hidden) {
+            return;
+        }
+        loaders.hidden = true;
+        if (loaders.overview) {
+            hideOverviewLoaders(loaders.overview);
+        }
+        if (loaders.stages) {
+            hideStageOverviewLoaders(loaders.stages);
+        }
+    }
+
+    function getCompareLoaderHosts() {
+        const tabRoot = document.getElementById("compare-insight-tabs");
+        return uniqueElements([
+            refs.compareCards,
+            refs.compareSummaryCard,
+            ...(Array.from(tabRoot?.querySelectorAll?.("[data-compare-insight-panel]") || []))
+        ]);
+    }
+
+    function showCompareLoaders() {
+        return showScopedSectionLoader("compare", getCompareLoaderHosts());
+    }
+
+    function hideCompareLoaders(token) {
+        hideScopedSectionLoader("compare", token);
+    }
+
     function getUniversalChartLoaderHosts() {
         return uniqueElements([
             refs.universalKpiCard,
@@ -15729,11 +18872,23 @@
     }
 
     function showUniversalChartLoaders() {
-        return null;
+        if (state.universalLoaderAutoHideTimer) {
+            clearTimeout(state.universalLoaderAutoHideTimer);
+            state.universalLoaderAutoHideTimer = null;
+        }
+        const token = showScopedSectionLoader("universal", getUniversalChartLoaderHosts());
+        state.universalLoaderAutoHideTimer = setTimeout(() => {
+            hideUniversalChartLoaders(token);
+        }, 30000);
+        return token;
     }
 
     function hideUniversalChartLoaders(token) {
-        void token;
+        if (state.universalLoaderAutoHideTimer) {
+            clearTimeout(state.universalLoaderAutoHideTimer);
+            state.universalLoaderAutoHideTimer = null;
+        }
+        hideScopedSectionLoader("universal", token);
     }
 
     async function withUniversalChartLoaders(task, options = {}) {
@@ -15850,6 +19005,7 @@
             `;
             container.appendChild(loader);
         }
+        setLoaderMessage(loader, ANALYTICS_LOADING_TEXT);
         loader.classList.toggle(
             "is-visible",
             Math.max(0, Number(state.expandedLoadingDepthBySource?.[canvasId] || 0)) > 0
@@ -15932,6 +19088,20 @@
             return "-";
         }
         return formatDateTimePattern(date);
+    }
+
+    function formatEventDetailsDateTime(value) {
+        if (!value) {
+            return "-";
+        }
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) {
+            return "-";
+        }
+        const pad2 = (item) => String(item).padStart(2, "0");
+        const pad3 = (item) => String(item).padStart(3, "0");
+        return `${pad2(date.getDate())}.${pad2(date.getMonth() + 1)}.${date.getFullYear()}, `
+            + `${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}.${pad3(date.getMilliseconds())}`;
     }
 
     function formatLogDateTime(value) {
@@ -16427,7 +19597,7 @@
             setEventKpiCompareModeRaw(mode, override);
             setChartActionLoading(canvasId, true);
             try {
-                await loadOverview();
+                await loadOverview(state.mainReloadRequestId || nextMainReloadRequestId());
                 syncInlineCompareModeSelectValues(canvasId);
                 syncInlineCompareModeResetVisibility(canvasId);
                 if (state.expandedChart.sourceCanvasId === canvasId) {
@@ -16492,7 +19662,7 @@
         setEventKpiCompareModeRaw(mode, true);
         setChartActionLoading(canvasId, true);
         try {
-            await loadOverview();
+            await loadOverview(state.mainReloadRequestId || nextMainReloadRequestId());
             syncInlineCompareModeSelectValues(canvasId);
             syncInlineCompareModeResetVisibility(canvasId);
             if (state.expandedChart.sourceCanvasId === canvasId) {
@@ -16785,6 +19955,7 @@
     }
 
     function collapseExpandedChart(options = {}) {
+        nextExpandedChartRequestId();
         const sourceCanvasId = state.expandedChart.sourceCanvasId;
         const preserveFocusedSnapshot = options.preserveFocusedSnapshot === true
             || state.preserveExpandedFocusedChartOnNextCollapse === true;
@@ -17526,7 +20697,13 @@
 
     function scenarioDetailSelectionFor(canvasId) {
         const sourceCanvasId = resolveChartScenarioSourceCanvasId(canvasId);
-        return new Set((state.scenarioDetailSelectionBySource?.[sourceCanvasId] || [])
+        const storedCodes = (state.scenarioDetailSelectionBySource?.[sourceCanvasId] || [])
+            .map((code) => String(code || "").trim())
+            .filter(Boolean);
+        if (storedCodes.length) {
+            return new Set(storedCodes);
+        }
+        return new Set(scenarioDetailSelectedEventCodes(sourceCanvasId)
             .map((code) => String(code || "").trim())
             .filter(Boolean));
     }
@@ -17573,7 +20750,7 @@
     }
 
     function renderScenarioDetailTable(canvasId, rows, totalCount) {
-        const limited = scenarioDetailSortRows(canvasId, rows).slice(0, 10);
+        const limited = scenarioDetailSortRows(canvasId, rows);
         if (!limited.length) {
             return `<div class="analytics-expanded-scenario-detail-empty">Детализация недоступна для текущего набора данных</div>`;
         }
@@ -17602,7 +20779,7 @@
                             <td class="text-end">${formatMs(row.avgMs)}</td>
                             <td class="text-end">${formatMs(row.p95)}</td>
                             <td class="text-end">${formatMs(row.p99Ms)}</td>
-                            <td class="text-end">${formatPercent(row.err)}</td>
+                            <td class="text-end">${formatPercentValue(row.err)}</td>
                         </tr>`).join("")}
                     </tbody>
                 </table>`;
@@ -17619,7 +20796,7 @@
                             <td class="text-end">${formatInt(row.count)}</td>
                             <td class="text-end">${formatInt(row.errorCount)}</td>
                             <td class="text-end">${formatInt(row.successCount)}</td>
-                            <td class="text-end">${formatPercent(row.err)}</td>
+                            <td class="text-end">${formatPercentValue(row.err)}</td>
                             <td class="text-end">${formatMs(row.avgMs)} / ${formatMs(row.p95)}</td>
                         </tr>`).join("")}
                     </tbody>
@@ -17637,7 +20814,7 @@
                         <td class="text-end">${share(row)}</td>
                         <td class="text-end">${formatMs(row.avgMs)}</td>
                         <td class="text-end">${formatMs(row.p95)}</td>
-                        <td class="text-end">${formatPercent(row.err)}</td>
+                        <td class="text-end">${formatPercentValue(row.err)}</td>
                     </tr>`).join("")}
                 </tbody>
             </table>`;
@@ -17750,17 +20927,19 @@
         if (!selectedCodes.length) {
             const eventState = getExpandedEventFilterState(canvasId);
             const scenarioCodes = await resolveOverviewScenarioEventCodes(sourceCanvasId);
-            eventState.includeOverall = false;
-            eventState.codes = Array.from(new Set(scenarioCodes));
-            syncExpandedEventFilterControls(canvasId);
-            const ranges = currentScenarioDetailRanges(canvasId);
-            const normalized = normalizeCompareRangesByAfter(ranges.from, ranges.to, "", "");
-            await renderExpandedChartByRanges(canvasId, normalized, {
-                ...getExpandedEventRenderOptions(canvasId),
-                skipScenarioDetailRefresh: true
-            });
-            state.expandedChart.customRangeActive = true;
-            return;
+        eventState.includeOverall = false;
+        eventState.codes = Array.from(new Set(scenarioCodes));
+        setGlobalEventCodesFromScenario(eventState.codes);
+        syncExpandedEventFilterControls(canvasId);
+        const ranges = currentScenarioDetailRanges(canvasId);
+        const normalized = normalizeCompareRangesByAfter(ranges.from, ranges.to, "", "");
+        await renderExpandedChartByRanges(canvasId, normalized, {
+            ...getExpandedEventRenderOptions(canvasId),
+            skipScenarioDetailRefresh: true
+        });
+        state.expandedChart.customRangeActive = true;
+        await submitMainFiltersPreservingExpandedUiState();
+        return;
         }
         const eventState = getExpandedEventFilterState(canvasId);
         if (!state.scenarioEventFilterBeforeBySource?.[sourceCanvasId]) {
@@ -17771,6 +20950,7 @@
         }
         eventState.includeOverall = false;
         eventState.codes = Array.from(new Set(selectedCodes));
+        setGlobalEventCodesFromScenario(eventState.codes);
         syncExpandedEventFilterControls(canvasId);
         const ranges = currentScenarioDetailRanges(canvasId);
         const normalized = normalizeCompareRangesByAfter(ranges.from, ranges.to, "", "");
@@ -17779,6 +20959,7 @@
             skipScenarioDetailRefresh: true
         });
         state.expandedChart.customRangeActive = true;
+        await submitMainFiltersPreservingExpandedUiState();
     }
 
     async function resetScenarioDetailEventDrilldown(canvasId) {
@@ -18081,6 +21262,7 @@
         const forcedEventCodes = selectedEventCode
             ? [selectedEventCode]
             : universalEventCodes.map((code) => String(code || "").trim()).filter(Boolean);
+        const targetScreen = systemEvent ? "system" : "raw";
         state.eventsForcedEventCodes = forcedEventCodes;
         state.eventsForcedErrorKey = selectedErrorKey;
         state.eventsForcedModuleCode = selectedModuleCode;
@@ -18090,20 +21272,44 @@
             if (refs.systemChartFrom) refs.systemChartFrom.value = afterFrom;
             if (refs.systemChartTo) refs.systemChartTo.value = afterTo;
             if (refs.systemChartIsError) refs.systemChartIsError.value = forceErrorsOnly ? "true" : "";
-            setDashboardViewTab("system", true);
-            await refreshSystemChartEventOptions({preserveSelection: false});
-            const matchingOption = selectedEventCode
-                ? Array.from(refs.systemChartEventsList?.options || [])
-                    .find((option) => String(option.value || "").trim() === selectedEventCode)
-                : null;
-            Array.from(refs.systemChartEventsList?.options || []).forEach((option) => {
-                option.selected = option === matchingOption;
-            });
-            if (refs.systemChartEventsAll) {
-                refs.systemChartEventsAll.checked = !matchingOption;
+            state.suppressEventsScopeRefreshOnNextTabSwitch = true;
+            setDashboardViewTab("system", false);
+            replaceAnalyticsTabUrl("system");
+            const targetGeneration = currentAnalyticsScreenGeneration(targetScreen);
+            showEventsFilterNavigationLoading();
+            try {
+                await refreshSystemChartEventOptions({preserveSelection: false});
+                if (!isCurrentAnalyticsScreenRequest(targetScreen, targetGeneration)) {
+                    return;
+                }
+                const matchingOption = selectedEventCode
+                    ? Array.from(refs.systemChartEventsList?.options || [])
+                        .find((option) => String(option.value || "").trim() === selectedEventCode)
+                    : null;
+                Array.from(refs.systemChartEventsList?.options || []).forEach((option) => {
+                    option.selected = option === matchingOption;
+                });
+                if (refs.systemChartEventsAll) {
+                    refs.systemChartEventsAll.checked = !matchingOption;
+                }
+                updateSystemChartEventsLabel();
+                await loadEvents(true);
+            } catch (error) {
+                if (error?.name === "AbortError" || !isCurrentAnalyticsScreenRequest(targetScreen, targetGeneration)) {
+                    return;
+                }
+                clearEventsLoadingTimers();
+                hideEventsRefreshStatus();
+                removeEventsLoadingRows();
+                state.eventsLoading = false;
+                state.eventsHasMore = false;
+                setEventsLoadMoreVisible(false);
+                console.error("Filtered system events navigation failed", error);
+                const detail = error instanceof Error ? error.message : "неизвестная ошибка";
+                if (refs.eventsTableBody) {
+                    refs.eventsTableBody.innerHTML = eventsInfoRow(`Не удалось загрузить события по выбранному фильтру: ${detail}`, true);
+                }
             }
-            updateSystemChartEventsLabel();
-            await loadEvents(true);
             return;
         }
         if (refs.eventsIsError) refs.eventsIsError.value = forceErrorsOnly ? "true" : "";
@@ -18120,10 +21326,34 @@
             refs.eventsAdvancedToggle?.setAttribute("aria-expanded", "true");
         }
         updateEventsErrorClassVisibility();
-        setDashboardViewTab("raw", true);
-        await refreshRawEventTypeOptionsForMode(forcedEventCodes);
-        restoreRawEventTypeSelection(forcedEventCodes);
-        await loadEvents(true);
+        state.suppressEventsScopeRefreshOnNextTabSwitch = true;
+        setDashboardViewTab("raw", false);
+        replaceAnalyticsTabUrl("raw");
+        const targetGeneration = currentAnalyticsScreenGeneration(targetScreen);
+        showEventsFilterNavigationLoading();
+        try {
+            await refreshRawEventTypeOptionsForMode(forcedEventCodes);
+            if (!isCurrentAnalyticsScreenRequest(targetScreen, targetGeneration)) {
+                return;
+            }
+            restoreRawEventTypeSelection(forcedEventCodes);
+            await loadEvents(true);
+        } catch (error) {
+            if (error?.name === "AbortError" || !isCurrentAnalyticsScreenRequest(targetScreen, targetGeneration)) {
+                return;
+            }
+            clearEventsLoadingTimers();
+            hideEventsRefreshStatus();
+            removeEventsLoadingRows();
+            state.eventsLoading = false;
+            state.eventsHasMore = false;
+            setEventsLoadMoreVisible(false);
+            console.error("Filtered events navigation failed", error);
+            const detail = error instanceof Error ? error.message : "неизвестная ошибка";
+            if (refs.eventsTableBody) {
+                refs.eventsTableBody.innerHTML = eventsInfoRow(`Не удалось загрузить события по выбранному фильтру: ${detail}`, true);
+            }
+        }
     }
 
     function syncExpandedEventFilterControls(canvasId) {
@@ -18824,9 +22054,10 @@
     }
 
     async function reloadInlineCompareChartSources() {
+        const requestId = state.mainReloadRequestId || nextMainReloadRequestId();
         await Promise.all([
-            loadOverview(),
-            loadStages()
+            loadOverview(requestId),
+            loadStages(requestId)
         ]);
     }
 
@@ -18836,7 +22067,7 @@
         }
         if (canvasId === "chart-event-kpi") {
             clearEventKpiMiniCompareState();
-            await loadOverview();
+            await loadOverview(state.mainReloadRequestId || nextMainReloadRequestId());
             return;
         }
         const compareMode = canvasId === "chart-event-kpi"
@@ -19087,10 +22318,7 @@
         if (moduleCode) {
             params.set("moduleCode", moduleCode);
         }
-        const eventTypeCode = refs.eventType?.value?.trim();
-        if (eventTypeCode) {
-            params.set("eventTypeCode", eventTypeCode);
-        }
+        appendMainEventTypeParams(params, true);
         const requestPath = refs.analyticsRequestPath?.value?.trim();
         if (requestPath) {
             params.set("requestPath", requestPath);
@@ -19337,7 +22565,7 @@
                     await applyInlineComparePresetToChart(canvasId);
                 }
             }));
-            await loadOverview();
+            await loadOverview(state.mainReloadRequestId || nextMainReloadRequestId());
             if (refs.universalCompareGhost) {
                 await withUniversalChartLoaders(() => loadUniversal());
             }
@@ -19430,7 +22658,7 @@
                     await applyInlineComparePresetToChart(canvasId);
                 }
             }));
-            await loadOverview();
+            await loadOverview(state.mainReloadRequestId || nextMainReloadRequestId());
             await waitForChartPaint(1);
             hideOverviewLoaders();
             if (refs.stageMetricForm) {
@@ -19665,16 +22893,21 @@
             if (!chart.options.scales.x.ticks) {
                 chart.options.scales.x.ticks = {};
             }
-            chart.options.scales.x.ticks.autoSkip = false;
-            chart.options.scales.x.ticks.maxTicksLimit = 1000;
+            chart.options.scales.x.ticks = timeAxisTickOptions(
+                chart.options.scales.x.ticks,
+                expanded,
+                chart.options.scales.x.type === "linear" ? adaptiveLinearTimeTickLabel : adaptiveTimeTickLabel
+            );
             return;
         }
         if (!chart.options.scales.x.ticks) {
             chart.options.scales.x.ticks = {};
         }
-        chart.options.scales.x.ticks.autoSkip = false;
-        chart.options.scales.x.ticks.maxTicksLimit = 1000;
-        chart.options.scales.x.ticks.callback = adaptiveTimeTickLabel;
+        chart.options.scales.x.ticks = timeAxisTickOptions(
+            chart.options.scales.x.ticks,
+            expanded,
+            chart.options.scales.x.type === "linear" ? adaptiveLinearTimeTickLabel : adaptiveTimeTickLabel
+        );
     }
 
     function getGridColumnCount(gridEl) {
@@ -19790,7 +23023,7 @@
         if (boundsByHost instanceof Map) {
             boundsByHost.set(host, [host]);
         }
-        setSectionLocalLoading(host, [host], true);
+        setSectionLocalLoading(host, [host], true, ANALYTICS_LOADING_TEXT);
     }
 
     function isOpenedExpandedStageMetricSource(canvasId) {
@@ -19865,23 +23098,14 @@
         config.options = config.options || {};
         config.options.responsive = true;
         config.options.maintainAspectRatio = false;
-        if (config.options.scales?.x?.ticks) {
-            if (canvasId === "chart-event-kpi") {
-                config.options.scales.x.ticks.autoSkip = false;
-                config.options.scales.x.ticks.maxTicksLimit = 1000;
-            } else {
-                config.options.scales.x.ticks.autoSkip = false;
-                config.options.scales.x.ticks.maxTicksLimit = 1000;
-                config.options.scales.x.ticks.callback = adaptiveTimeTickLabel;
-            }
-        }
+        applyTimeAxisTickOptionsToConfig(config, true);
         if (config.options.plugins?.decimation) {
             config.options.plugins.decimation.samples = 260;
         }
         if (state.expandedChart.instance) {
             state.expandedChart.instance.destroy();
         }
-        state.expandedChart.instance = new Chart(expandedCanvas.getContext("2d"), config);
+        state.expandedChart.instance = new Chart(expandedCanvas.getContext("2d"), normalizeChartHoverOptions(config));
         syncExpandedBucketLabelFromConfig(canvasId, config);
 
         if (state.expandedChart.compareInstance) {
@@ -19909,20 +23133,11 @@
         compareConfig.options = compareConfig.options || {};
         compareConfig.options.responsive = true;
         compareConfig.options.maintainAspectRatio = false;
-        if (compareConfig.options.scales?.x?.ticks) {
-            if (canvasId === "chart-event-kpi") {
-                compareConfig.options.scales.x.ticks.autoSkip = false;
-                compareConfig.options.scales.x.ticks.maxTicksLimit = 1000;
-            } else {
-                compareConfig.options.scales.x.ticks.autoSkip = false;
-                compareConfig.options.scales.x.ticks.maxTicksLimit = 1000;
-                compareConfig.options.scales.x.ticks.callback = adaptiveTimeTickLabel;
-            }
-        }
+        applyTimeAxisTickOptionsToConfig(compareConfig, true);
         if (compareConfig.options.plugins?.decimation) {
             compareConfig.options.plugins.decimation.samples = 260;
         }
-        state.expandedChart.compareInstance = new Chart(compareExpandedCanvas.getContext("2d"), compareConfig);
+        state.expandedChart.compareInstance = new Chart(compareExpandedCanvas.getContext("2d"), normalizeChartHoverOptions(compareConfig));
         if (!skipScenarioDetailRefresh) {
             void refreshExpandedScenarioDetailPanel();
         }
@@ -20390,9 +23605,11 @@
         if (moduleCode) {
             params.set("moduleCode", moduleCode);
         }
-        const eventTypeCode = String(options.eventTypeCode ?? refs.eventType?.value ?? "").trim();
-        if (options.includeEventType !== false && eventTypeCode) {
-            params.set("eventTypeCode", eventTypeCode);
+        const explicitEventTypeCode = String(options.eventTypeCode ?? "").trim();
+        if (options.includeEventType !== false && explicitEventTypeCode) {
+            params.set("eventTypeCode", explicitEventTypeCode);
+        } else if (options.includeEventType !== false) {
+            appendMainEventTypeParams(params, true);
         }
         const requestPath = String(options.requestPath || "").trim();
         if (requestPath) {
@@ -20422,8 +23639,7 @@
         const indexes = Array.isArray(sampled?.indexes) ? sampled.indexes : [];
         const points = Array.isArray(sourceTimePoints) ? sourceTimePoints : [];
         config.__analyticsTimePoints = indexes
-            .map((index) => points[index])
-            .filter(Boolean);
+            .map((index) => points[index] ?? null);
         return config;
     }
 
@@ -20804,6 +24020,30 @@
         };
     }
 
+    function pointerLocalXInElement(event, element) {
+        const rect = element?.getBoundingClientRect?.();
+        if (!rect || rect.width <= 0) {
+            return 0;
+        }
+        const cssWidth = element.clientWidth || rect.width;
+        return (event.clientX - rect.left) * (cssWidth / rect.width);
+    }
+
+    function rectDeltaToElementCssPx(rectDelta, element, axis = "x") {
+        const rect = element?.getBoundingClientRect?.();
+        if (!rect) {
+            return rectDelta;
+        }
+        const cssSize = axis === "y"
+            ? (element.clientHeight || rect.height)
+            : (element.clientWidth || rect.width);
+        const rectSize = axis === "y" ? rect.height : rect.width;
+        if (!rectSize || rectSize <= 0 || !cssSize) {
+            return rectDelta;
+        }
+        return rectDelta * (cssSize / rectSize);
+    }
+
     function setupExpandedIntervalSelection(container, canvasId, context = {}) {
         if (!container || !isTimeRangeSelectableExpandedChart(canvasId)) {
             return;
@@ -20923,15 +24163,15 @@
             const maxX = Math.min(area.right, Math.max(leftX, rightX));
             const wrapRect = wrap.getBoundingClientRect();
             const canvasRect = canvas.getBoundingClientRect();
-            const offsetLeft = canvasRect.left - wrapRect.left;
-            const offsetTop = canvasRect.top - wrapRect.top;
+            const offsetLeft = rectDeltaToElementCssPx(canvasRect.left - wrapRect.left, wrap);
+            const offsetTop = rectDeltaToElementCssPx(canvasRect.top - wrapRect.top, wrap, "y");
             overlay.style.left = `${offsetLeft + minX}px`;
             overlay.style.top = `${offsetTop + area.top}px`;
             overlay.style.width = `${Math.max(0, maxX - minX)}px`;
             overlay.style.height = `${Math.max(0, area.bottom - area.top)}px`;
             overlay.classList.remove("d-none");
         };
-        const localX = (event) => event.clientX - canvas.getBoundingClientRect().left;
+        const localX = (event) => pointerLocalXInElement(event, canvas);
         canvas.addEventListener("mousedown", (event) => {
             if (!state.expandedIntervalSelectionEnabledBySource[canvasId]) return;
             const chart = state.expandedChart.instance;
@@ -21251,7 +24491,13 @@
                 && localMode !== resolveGlobalInlineCompareMode();
             const metricChanged = (latencyMetricEl && getExpandedLatencyMetricMode(canvasId) !== "p95")
                 || (stageLatencyEventMetricEl && getExpandedStageLatencyEventMetricMode(canvasId) !== "p95");
-            const hasOverride = compareChanged || presetChanged || dateChanged || bucketChanged || eventChanged || metricChanged;
+            const hasOverride = !!state.expandedChart.customRangeActive
+                || compareChanged
+                || presetChanged
+                || dateChanged
+                || bucketChanged
+                || eventChanged
+                || metricChanged;
             resetEl?.classList.toggle("d-none", !hasOverride);
             refs.analyticsPage?.querySelectorAll(`[data-inline-compare-reset='${canvasId}']`)
                 ?.forEach((button) => {
@@ -21368,6 +24614,8 @@
 
         latencyMetricEl?.addEventListener("change", async () => {
             state.expandedLatencyMetricBySource[canvasId] = (latencyMetricEl.value || "p95").trim().toLowerCase();
+            state.expandedChart.customRangeActive = true;
+            syncResetVisibility();
             const ranges = readRangesFromUi();
             if (!isValidExpandedRanges(ranges)) {
                 return;
@@ -21391,6 +24639,8 @@
 
         stageLatencyEventMetricEl?.addEventListener("change", async () => {
             state.expandedStageLatencyEventMetricBySource[canvasId] = (stageLatencyEventMetricEl.value || "p95").trim().toLowerCase();
+            state.expandedChart.customRangeActive = true;
+            syncResetVisibility();
             const ranges = readRangesFromUi();
             if (!isValidExpandedRanges(ranges)) {
                 return;
@@ -21485,6 +24735,7 @@
         bucketEl?.addEventListener("change", async () => {
             setChartActionLoading(canvasId, true);
             try {
+                state.expandedChart.customRangeActive = true;
                 setGlobalBucketFromChart(bucketEl.value || "");
                 syncResetVisibility();
                 await submitMainFiltersPreservingExpandedUiState();
@@ -21568,7 +24819,7 @@
                 if (state.expandedChart.instance) {
                     state.expandedChart.instance.destroy();
                 }
-                state.expandedChart.instance = new Chart(expandedCanvas.getContext("2d"), config);
+                state.expandedChart.instance = new Chart(expandedCanvas.getContext("2d"), normalizeChartHoverOptions(config));
                 syncExpandedBucketLabelFromConfig(canvasId, config);
                 if (canvasId !== "chart-event-kpi") {
                     upsertChart(canvasId, config);
@@ -21582,6 +24833,7 @@
             }
         };
         const scheduleApplyRanges = () => {
+            state.expandedChart.customRangeActive = true;
             syncQuickRangeSelectFromRange(presetEl, readRangesFromUi().afterFrom, readRangesFromUi().afterTo);
             syncResetVisibility();
             if (applyTimerId != null) {
@@ -21758,6 +25010,7 @@
     }
 
     async function renderExpandedChartByRanges(canvasId, ranges, options = {}) {
+        const requestId = nextExpandedChartRequestId();
         const container = state.expandedChart.containerEl;
         if (!container) {
             return;
@@ -21785,8 +25038,8 @@
                 if (compareMode === "split" && compareCanvas) {
                     const beforeConfig = buildEventKpiSingleChartConfig(beforeRows, options);
                     const afterConfig = buildEventKpiSingleChartConfig(afterRows, options);
-                    state.expandedChart.compareInstance = new Chart(compareCanvas.getContext("2d"), beforeConfig);
-                    state.expandedChart.instance = new Chart(primaryCanvas.getContext("2d"), afterConfig);
+                    state.expandedChart.compareInstance = new Chart(compareCanvas.getContext("2d"), normalizeChartHoverOptions(beforeConfig));
+                    state.expandedChart.instance = new Chart(primaryCanvas.getContext("2d"), normalizeChartHoverOptions(afterConfig));
                     syncExpandedBucketLabelFromConfig(canvasId, afterConfig);
                     return;
                 }
@@ -21795,12 +25048,12 @@
                         ...options,
                         preserveCurrentOrder: true
                     });
-                    state.expandedChart.instance = new Chart(primaryCanvas.getContext("2d"), overlayConfig);
+                    state.expandedChart.instance = new Chart(primaryCanvas.getContext("2d"), normalizeChartHoverOptions(overlayConfig));
                     syncExpandedBucketLabelFromConfig(canvasId, overlayConfig);
                     return;
                 }
                 const afterConfig = buildEventKpiSingleChartConfig(afterRows, options);
-                state.expandedChart.instance = new Chart(primaryCanvas.getContext("2d"), afterConfig);
+                state.expandedChart.instance = new Chart(primaryCanvas.getContext("2d"), normalizeChartHoverOptions(afterConfig));
                 syncExpandedBucketLabelFromConfig(canvasId, afterConfig);
                 return;
             }
@@ -21809,10 +25062,13 @@
                     loadExpandedEventKpiRowsForRange(ranges.beforeFrom, ranges.beforeTo, options),
                     loadExpandedEventKpiRowsForRange(ranges.afterFrom, ranges.afterTo, options)
                 ]);
+                if (isStaleExpandedChartRequest(requestId, canvasId)) {
+                    return;
+                }
                 const beforeConfig = buildEventKpiSingleChartConfig(beforeRows, options);
                 const afterConfig = buildEventKpiSingleChartConfig(afterRows, options);
-                state.expandedChart.compareInstance = new Chart(compareCanvas.getContext("2d"), beforeConfig);
-                state.expandedChart.instance = new Chart(primaryCanvas.getContext("2d"), afterConfig);
+                state.expandedChart.compareInstance = new Chart(compareCanvas.getContext("2d"), normalizeChartHoverOptions(beforeConfig));
+                state.expandedChart.instance = new Chart(primaryCanvas.getContext("2d"), normalizeChartHoverOptions(afterConfig));
                 syncExpandedBucketLabelFromConfig(canvasId, afterConfig);
                 return;
             }
@@ -21821,21 +25077,30 @@
                     loadExpandedEventKpiRowsForRange(ranges.beforeFrom, ranges.beforeTo, options),
                     loadExpandedEventKpiRowsForRange(ranges.afterFrom, ranges.afterTo, options)
                 ]);
+                if (isStaleExpandedChartRequest(requestId, canvasId)) {
+                    return;
+                }
                 const overlayConfig = buildEventKpiOverlayChartConfig(afterRows, beforeRows, {
                     ...options,
                     preserveCurrentOrder: true
                 });
-                state.expandedChart.instance = new Chart(primaryCanvas.getContext("2d"), overlayConfig);
+                state.expandedChart.instance = new Chart(primaryCanvas.getContext("2d"), normalizeChartHoverOptions(overlayConfig));
                 syncExpandedBucketLabelFromConfig(canvasId, overlayConfig);
                 return;
             }
             const afterRows = await loadExpandedEventKpiRowsForRange(ranges.afterFrom, ranges.afterTo, options);
+            if (isStaleExpandedChartRequest(requestId, canvasId)) {
+                return;
+            }
             const afterConfig = buildEventKpiSingleChartConfig(afterRows, options);
-            state.expandedChart.instance = new Chart(primaryCanvas.getContext("2d"), afterConfig);
+            state.expandedChart.instance = new Chart(primaryCanvas.getContext("2d"), normalizeChartHoverOptions(afterConfig));
             syncExpandedBucketLabelFromConfig(canvasId, afterConfig);
             return;
         }
         const afterConfig = await buildChartConfigByRange(canvasId, ranges.afterFrom, ranges.afterTo, compareCanvas ? "После" : "Период", bucketOverride, options);
+        if (isStaleExpandedChartRequest(requestId, canvasId)) {
+            return;
+        }
         if (!compareCanvas) {
             if (state.expandedChart.compareInstance) {
                 state.expandedChart.compareInstance.destroy();
@@ -21849,6 +25114,9 @@
                     ranges.beforeTo
                 );
                 const beforeConfig = await buildChartConfigByRange(canvasId, normalizedRanges.beforeFrom, normalizedRanges.beforeTo, "До", bucketOverride, options);
+                if (isStaleExpandedChartRequest(requestId, canvasId)) {
+                    return;
+                }
                 if (isInlineGhostEnabled(canvasId) && Array.isArray(beforeConfig?.data?.datasets)) {
                     const ghostDatasets = beforeConfig.data.datasets.map((item) => buildGhostDataset(item, canvasId));
                     afterConfig.data = afterConfig.data || {};
@@ -21858,7 +25126,7 @@
             if (state.expandedChart.instance) {
                 state.expandedChart.instance.destroy();
             }
-            state.expandedChart.instance = new Chart(primaryCanvas.getContext("2d"), afterConfig);
+            state.expandedChart.instance = new Chart(primaryCanvas.getContext("2d"), normalizeChartHoverOptions(afterConfig));
             syncExpandedBucketLabelFromConfig(canvasId, afterConfig);
             if (canvasId !== "chart-event-kpi") {
                 upsertChart(canvasId, afterConfig);
@@ -21874,14 +25142,17 @@
             afterConfig.data = afterConfig.data || {};
             afterConfig.data.datasets = [...(afterConfig.data.datasets || []), ...ghostDatasets];
         }
+        if (isStaleExpandedChartRequest(requestId, canvasId)) {
+            return;
+        }
         if (state.expandedChart.instance) {
             state.expandedChart.instance.destroy();
         }
         if (state.expandedChart.compareInstance) {
             state.expandedChart.compareInstance.destroy();
         }
-        state.expandedChart.compareInstance = new Chart(compareCanvas.getContext("2d"), beforeConfig);
-        state.expandedChart.instance = new Chart(primaryCanvas.getContext("2d"), afterConfig);
+        state.expandedChart.compareInstance = new Chart(compareCanvas.getContext("2d"), normalizeChartHoverOptions(beforeConfig));
+        state.expandedChart.instance = new Chart(primaryCanvas.getContext("2d"), normalizeChartHoverOptions(afterConfig));
         syncExpandedBucketLabelFromConfig(canvasId, afterConfig);
         if (!options.skipScenarioDetailRefresh) {
             void refreshExpandedScenarioDetailPanel();
@@ -21924,7 +25195,7 @@
     }
 
     async function buildChartConfigByRange(canvasId, fromLocal, toLocal, sideLabel, bucketOverride, options = {}) {
-        const lowerId = (canvasId || "").toLowerCase();
+        const lowerId = String(canvasId || "").toLowerCase();
         const fromIso = toIso(fromLocal);
         const toIsoValue = toIso(toLocal);
         const params = mainParams();
@@ -22126,7 +25397,7 @@
                     }]
                 },
                 options: baseChartOptions("Количество"),
-                __analyticsTimePoints: sampled.indexes.map((index) => timePoints[index]).filter(Boolean),
+                __analyticsTimePoints: sampled.indexes.map((index) => timePoints[index] ?? null),
                 __analyticsEffectiveBucketMinutes: effectiveBucketMinutes
             };
         }
@@ -22155,7 +25426,7 @@
                             ]
                         },
                         options: baseChartOptions("ms"),
-                        __analyticsTimePoints: sampledSingle.indexes.map((index) => singleTimePoints[index]).filter(Boolean),
+                        __analyticsTimePoints: sampledSingle.indexes.map((index) => singleTimePoints[index] ?? null),
                         __analyticsEffectiveBucketMinutes: payload?.bucketMinutes || effectiveBucketMinutes
                     };
                 }
@@ -22177,7 +25448,7 @@
                     ]
                 },
                 options: baseChartOptions("ms"),
-                __analyticsTimePoints: sampled.indexes.map((index) => timePoints[index]).filter(Boolean),
+                __analyticsTimePoints: sampled.indexes.map((index) => timePoints[index] ?? null),
                 __analyticsEffectiveBucketMinutes: effectiveBucketMinutes
             };
         }
@@ -22204,7 +25475,7 @@
                     }]
                 },
                 options: baseChartOptions("%"),
-                __analyticsTimePoints: sampled.indexes.map((index) => timePoints[index]).filter(Boolean),
+                __analyticsTimePoints: sampled.indexes.map((index) => timePoints[index] ?? null),
                 __analyticsEffectiveBucketMinutes: effectiveBucketMinutes
             };
         }
@@ -22289,7 +25560,7 @@
                 datasets
             },
             options: baseChartOptions(mode === "error" ? "%" : (mode === "latency" ? "P95, ms" : "Количество")),
-            __analyticsTimePoints: sampled.indexes.map((index) => timePointsRaw[index]).filter(Boolean),
+            __analyticsTimePoints: sampled.indexes.map((index) => timePointsRaw[index] ?? null),
             __analyticsEffectiveBucketMinutes: effectiveBucketMinutes
         };
     }
@@ -22711,6 +25982,10 @@
         return `${(toNumber(value) * 100).toFixed(2)}%`;
     }
 
+    function formatPercentValue(value) {
+        return `${toNumber(value).toFixed(2)}%`;
+    }
+
     function toPercentNumber(value) {
         return Number((toNumber(value) * 100).toFixed(4));
     }
@@ -22786,11 +26061,169 @@
         return `<tr><td colspan="9" class="text-center ${className} py-3">${escapeHtml(message)}</td></tr>`;
     }
 
-    function renderNormalizedLogsTable(logs, emptyMessage, includeRaw) {
+    function eventsLoadingRow(message) {
+        return `
+            <tr class="analytics-events-loading-row">
+                <td colspan="9">
+                    <div class="analytics-events-loading-state" role="status" aria-live="polite">
+                        <div class="analytics-events-loading-label">
+                            <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                        <span data-events-loading-message>${escapeHtml(message || "Загружаем события...")}</span>
+                        </div>
+                        <div class="analytics-events-loading-skeleton" aria-hidden="true">
+                            ${Array.from({length: 5}).map(() => `
+                                <span class="analytics-events-loading-skeleton-row">
+                                    <span></span><span></span><span></span><span></span>
+                                </span>
+                            `).join("")}
+                        </div>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }
+
+    function eventsRequestCacheKey(systemOnly, paramsString) {
+        return `${systemOnly ? "system" : "journal"}:${paramsString || ""}`;
+    }
+
+    function cacheEventsRows(cacheKey) {
+        if (!refs.eventsTableBody || !cacheKey) {
+            return;
+        }
+        state.eventsRenderedCache = state.eventsRenderedCache || {};
+        state.eventsRenderedCache[cacheKey] = refs.eventsTableBody.innerHTML;
+        const keys = Object.keys(state.eventsRenderedCache);
+        if (keys.length > 10) {
+            delete state.eventsRenderedCache[keys[0]];
+        }
+    }
+
+    function clearEventsLoadingTimers() {
+        if (state.eventsLoadingSlowTimer) {
+            clearTimeout(state.eventsLoadingSlowTimer);
+            state.eventsLoadingSlowTimer = null;
+        }
+        if (state.eventsLoadingVerySlowTimer) {
+            clearTimeout(state.eventsLoadingVerySlowTimer);
+            state.eventsLoadingVerySlowTimer = null;
+        }
+    }
+
+    function ensureEventsRefreshStatus() {
+        const host = refs.eventsTable?.parentElement;
+        if (!host) {
+            return null;
+        }
+        let status = host.querySelector(".analytics-events-refresh-state");
+        if (!status) {
+            status = document.createElement("div");
+            status.className = "analytics-events-refresh-state d-none";
+            status.setAttribute("role", "status");
+            status.setAttribute("aria-live", "polite");
+            status.innerHTML = `
+                <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                <span data-events-refresh-message>Обновляем журнал событий...</span>
+            `;
+            host.insertBefore(status, refs.eventsTable);
+        }
+        return status;
+    }
+
+    function setEventsRefreshStatus(message, visible) {
+        const status = ensureEventsRefreshStatus();
+        if (!status) {
+            return;
+        }
+        const label = status.querySelector("[data-events-refresh-message]");
+        if (label) {
+            label.textContent = message || "Обновляем журнал событий...";
+        }
+        status.classList.toggle("d-none", !visible);
+    }
+
+    function hideEventsRefreshStatus() {
+        const status = refs.eventsTable?.parentElement?.querySelector(".analytics-events-refresh-state");
+        status?.classList.add("d-none");
+    }
+
+    function updateEventsLoadingMessage(message) {
+        const text = message || "Загружаем журнал событий...";
+        refs.eventsTableBody
+            ?.querySelectorAll?.("[data-events-loading-message]")
+            ?.forEach((node) => {
+                node.textContent = text;
+            });
+        const refreshLabel = refs.eventsTable
+            ?.parentElement
+            ?.querySelector("[data-events-refresh-message]");
+        if (refreshLabel) {
+            refreshLabel.textContent = text;
+        }
+    }
+
+    function showEventsLoadingState(reset, cacheKey, messages = {}) {
+        const initialMessage = messages.initialMessage || (reset
+            ? "Загружаем события..."
+            : "Загружаем следующую страницу...");
+        const slowMessage = messages.slowMessage || "Загружаем журнал событий...";
+        const verySlowMessage = messages.verySlowMessage || "Журнал загружается дольше обычного...";
+        setEventsLoadMoreVisible(false);
+        clearEventsLoadingTimers();
+        const cachedRows = reset ? state.eventsRenderedCache?.[cacheKey] : "";
+        if (refs.eventsTableBody) {
+            if (reset && typeof cachedRows === "string" && cachedRows.trim()) {
+                refs.eventsTableBody.innerHTML = cachedRows;
+                setEventsRefreshStatus(messages.refreshMessage || "Обновляем журнал событий...", true);
+            } else if (reset) {
+                hideEventsRefreshStatus();
+                refs.eventsTableBody.innerHTML = eventsLoadingRow(initialMessage);
+            } else {
+                hideEventsRefreshStatus();
+                removeEventsLoadingRows();
+                refs.eventsTableBody.insertAdjacentHTML("beforeend", eventsLoadingRow(initialMessage));
+            }
+        }
+        state.eventsLoadingSlowTimer = setTimeout(() => {
+            updateEventsLoadingMessage(slowMessage);
+        }, 500);
+        state.eventsLoadingVerySlowTimer = setTimeout(() => {
+            updateEventsLoadingMessage(verySlowMessage);
+        }, 3000);
+    }
+
+    function showEventsFilterNavigationLoading() {
+        state.eventsLoading = true;
+        state.eventsHasMore = false;
+        showEventsLoadingState(true, "", {
+            initialMessage: "Загружаем события по выбранному фильтру...",
+            slowMessage: "Загружаем события по выбранному фильтру...",
+            verySlowMessage: "Загрузка занимает больше обычного..."
+        });
+    }
+
+    function removeEventsLoadingRows() {
+        refs.eventsTableBody
+            ?.querySelectorAll?.(".analytics-events-loading-row")
+            ?.forEach((row) => row.remove());
+    }
+
+    function setEventsLoadMoreVisible(visible) {
+        if (!refs.eventsLoadMore) {
+            return;
+        }
+        refs.eventsLoadMore.classList.toggle("d-none", !visible);
+        refs.eventsLoadMore.disabled = !visible;
+    }
+
+    function renderNormalizedLogsTable(logs, emptyMessage, includeRaw, options = {}) {
         const rows = Array.isArray(logs) ? logs : [];
         if (!rows.length) {
             return `<div class="text-muted small">${escapeHtml(emptyMessage || "Логи не найдены.")}</div>`;
         }
+        const timestampFormatter = typeof options.timestampFormatter === "function"
+            ? options.timestampFormatter
+            : formatLogDateTime;
         const compactCell = (value, className, lines) => {
             const text = value == null || value === "" ? "-" : String(value);
             const title = text.replace(/\s+/g, " ").trim();
@@ -22847,7 +26280,7 @@
             return `
                 <tr class="analytics-log-row">
                     ${rawToggleCell}
-                    <td class="small text-muted text-nowrap analytics-log-col-time">${formatLogDateTime(entry.timestamp)}</td>
+                    <td class="small text-muted text-nowrap analytics-log-col-time">${timestampFormatter(entry.timestamp)}</td>
                     <td class="analytics-log-col-status">${statusBadge}</td>
                     <td class="analytics-log-col-layer">${compactCell(entry.layer || "-", "analytics-log-layer", 1)}</td>
                     <td class="analytics-log-col-source">${compactCell(entry.source || "-", "analytics-log-source", 1)}</td>
@@ -23582,8 +27015,11 @@
             plugins: {
                 ...baseOptions.plugins,
                 tooltip: {
-                    mode: "index",
+                    enabled: true,
+                    mode: "nearest",
+                    axis: "x",
                     intersect: false,
+                    position: "nearest",
                     filter: (tooltipItem) => {
                         const datasetValue = tooltipItem?.dataset?.data?.[tooltipItem?.dataIndex];
                         const candidates = [tooltipItem?.parsed?.y, tooltipItem?.raw, datasetValue, tooltipItem?.formattedValue];
@@ -23599,7 +27035,7 @@
                                 return Number.isFinite(parsed) ? parsed : null;
                             })
                             .find((value) => Number.isFinite(value));
-                        return Number.isFinite(numeric) && Math.abs(numeric) > 0.0001;
+                        return Number.isFinite(numeric);
                     },
                     callbacks: {
                         title: eventKpiTooltipTitle,
@@ -23618,7 +27054,7 @@
                                     return Number.isFinite(parsed) ? parsed : null;
                                 })
                                 .find((value) => Number.isFinite(value));
-                            if (!Number.isFinite(numeric) || Math.abs(numeric) <= 0.0001) {
+                            if (!Number.isFinite(numeric)) {
                                 return null;
                             }
                             const label = tooltipItem?.dataset?.label || "";

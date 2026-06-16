@@ -22,6 +22,25 @@ public interface AnalyticsStageMetricRepository extends JpaRepository<AnalyticsS
     long countByMetricTypeCode(String metricTypeCode);
 
     @Query("""
+        select count(sm.id) from AnalyticsStageMetric sm
+        join AnalyticsStage s on s.id = sm.stageId
+        join AnalyticsEvent e on e.id = s.eventId
+        where e.startedAt between :from and :to
+          and (:moduleCode is null or e.moduleCode = :moduleCode)
+          and (:eventTypeCode is null or e.eventTypeCode = :eventTypeCode)
+          and (:stageTypeCode is null or s.stageTypeCode = :stageTypeCode)
+          and (:metricTypeCode is null or sm.metricTypeCode = :metricTypeCode)
+        """)
+    long countByScope(
+        @Param("from") Instant from,
+        @Param("to") Instant to,
+        @Param("moduleCode") String moduleCode,
+        @Param("eventTypeCode") String eventTypeCode,
+        @Param("stageTypeCode") String stageTypeCode,
+        @Param("metricTypeCode") String metricTypeCode
+    );
+
+    @Query("""
         select sm from AnalyticsStageMetric sm
         join AnalyticsStage s on s.id = sm.stageId
         join AnalyticsEvent e on e.id = s.eventId

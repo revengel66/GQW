@@ -142,7 +142,7 @@ public class AnalyticsUniversalModuleBreakdownService {
                 group by coalesce(r.module_code, 'DEFAULT'), module_name, r.stage_type_code, stage_type_name, system_event
             ),
             context_problem_stats as (
-                select coalesce(sum(case when error_count > 0 or p95_ms >= 1000 or avg_ms >= 500 then count else 0 end), 0)::bigint as problem_event_count
+                select coalesce(max(case when error_count > 0 or p95_ms >= 1000 or avg_ms >= 500 then event_count else 0 end), 0)::bigint as problem_event_count
                 from grouped
             ),
             enriched as (
@@ -207,7 +207,7 @@ public class AnalyticsUniversalModuleBreakdownService {
                     coalesce(st.name, s.stage_type_code) as stage_type_name,
                     coalesce(et.is_system, false) as system_event,
                     case when s.duration_ms is null or s.duration_ms < 0 then 0 else s.duration_ms end as duration_ms,
-                    case when coalesce(s.is_error, false) or coalesce(e.is_error, false) then 1 else 0 end as error_flag
+                    case when coalesce(s.is_error, false) then 1 else 0 end as error_flag
                 from analytics.stage s
                 join analytics.event e on e.id = s.event_id
                 join analytics.event_type et on et.code = e.event_type_code
@@ -219,7 +219,7 @@ public class AnalyticsUniversalModuleBreakdownService {
                   and (:moduleEnabled = false or coalesce(e.module_code, 'DEFAULT') = :moduleCode)
             ),
             context_problem_stats as (
-                select coalesce(count(*), 0)::bigint as problem_event_count
+                select coalesce(count(distinct event_id), 0)::bigint as problem_event_count
                 from base
                 where error_flag > 0 or duration_ms >= 1000
             ),
@@ -400,10 +400,9 @@ public class AnalyticsUniversalModuleBreakdownService {
                     s.event_id,
                     s.stage_type_code,
                     case when s.duration_ms is null or s.duration_ms < 0 then 0 else s.duration_ms end as duration_ms,
-                    case when coalesce(s.is_error, false) or coalesce(e.is_error, false) then 1 else 0 end as error_flag,
+                    case when coalesce(s.is_error, false) then 1 else 0 end as error_flag,
                     case
-                        when coalesce(s.is_error, false) or coalesce(e.is_error, false)
-                          or coalesce(s.duration_ms, 0) >= 3000 then 'critical'
+                        when coalesce(s.is_error, false) or coalesce(s.duration_ms, 0) >= 3000 then 'critical'
                         when coalesce(s.duration_ms, 0) >= 1000 then 'warning'
                         else 'normal'
                     end as severity_level

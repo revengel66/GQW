@@ -49,6 +49,7 @@ public class AnalyticsFilterRollupService {
         this.defaultLongRangeDays = Math.max(1, longRangeDays);
         this.defaultRefreshRecentDays = Math.max(1, refreshRecentDays);
         this.defaultRefreshIntervalMinutes = Math.max(1, refreshIntervalMinutes);
+        this.lastScheduledRefreshAt = Instant.now(this.clock);
     }
 
     @Transactional(transactionManager = "analyticsTransactionManager")
@@ -145,6 +146,11 @@ public class AnalyticsFilterRollupService {
             3650
         );
         return rangeDays >= longRangeDays;
+    }
+
+    @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
+    public boolean canUseLookupRollup(String requestPath) {
+        return requestPath == null && isEnabled() && rollupTablesExist() && hasRollupData();
     }
 
     private boolean isEnabled() {

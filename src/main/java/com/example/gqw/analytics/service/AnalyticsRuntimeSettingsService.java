@@ -139,9 +139,7 @@ public class AnalyticsRuntimeSettingsService {
 
     @Transactional(transactionManager = "analyticsTransactionManager")
     public SettingsView update(Map<String, String> values, String updatedBy) {
-        if (!tableExists()) {
-            return view();
-        }
+        ensureTableExists();
         if (values == null || values.isEmpty()) {
             return view();
         }
@@ -504,6 +502,22 @@ public class AnalyticsRuntimeSettingsService {
             Integer.class
         );
         return count != null && count > 0;
+    }
+
+    private void ensureTableExists() {
+        if (tableExists()) {
+            return;
+        }
+        jdbcTemplate.getJdbcTemplate().execute(
+            """
+                create table if not exists analytics.runtime_setting (
+                    setting_key varchar(128) primary key,
+                    setting_value varchar(2048) not null,
+                    updated_at timestamp with time zone not null default now(),
+                    updated_by varchar(128)
+                )
+            """
+        );
     }
 
     private static String normalizeByType(SettingDefinition definition, String raw) {
@@ -872,6 +886,13 @@ public class AnalyticsRuntimeSettingsService {
                 "LOGGING",
                 "\u041b\u043e\u0433\u0438\u0440\u043e\u0432\u0430\u043d\u0438\u0435",
                 "\u0423\u043f\u0440\u0430\u0432\u043b\u044f\u0435\u0442 \u0432\u0441\u0442\u0440\u043e\u0435\u043d\u043d\u044b\u043c\u0438 \u043b\u043e\u0433\u0430\u043c\u0438 Analytics \u0438 \u043b\u043e\u0433\u0430\u043c\u0438 \u0432 \u0442\u0440\u0430\u0441\u0441\u0438\u0440\u043e\u0432\u043a\u0435.",
+                def(
+                    KEY_ANALYTICS_LOGGING_ENABLED,
+                    "\u0412\u0441\u0442\u0440\u043e\u0435\u043d\u043d\u044b\u0435 \u043b\u043e\u0433\u0438 Analytics",
+                    "\u0413\u043b\u0430\u0432\u043d\u044b\u0439 \u043f\u0435\u0440\u0435\u043a\u043b\u044e\u0447\u0430\u0442\u0435\u043b\u044c \u0432\u0441\u0442\u0440\u043e\u0435\u043d\u043d\u044b\u0445 Analytics-\u043b\u043e\u0433\u043e\u0432. \u0415\u0441\u043b\u0438 \u0432\u044b\u043a\u043b\u044e\u0447\u0435\u043d, \u0441\u043b\u043e\u0439\u043d\u044b\u0435, DB, custom-layer \u0438 strict warning \u043b\u043e\u0433\u0438 \u043d\u0435 \u043f\u0438\u0448\u0443\u0442\u0441\u044f.",
+                    SettingKind.BOOLEAN,
+                    "true"
+                ),
                 def(
                     KEY_ANALYTICS_LOGGING_LEVEL,
                     "\u0423\u0440\u043e\u0432\u0435\u043d\u044c \u0432\u0441\u0442\u0440\u043e\u0435\u043d\u043d\u044b\u0445 \u043b\u043e\u0433\u043e\u0432",

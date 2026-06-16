@@ -119,8 +119,41 @@ public final class AnalyticsApiDto {
         BigDecimal avgMs,
         BigDecimal p95Ms,
         BigDecimal p99Ms,
-        BigDecimal maxMs
+        BigDecimal maxMs,
+        long selfDurationSum,
+        BigDecimal avgSelfMs,
+        BigDecimal p95SelfMs,
+        BigDecimal p99SelfMs,
+        BigDecimal maxSelfMs,
+        BigDecimal selfShare
     ) {
+        public StageKpiDto(
+            String stageTypeCode,
+            String stageTypeName,
+            long count,
+            BigDecimal errorRate,
+            BigDecimal avgMs,
+            BigDecimal p95Ms,
+            BigDecimal p99Ms,
+            BigDecimal maxMs
+        ) {
+            this(
+                stageTypeCode,
+                stageTypeName,
+                count,
+                errorRate,
+                avgMs,
+                p95Ms,
+                p99Ms,
+                maxMs,
+                0L,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO
+            );
+        }
     }
 
     public record StageSeriesDto(
