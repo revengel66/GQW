@@ -33,6 +33,7 @@
     const state = {
         charts: {},
         chartConfigs: {},
+        chartRefreshRafByCanvas: {},
         kpiFullChartConfigs: {},
         kpiMiniTopStatsByCanvas: {},
         kpiRuntimeMetaBySource: {},
@@ -4325,6 +4326,7 @@
         if (firstRejected && firstRejected.reason) {
             throw firstRejected.reason;
         }
+        await waitForChartPaint(2);
     }
 
     async function runPanelBackgroundRefresh(panelEl, task, errorLogPrefix) {
@@ -17185,6 +17187,30 @@
         }
     }
 
+    function scheduleChartCanvasRefresh(canvasId) {
+        const safeCanvasId = String(canvasId || "").trim();
+        if (!safeCanvasId) {
+            return;
+        }
+        if (state.chartRefreshRafByCanvas?.[safeCanvasId]) {
+            cancelAnimationFrame(state.chartRefreshRafByCanvas[safeCanvasId]);
+        }
+        state.chartRefreshRafByCanvas[safeCanvasId] = requestAnimationFrame(() => {
+            delete state.chartRefreshRafByCanvas[safeCanvasId];
+            const chart = state.charts?.[safeCanvasId];
+            const canvas = document.getElementById(safeCanvasId);
+            if (!chart || !canvas || !canvas.isConnected) {
+                return;
+            }
+            if (typeof chart.resize === "function") {
+                chart.resize();
+            }
+            if (typeof chart.update === "function") {
+                chart.update("none");
+            }
+        });
+    }
+
     function upsertChart(canvasId, config) {
         const canvas = document.getElementById(canvasId);
         if (!canvas) {
@@ -17237,6 +17263,7 @@
                 setChartExpandedTicks(state.charts[canvasId], false);
                 installChartHoverDebug(canvasId, state.charts[canvasId]);
                 queueInitialKpiCompareScrollOffsets(canvasId);
+                scheduleChartCanvasRefresh(canvasId);
                 return;
             }
             existingChart.data = configToRender.data;
@@ -17254,6 +17281,7 @@
             existingChart.update("none");
             installChartHoverDebug(canvasId, existingChart);
             queueInitialKpiCompareScrollOffsets(canvasId);
+            scheduleChartCanvasRefresh(canvasId);
             if (isExpandedChartRelated(canvasId)) {
                 renderExpandedChartClone(state.expandedChart.sourceCanvasId);
             }
@@ -17263,6 +17291,7 @@
         setChartExpandedTicks(state.charts[canvasId], false);
         installChartHoverDebug(canvasId, state.charts[canvasId]);
         queueInitialKpiCompareScrollOffsets(canvasId);
+        scheduleChartCanvasRefresh(canvasId);
         if (isExpandedChartRelated(canvasId)) {
             renderExpandedChartClone(state.expandedChart.sourceCanvasId);
         }

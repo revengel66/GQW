@@ -91,7 +91,7 @@ public class AnalyticsLogArchiveIndexService {
 
     @Scheduled(cron = "0 * * * * *")
     public void scheduledIndexTick() {
-        if (!scheduledJobsPolicy.isEnabled()) {
+        if (!scheduledJobsPolicy.canRun("log-archive-index")) {
             return;
         }
         if (!runtimeSettingsService.getBoolean(AnalyticsRuntimeSettingsService.KEY_LOG_INDEX_ENABLED, false)) {
@@ -113,7 +113,7 @@ public class AnalyticsLogArchiveIndexService {
 
     @Scheduled(cron = "30 * * * * *")
     public void scheduledRetentionTick() {
-        if (!scheduledJobsPolicy.isEnabled()) {
+        if (!scheduledJobsPolicy.canRun("log-archive-retention")) {
             return;
         }
         if (!runtimeSettingsService.getBoolean(AnalyticsRuntimeSettingsService.KEY_LOG_RETENTION_CLEANUP_ENABLED, false)) {

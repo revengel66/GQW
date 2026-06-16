@@ -10,6 +10,7 @@ import java.sql.Types;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -27,10 +28,13 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class AnalyticsTimeRollupService {
 
+    private static final Logger log = LoggerFactory.getLogger(AnalyticsTimeRollupService.class);
     private static final String WATERMARK_SCOPE_EVENT = "EVENT";
     private static final String WATERMARK_SCOPE_STAGE = "STAGE";
     private static final String DEFAULT_MODULE_CODE = "DEFAULT";
@@ -45,6 +49,8 @@ public class AnalyticsTimeRollupService {
     private final int defaultOverlapMinutes;
     private final int defaultBootstrapLookbackDays;
     private final int defaultRefreshIntervalMinutes;
+    private final long maxRawFallbackSeconds;
+    private final boolean stageRawFallbackEnabled;
     private final Object refreshLock = new Object();
     private volatile Instant lastScheduledRefreshAt;
 
@@ -55,7 +61,9 @@ public class AnalyticsTimeRollupService {
         @Value("${app.analytics.time-rollup.enabled:true}") boolean enabled,
         @Value("${app.analytics.time-rollup.refresh-interval-minutes:5}") int refreshIntervalMinutes,
         @Value("${app.analytics.time-rollup.overlap-minutes:10}") int overlapMinutes,
-        @Value("${app.analytics.time-rollup.bootstrap-lookback-days:370}") int bootstrapLookbackDays
+        @Value("${app.analytics.time-rollup.bootstrap-lookback-days:370}") int bootstrapLookbackDays,
+        @Value("${app.analytics.raw-fallback.max-range-minutes:60}") int maxRawFallbackMinutes,
+        @Value("${app.analytics.stage-raw-fallback.enabled:false}") boolean stageRawFallbackEnabled
     ) {
         this.jdbcTemplate = jdbcTemplate;
         this.runtimeSettingsService = runtimeSettingsService;
@@ -65,6 +73,8 @@ public class AnalyticsTimeRollupService {
         this.defaultRefreshIntervalMinutes = Math.max(1, refreshIntervalMinutes);
         this.defaultOverlapMinutes = Math.max(1, overlapMinutes);
         this.defaultBootstrapLookbackDays = Math.max(1, bootstrapLookbackDays);
+        this.maxRawFallbackSeconds = Math.max(1L, maxRawFallbackMinutes) * 60L;
+        this.stageRawFallbackEnabled = stageRawFallbackEnabled;
         this.lastScheduledRefreshAt = Instant.now(this.clock);
     }
 
@@ -138,6 +148,9 @@ public class AnalyticsTimeRollupService {
         int targetBucketMinutes
     ) {
         if (!isEnabled()) {
+            if (!rawFallbackAllowed("event-rollup-disabled", from, to)) {
+                return List.of();
+            }
             return queryRawEventPoints(from, to, moduleCode, eventTypeCodes, targetBucketMinutes);
         }
 
@@ -149,6 +162,9 @@ public class AnalyticsTimeRollupService {
             true
         );
         if (!tailMergeEnabled && !cutoff.isAfter(from)) {
+            if (!rawFallbackAllowed("event-no-rollup-coverage", from, to)) {
+                return List.of();
+            }
             return queryRawEventPoints(from, to, moduleCode, eventTypeCodes, targetBucketMinutes);
         }
 
@@ -156,11 +172,14 @@ public class AnalyticsTimeRollupService {
         if (cutoff.isAfter(from)) {
             result.addAll(queryRollupEventPoints(from, cutoff, moduleCode, eventTypeCodes, sourceGranularity, targetBucketMinutes));
         }
-        if (tailMergeEnabled && to.isAfter(cutoff)) {
+        if (tailMergeEnabled && to.isAfter(cutoff) && rawFallbackAllowed("event-rollup-tail", cutoff, to)) {
             result.addAll(queryRawEventPoints(cutoff, to, moduleCode, eventTypeCodes, targetBucketMinutes));
         }
         List<AggregatePoint> merged = mergeDuplicatePoints(result);
         if (merged.isEmpty()) {
+            if (!rawFallbackAllowed("event-empty-rollup-fallback", from, to)) {
+                return List.of();
+            }
             return queryRawEventPoints(from, to, moduleCode, eventTypeCodes, targetBucketMinutes);
         }
         return merged;
@@ -178,6 +197,9 @@ public class AnalyticsTimeRollupService {
         if (isError == null) {
             return loadEventAggregatePoints(from, to, moduleCode, eventTypeCodes, targetBucketMinutes);
         }
+        if (!rawFallbackAllowed("event-error-filter-raw", from, to)) {
+            return List.of();
+        }
         return queryRawEventPoints(from, to, moduleCode, eventTypeCodes, targetBucketMinutes, isError);
     }
 
@@ -191,6 +213,9 @@ public class AnalyticsTimeRollupService {
         int targetBucketMinutes
     ) {
         if (!isEnabled()) {
+            if (!stageRawFallbackAllowed("stage-rollup-disabled", from, to)) {
+                return List.of();
+            }
             return queryRawStagePoints(from, to, moduleCode, eventTypeCodes, stageTypeCodes, targetBucketMinutes);
         }
 
@@ -211,6 +236,9 @@ public class AnalyticsTimeRollupService {
         );
         List<AggregatePoint> merged = mergeDuplicatePoints(result);
         if (merged.isEmpty()) {
+            if (!stageRawFallbackAllowed("stage-empty-rollup-fallback", from, to)) {
+                return List.of();
+            }
             return queryRawStagePoints(from, to, moduleCode, eventTypeCodes, stageTypeCodes, targetBucketMinutes);
         }
         return merged;
@@ -293,6 +321,9 @@ public class AnalyticsTimeRollupService {
         int targetBucketMinutes
     ) {
         if (!isEnabled()) {
+            if (!stageRawFallbackAllowed("stage-event-rollup-disabled", from, to)) {
+                return List.of();
+            }
             return queryRawStageEventPoints(from, to, moduleCode, eventTypeCodes, stageTypeCodes, targetBucketMinutes);
         }
 
@@ -313,6 +344,9 @@ public class AnalyticsTimeRollupService {
         );
         List<AggregatePoint> merged = mergeDuplicatePoints(result);
         if (merged.isEmpty()) {
+            if (!stageRawFallbackAllowed("stage-event-empty-rollup-fallback", from, to)) {
+                return List.of();
+            }
             return queryRawStageEventPoints(from, to, moduleCode, eventTypeCodes, stageTypeCodes, targetBucketMinutes);
         }
         return merged;
@@ -321,7 +355,7 @@ public class AnalyticsTimeRollupService {
     @Scheduled(cron = "0 * * * * *")
     @Transactional(transactionManager = "analyticsTransactionManager")
     public void scheduledRefresh() {
-        if (!scheduledJobsPolicy.isEnabled()) {
+        if (!scheduledJobsPolicy.canRun("time-rollup-refresh")) {
             return;
         }
         int intervalMinutes = runtimeSettingsService.getInt(
@@ -825,7 +859,7 @@ public class AnalyticsTimeRollupService {
                 cursor = cutoff;
             }
         }
-        if (tailMergeEnabled && to.isAfter(cursor)) {
+        if (tailMergeEnabled && to.isAfter(cursor) && stageRawFallbackAllowed("stage-rollup-tail", cursor, to)) {
             result.addAll(queryRawStagePoints(cursor, to, moduleCode, eventTypeCodes, stageTypeCodes, targetBucketMinutes));
         }
         return result;
@@ -1032,7 +1066,7 @@ public class AnalyticsTimeRollupService {
                 cursor = cutoff;
             }
         }
-        if (tailMergeEnabled && to.isAfter(cursor)) {
+        if (tailMergeEnabled && to.isAfter(cursor) && stageRawFallbackAllowed("stage-event-rollup-tail", cursor, to)) {
             result.addAll(queryRawStageEventPoints(cursor, to, moduleCode, eventTypeCodes, stageTypeCodes, targetBucketMinutes));
         }
         return result;
@@ -1293,6 +1327,38 @@ public class AnalyticsTimeRollupService {
 
     private Timestamp asTimestamp(Instant value) {
         return value == null ? null : Timestamp.from(value);
+    }
+
+    private boolean rawFallbackAllowed(String context, Instant from, Instant to) {
+        if (from == null || to == null || !to.isAfter(from)) {
+            return false;
+        }
+        long seconds = Math.max(0L, Duration.between(from, to).getSeconds());
+        if (seconds <= maxRawFallbackSeconds) {
+            return true;
+        }
+        log.warn(
+            "Analytics raw fallback skipped context={} rangeSeconds={} maxRangeSeconds={} from={} to={}",
+            context,
+            seconds,
+            maxRawFallbackSeconds,
+            from,
+            to
+        );
+        return false;
+    }
+
+    private boolean stageRawFallbackAllowed(String context, Instant from, Instant to) {
+        if (!stageRawFallbackEnabled) {
+            log.warn(
+                "Analytics stage raw fallback skipped context={} reason=disabled from={} to={}",
+                context,
+                from,
+                to
+            );
+            return false;
+        }
+        return rawFallbackAllowed(context, from, to);
     }
 
     private RowMapper<AggregatePoint> aggregatePointMapper() {

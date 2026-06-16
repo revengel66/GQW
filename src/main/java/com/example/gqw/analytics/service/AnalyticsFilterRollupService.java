@@ -101,7 +101,7 @@ public class AnalyticsFilterRollupService {
     @Scheduled(cron = "0 * * * * *")
     @Transactional(transactionManager = "analyticsTransactionManager")
     public void scheduledRefresh() {
-        if (!scheduledJobsPolicy.isEnabled()) {
+        if (!scheduledJobsPolicy.canRun("filter-rollup-refresh")) {
             return;
         }
         int intervalMinutes = runtimeSettingsService.getInt(

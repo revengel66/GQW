@@ -39,6 +39,12 @@ public class AnalyticsPersistenceConfig {
         dataSource.setPassword(properties.getPassword());
         dataSource.setDriverClassName(properties.getDriverClassName());
         dataSource.setPoolName("analyticsDataSource");
+        dataSource.setConnectionTimeout(Math.max(1000L, properties.getConnectionTimeoutMs()));
+        dataSource.setValidationTimeout(Math.max(1000L, properties.getValidationTimeoutMs()));
+        dataSource.setLeakDetectionThreshold(Math.max(0L, properties.getLeakDetectionThresholdMs()));
+        dataSource.setMaxLifetime(Math.max(30000L, properties.getMaxLifetimeMs()));
+        dataSource.setKeepaliveTime(Math.max(0L, properties.getKeepaliveTimeMs()));
+        dataSource.setConnectionInitSql(connectionInitSql(properties));
         return dataSource;
     }
 
@@ -49,15 +55,20 @@ public class AnalyticsPersistenceConfig {
     }
 
     @Bean(name = "analyticsJdbcTemplate")
-    JdbcTemplate analyticsJdbcTemplate(@Qualifier("analyticsDataSource") DataSource dataSource) {
-        return new JdbcTemplate(dataSource);
+    JdbcTemplate analyticsJdbcTemplate(
+        @Qualifier("analyticsDataSource") DataSource dataSource,
+        AnalyticsDataSourceProperties properties
+    ) {
+        JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
+        jdbcTemplate.setQueryTimeout(Math.max(1, properties.getQueryTimeoutSeconds()));
+        return jdbcTemplate;
     }
 
     @Bean(name = "analyticsNamedParameterJdbcTemplate")
     NamedParameterJdbcTemplate analyticsNamedParameterJdbcTemplate(
-        @Qualifier("analyticsDataSource") DataSource dataSource
+        @Qualifier("analyticsJdbcTemplate") JdbcTemplate jdbcTemplate
     ) {
-        return new NamedParameterJdbcTemplate(dataSource);
+        return new NamedParameterJdbcTemplate(jdbcTemplate);
     }
 
     @Bean(name = {"transactionManager", "analyticsTransactionManager"})
@@ -257,5 +268,14 @@ public class AnalyticsPersistenceConfig {
 
     private static boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private static String connectionInitSql(AnalyticsDataSourceProperties properties) {
+        int statementTimeoutMs = Math.max(1, properties.getStatementTimeoutSeconds()) * 1000;
+        int idleTimeoutMs = Math.max(1, properties.getIdleInTransactionTimeoutSeconds()) * 1000;
+        int lockTimeoutMs = Math.max(1, properties.getLockTimeoutSeconds()) * 1000;
+        return "set statement_timeout = " + statementTimeoutMs
+            + "; set idle_in_transaction_session_timeout = " + idleTimeoutMs
+            + "; set lock_timeout = " + lockTimeoutMs;
     }
 }

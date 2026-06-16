@@ -47,7 +47,7 @@ public class AnalyticsDataLifecycleService {
     @Scheduled(cron = "0 * * * * *")
     @Transactional(transactionManager = "analyticsTransactionManager")
     public void scheduledMaintenance() {
-        if (!scheduledJobsPolicy.isEnabled()) {
+        if (!scheduledJobsPolicy.canRun("analytics-lifecycle-maintenance")) {
             return;
         }
         if (!runtimeSettingsService.getBoolean(

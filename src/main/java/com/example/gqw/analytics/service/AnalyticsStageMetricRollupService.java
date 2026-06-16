@@ -11,6 +11,7 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.sql.Types;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -25,10 +26,13 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class AnalyticsStageMetricRollupService {
 
+    private static final Logger log = LoggerFactory.getLogger(AnalyticsStageMetricRollupService.class);
     private static final String WATERMARK_SCOPE_METRIC = "METRIC";
     private static final String DEFAULT_MODULE_CODE = "DEFAULT";
     private static final Instant DATE_BIN_ORIGIN = Instant.parse("2001-01-01T00:00:00Z");
@@ -42,6 +46,7 @@ public class AnalyticsStageMetricRollupService {
     private final int defaultOverlapMinutes;
     private final int defaultBootstrapLookbackDays;
     private final int defaultRefreshIntervalMinutes;
+    private final long maxRawFallbackSeconds;
     private final Object refreshLock = new Object();
     private volatile Instant lastScheduledRefreshAt;
 
@@ -52,7 +57,8 @@ public class AnalyticsStageMetricRollupService {
         @Value("${app.analytics.stage-metric-rollup.enabled:true}") boolean enabled,
         @Value("${app.analytics.stage-metric-rollup.refresh-interval-minutes:5}") int refreshIntervalMinutes,
         @Value("${app.analytics.stage-metric-rollup.overlap-minutes:10}") int overlapMinutes,
-        @Value("${app.analytics.stage-metric-rollup.bootstrap-lookback-days:370}") int bootstrapLookbackDays
+        @Value("${app.analytics.stage-metric-rollup.bootstrap-lookback-days:370}") int bootstrapLookbackDays,
+        @Value("${app.analytics.raw-fallback.max-range-minutes:60}") int maxRawFallbackMinutes
     ) {
         this.jdbcTemplate = jdbcTemplate;
         this.runtimeSettingsService = runtimeSettingsService;
@@ -62,6 +68,7 @@ public class AnalyticsStageMetricRollupService {
         this.defaultRefreshIntervalMinutes = Math.max(1, refreshIntervalMinutes);
         this.defaultOverlapMinutes = Math.max(1, overlapMinutes);
         this.defaultBootstrapLookbackDays = Math.max(1, bootstrapLookbackDays);
+        this.maxRawFallbackSeconds = Math.max(1L, maxRawFallbackMinutes) * 60L;
     }
 
     @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
@@ -79,7 +86,7 @@ public class AnalyticsStageMetricRollupService {
     @Scheduled(cron = "0 * * * * *")
     @Transactional(transactionManager = "analyticsTransactionManager")
     public void scheduledRefresh() {
-        if (!scheduledJobsPolicy.isEnabled()) {
+        if (!scheduledJobsPolicy.canRun("stage-metric-rollup-refresh")) {
             return;
         }
         int intervalMinutes = runtimeSettingsService.getInt(
@@ -137,6 +144,9 @@ public class AnalyticsStageMetricRollupService {
         String stageTypeCode
     ) {
         if (!isEnabled()) {
+            if (!rawFallbackAllowed("stage-metric-summary-rollup-disabled", from, to)) {
+                return List.of();
+            }
             return queryRawMetricSummaries(from, to, moduleCode, eventTypeCodes, stageTypeCode);
         }
 
@@ -169,6 +179,9 @@ public class AnalyticsStageMetricRollupService {
         int targetBucketMinutes
     ) {
         if (!isEnabled()) {
+            if (!rawFallbackAllowed("stage-metric-series-rollup-disabled", from, to)) {
+                return seriesFromPoints(from, to, targetBucketMinutes, List.of());
+            }
             return seriesFromPoints(from, to, targetBucketMinutes, queryRawSeriesPoints(
                 from,
                 to,
@@ -201,7 +214,7 @@ public class AnalyticsStageMetricRollupService {
                 targetBucketMinutes
             ));
         }
-        if (tailMergeEnabled && to.isAfter(cutoff)) {
+        if (tailMergeEnabled && to.isAfter(cutoff) && rawFallbackAllowed("stage-metric-series-rollup-tail", cutoff, to)) {
             points.addAll(queryRawSeriesPoints(
                 cutoff,
                 to,
@@ -225,6 +238,9 @@ public class AnalyticsStageMetricRollupService {
         String metricTypeCode,
         int limit
     ) {
+        if (!rawFallbackAllowed("stage-metric-top-values-raw", from, to)) {
+            return List.of();
+        }
         MapSqlParameterSource params = new MapSqlParameterSource()
             .addValue("fromTs", asTimestamp(from))
             .addValue("toTs", asTimestamp(to))
@@ -441,7 +457,7 @@ public class AnalyticsStageMetricRollupService {
                 cursor = cutoff;
             }
         }
-        if (tailMergeEnabled && to.isAfter(cursor)) {
+        if (tailMergeEnabled && to.isAfter(cursor) && rawFallbackAllowed("stage-metric-summary-rollup-tail", cursor, to)) {
             result.addAll(queryRawMetricSummaries(cursor, to, moduleCode, eventTypeCodes, stageTypeCode));
         }
         return result;
@@ -838,6 +854,25 @@ public class AnalyticsStageMetricRollupService {
 
     private Timestamp asTimestamp(Instant value) {
         return value == null ? null : Timestamp.from(value);
+    }
+
+    private boolean rawFallbackAllowed(String context, Instant from, Instant to) {
+        if (from == null || to == null || !to.isAfter(from)) {
+            return false;
+        }
+        long seconds = Math.max(0L, Duration.between(from, to).getSeconds());
+        if (seconds <= maxRawFallbackSeconds) {
+            return true;
+        }
+        log.warn(
+            "Analytics stage-metric raw fallback skipped context={} rangeSeconds={} maxRangeSeconds={} from={} to={}",
+            context,
+            seconds,
+            maxRawFallbackSeconds,
+            from,
+            to
+        );
+        return false;
     }
 
     private RowMapper<MetricSummaryPoint> metricSummaryMapper() {

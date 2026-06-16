@@ -14,6 +14,15 @@ public class AnalyticsDataSourceProperties {
     private String adminUrl = "";
     private String adminUsername = "";
     private String adminPassword = "";
+    private int statementTimeoutSeconds = 30;
+    private int idleInTransactionTimeoutSeconds = 30;
+    private int lockTimeoutSeconds = 5;
+    private int queryTimeoutSeconds = 30;
+    private long connectionTimeoutMs = 10000;
+    private long validationTimeoutMs = 5000;
+    private long leakDetectionThresholdMs = 45000;
+    private long maxLifetimeMs = 1800000;
+    private long keepaliveTimeMs = 300000;
 
     public boolean isEnabled() {
         return enabled;
@@ -85,5 +94,77 @@ public class AnalyticsDataSourceProperties {
 
     public void setAdminPassword(String adminPassword) {
         this.adminPassword = adminPassword;
+    }
+
+    public int getStatementTimeoutSeconds() {
+        return statementTimeoutSeconds;
+    }
+
+    public void setStatementTimeoutSeconds(int statementTimeoutSeconds) {
+        this.statementTimeoutSeconds = statementTimeoutSeconds;
+    }
+
+    public int getIdleInTransactionTimeoutSeconds() {
+        return idleInTransactionTimeoutSeconds;
+    }
+
+    public void setIdleInTransactionTimeoutSeconds(int idleInTransactionTimeoutSeconds) {
+        this.idleInTransactionTimeoutSeconds = idleInTransactionTimeoutSeconds;
+    }
+
+    public int getLockTimeoutSeconds() {
+        return lockTimeoutSeconds;
+    }
+
+    public void setLockTimeoutSeconds(int lockTimeoutSeconds) {
+        this.lockTimeoutSeconds = lockTimeoutSeconds;
+    }
+
+    public int getQueryTimeoutSeconds() {
+        return queryTimeoutSeconds;
+    }
+
+    public void setQueryTimeoutSeconds(int queryTimeoutSeconds) {
+        this.queryTimeoutSeconds = queryTimeoutSeconds;
+    }
+
+    public long getConnectionTimeoutMs() {
+        return connectionTimeoutMs;
+    }
+
+    public void setConnectionTimeoutMs(long connectionTimeoutMs) {
+        this.connectionTimeoutMs = connectionTimeoutMs;
+    }
+
+    public long getValidationTimeoutMs() {
+        return validationTimeoutMs;
+    }
+
+    public void setValidationTimeoutMs(long validationTimeoutMs) {
+        this.validationTimeoutMs = validationTimeoutMs;
+    }
+
+    public long getLeakDetectionThresholdMs() {
+        return leakDetectionThresholdMs;
+    }
+
+    public void setLeakDetectionThresholdMs(long leakDetectionThresholdMs) {
+        this.leakDetectionThresholdMs = leakDetectionThresholdMs;
+    }
+
+    public long getMaxLifetimeMs() {
+        return maxLifetimeMs;
+    }
+
+    public void setMaxLifetimeMs(long maxLifetimeMs) {
+        this.maxLifetimeMs = maxLifetimeMs;
+    }
+
+    public long getKeepaliveTimeMs() {
+        return keepaliveTimeMs;
+    }
+
+    public void setKeepaliveTimeMs(long keepaliveTimeMs) {
+        this.keepaliveTimeMs = keepaliveTimeMs;
     }
 }

@@ -21,7 +21,7 @@ public class AggregationScheduler {
 
     @Scheduled(cron = "0 */15 * * * *")
     public void runHourly() {
-        if (!scheduledJobsPolicy.isEnabled()) {
+        if (!scheduledJobsPolicy.canRun("aggregation-hourly")) {
             return;
         }
         Instant end = Instant.now();
@@ -31,7 +31,7 @@ public class AggregationScheduler {
 
     @Scheduled(cron = "0 0 * * * *")
     public void runDaily() {
-        if (!scheduledJobsPolicy.isEnabled()) {
+        if (!scheduledJobsPolicy.canRun("aggregation-daily")) {
             return;
         }
         Instant end = Instant.now();
@@ -41,7 +41,7 @@ public class AggregationScheduler {
 
     @Scheduled(cron = "0 0 2 * * *")
     public void runMonthly() {
-        if (!scheduledJobsPolicy.isEnabled()) {
+        if (!scheduledJobsPolicy.canRun("aggregation-monthly")) {
             return;
         }
         Instant end = Instant.now();

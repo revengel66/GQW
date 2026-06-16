@@ -101,7 +101,7 @@ public class AnalyticsHttpErrorTrackingService {
 
     @Scheduled(fixedDelayString = "${app.analytics.http-fallback.retry-delay-ms:5000}")
     public void flushPendingFallbackErrorsScheduled() {
-        if (!scheduledJobsPolicy.isEnabled()) {
+        if (!scheduledJobsPolicy.canRun("http-fallback-error-flush")) {
             return;
         }
         if (!instrumentationPolicy.isEnabled()) {
