@@ -1,7 +1,10 @@
 package com.example.gqw.shop.controller;
 
 import com.example.gqw.analytics.aop.TrackAnalyticsAttribute;
+import com.example.gqw.analytics.aop.AnalyticsEventContext;
+import com.example.gqw.analytics.aop.AnalyticsEventContextHolder;
 import com.example.gqw.analytics.aop.TrackAnalyticsEvent;
+import com.example.gqw.analytics.service.AnalyticsTrackingApi;
 import com.example.gqw.shop.entity.Product;
 import com.example.gqw.shop.entity.Review;
 import com.example.gqw.shop.facade.CatalogFacade;
@@ -28,15 +31,18 @@ public class CatalogController {
     private final CatalogService catalogService;
     private final CatalogFacade catalogFacade;
     private final ReviewService reviewService;
+    private final AnalyticsTrackingApi analyticsTrackingApi;
 
     public CatalogController(
         CatalogService catalogService,
         CatalogFacade catalogFacade,
-        ReviewService reviewService
+        ReviewService reviewService,
+        AnalyticsTrackingApi analyticsTrackingApi
     ) {
         this.catalogService = catalogService;
         this.catalogFacade = catalogFacade;
         this.reviewService = reviewService;
+        this.analyticsTrackingApi = analyticsTrackingApi;
     }
 
     @GetMapping("/")
@@ -60,7 +66,6 @@ public class CatalogController {
     @TrackAnalyticsEvent(
         code = "CATEGORY_VIEW",
         entityType = "'CATEGORY'",
-        entityId = "#p0",
         attributes = {
             @TrackAnalyticsAttribute(code = "CATEGORY_SLUG", value = "#p0"),
             @TrackAnalyticsAttribute(code = "PAGE_INDEX", value = "#p1"),
@@ -90,6 +95,7 @@ public class CatalogController {
         boolean onlyInStock = inStockOnly != null && inStockOnly;
         var categoryPage = catalogFacade.categoryPage(slug, page, resolvedSize, sort, q, minPrice, maxPrice, optionIds, onlyInStock);
         var category = categoryPage.category();
+        addCurrentEventAttribute("ENTITY_ID", category.getId());
         var categoryData = categoryPage.categoryData();
         var priceBounds = categoryPage.priceBounds();
         var pageData = categoryData.pageData();
@@ -138,10 +144,8 @@ public class CatalogController {
     @TrackAnalyticsEvent(
         code = "PRODUCT_VIEW",
         entityType = "'PRODUCT'",
-        entityId = "#p0",
         attributes = {
-            @TrackAnalyticsAttribute(code = "ENTITY_TYPE", value = "'PRODUCT'"),
-            @TrackAnalyticsAttribute(code = "ENTITY_ID", value = "#p0")
+            @TrackAnalyticsAttribute(code = "PRODUCT_SLUG", value = "#p0")
         }
     )
     public String product(
@@ -152,6 +156,7 @@ public class CatalogController {
         HttpServletRequest request
     ) {
         Product product = catalogService.productBySlug(slug);
+        addCurrentEventAttribute("ENTITY_ID", product.getId());
         model.addAttribute("product", product);
         model.addAttribute("productDescriptionHtml", toDescriptionHtml(product.getDescription()));
         model.addAttribute("characteristics", catalogService.characteristics(product));
@@ -245,6 +250,22 @@ public class CatalogController {
             weightedSum += (long) bucket.score() * bucket.count();
         }
         return weightedSum / (double) totalReviews;
+    }
+
+    private void addCurrentEventAttribute(String code, Object value) {
+        AnalyticsEventContext context = AnalyticsEventContextHolder.get();
+        if (context == null || value == null) {
+            return;
+        }
+        String text = String.valueOf(value);
+        if (text.isBlank()) {
+            return;
+        }
+        try {
+            analyticsTrackingApi.addAttribute(context.eventUid(), code, text);
+        } catch (RuntimeException ignored) {
+            // Analytics attributes must not break the storefront request.
+        }
     }
 
     private static String reviewWord(int count) {

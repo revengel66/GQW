@@ -1,27 +1,47 @@
 package com.example.gqw.config;
 
+import com.example.gqw.analytics.entity.MetricValueKind;
+import com.example.gqw.analytics.repository.EventAttributeTypeRepository;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Configuration
+@Order(450)
 @ConditionalOnProperty(value = "app.analytics.shop-dictionary-seed-enabled", havingValue = "true", matchIfMissing = true)
 @ConditionalOnProperty(value = "app.startup.runners-enabled", havingValue = "true", matchIfMissing = true)
-public class ShopAnalyticsDictionaryConfig {
+public class ShopAnalyticsDictionaryConfig implements CommandLineRunner {
 
-    @Bean
-    @Order(450)
-    CommandLineRunner seedShopAnalyticsDictionary(@Qualifier("analyticsJdbcTemplate") JdbcTemplate jdbcTemplate) {
-        return args -> {
-            seedEventTypes(jdbcTemplate);
-            seedAttributeTypes(jdbcTemplate);
-            seedStageTypes(jdbcTemplate);
-        };
+    private static final Logger log = LoggerFactory.getLogger(ShopAnalyticsDictionaryConfig.class);
+
+    private final JdbcTemplate jdbcTemplate;
+    private final EventAttributeTypeRepository eventAttributeTypeRepository;
+
+    public ShopAnalyticsDictionaryConfig(
+        @Qualifier("analyticsJdbcTemplate") JdbcTemplate jdbcTemplate,
+        EventAttributeTypeRepository eventAttributeTypeRepository
+    ) {
+        this.jdbcTemplate = jdbcTemplate;
+        this.eventAttributeTypeRepository = eventAttributeTypeRepository;
+    }
+
+    @Override
+    public void run(String... args) {
+        seedEventTypes(jdbcTemplate);
+        seedAttributeTypes(eventAttributeTypeRepository);
+        seedStageTypes(jdbcTemplate);
+        log.info(
+            "Seeded shop analytics dictionary: events={}, attributes={}, stages={}",
+            eventSeeds().size(),
+            attributeSeeds().size(),
+            stageSeeds().size()
+        );
     }
 
     private void seedEventTypes(JdbcTemplate jdbcTemplate) {
@@ -45,23 +65,16 @@ public class ShopAnalyticsDictionaryConfig {
         }
     }
 
-    private void seedAttributeTypes(JdbcTemplate jdbcTemplate) {
+    private void seedAttributeTypes(EventAttributeTypeRepository repository) {
         for (AttributeSeed seed : attributeSeeds()) {
-            jdbcTemplate.update(
-                """
-                    insert into analytics.event_attribute_type(code, name, description, value_kind, unit_default, is_system, is_active)
-                    values (?, ?, ?, 'TEXT', null, false, true)
-                    on conflict (code) do update
-                    set name = excluded.name,
-                        description = excluded.description,
-                        value_kind = excluded.value_kind,
-                        unit_default = excluded.unit_default,
-                        is_system = false,
-                        is_active = true
-                    """,
+            repository.upsert(
                 seed.code(),
                 seed.name(),
-                seed.description()
+                seed.description(),
+                MetricValueKind.TEXT.name(),
+                null,
+                false,
+                true
             );
         }
     }
@@ -130,7 +143,8 @@ public class ShopAnalyticsDictionaryConfig {
             attr("OPTION_IDS_COUNT", "Option ids count", "Количество выбранных опций фильтра."),
             attr("PAGE_INDEX", "Page index", "Номер страницы выдачи."),
             attr("CATEGORY_NAME", "Category name", "Название категории."),
-            attr("CATEGORY_SLUG", "Category slug", "Slug категории."),
+            attr("CATEGORY_SLUG", "Slug \u043A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u0438", "Slug \u043A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u0438."),
+            attr("PRODUCT_SLUG", "Slug \u0442\u043E\u0432\u0430\u0440\u0430", "Slug \u0442\u043E\u0432\u0430\u0440\u0430."),
             attr("DELIVERY_TYPE", "Delivery type", "Тип доставки заказа."),
             attr("DEMO_FAULT", "Demo fault", "Тип демонстрационной ошибки."),
             attr("PAGE_SIZE", "Page size", "Размер страницы выдачи."),
@@ -142,9 +156,7 @@ public class ShopAnalyticsDictionaryConfig {
             attr("SEARCH_QUERY", "Search query", "Поисковая строка."),
             attr("SORT_TYPE", "Sort type", "Тип сортировки."),
             attr("SUPPORT_TOPIC", "Support topic", "Тема обращения в поддержку."),
-            attr("AUTH_RESULT", "Auth result", "Результат авторизации."),
-            attr("ENTITY_TYPE", "Entity type", "Тип бизнес-сущности."),
-            attr("ENTITY_ID", "Entity id", "Идентификатор бизнес-сущности.")
+            attr("AUTH_RESULT", "Auth result", "Результат авторизации.")
         );
     }
 
