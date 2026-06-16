@@ -114,6 +114,21 @@ public class AnalyticsTimeRollupService {
         return best;
     }
 
+    private List<Integer> descendingSupportedGranularitiesAtMost(int maxGranularityMinutes) {
+        List<Integer> result = new ArrayList<>();
+        int safeMax = Math.max(1, maxGranularityMinutes);
+        for (int i = SUPPORTED_GRANULARITIES.size() - 1; i >= 0; i--) {
+            Integer candidate = SUPPORTED_GRANULARITIES.get(i);
+            if (candidate <= safeMax) {
+                result.add(candidate);
+            }
+        }
+        if (result.isEmpty()) {
+            result.add(1);
+        }
+        return result;
+    }
+
     @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public List<AggregatePoint> loadEventAggregatePoints(
         Instant from,
@@ -179,32 +194,21 @@ public class AnalyticsTimeRollupService {
             return queryRawStagePoints(from, to, moduleCode, eventTypeCodes, stageTypeCodes, targetBucketMinutes);
         }
 
-        int sourceGranularity = chooseSourceGranularityMinutes(from, to, targetBucketMinutes);
-        Instant watermark = readWatermark(WATERMARK_SCOPE_STAGE, sourceGranularity);
-        Instant cutoff = clampCutoff(from, to, watermark);
         boolean tailMergeEnabled = runtimeSettingsService.getBoolean(
             AnalyticsRuntimeSettingsService.KEY_TAIL_MERGE_ENABLED,
             true
         );
-        if (!tailMergeEnabled && !cutoff.isAfter(from)) {
-            return queryRawStagePoints(from, to, moduleCode, eventTypeCodes, stageTypeCodes, targetBucketMinutes);
-        }
-
-        List<AggregatePoint> result = new ArrayList<>();
-        if (cutoff.isAfter(from)) {
-            result.addAll(queryRollupStagePoints(
-                from,
-                cutoff,
-                moduleCode,
-                eventTypeCodes,
-                stageTypeCodes,
-                sourceGranularity,
-                targetBucketMinutes
-            ));
-        }
-        if (tailMergeEnabled && to.isAfter(cutoff)) {
-            result.addAll(queryRawStagePoints(cutoff, to, moduleCode, eventTypeCodes, stageTypeCodes, targetBucketMinutes));
-        }
+        int sourceGranularity = chooseSourceGranularityMinutes(from, to, targetBucketMinutes);
+        List<AggregatePoint> result = queryStagePointsWithRollupTail(
+            from,
+            to,
+            moduleCode,
+            eventTypeCodes,
+            stageTypeCodes,
+            sourceGranularity,
+            targetBucketMinutes,
+            tailMergeEnabled
+        );
         List<AggregatePoint> merged = mergeDuplicatePoints(result);
         if (merged.isEmpty()) {
             return queryRawStagePoints(from, to, moduleCode, eventTypeCodes, stageTypeCodes, targetBucketMinutes);
@@ -292,32 +296,21 @@ public class AnalyticsTimeRollupService {
             return queryRawStageEventPoints(from, to, moduleCode, eventTypeCodes, stageTypeCodes, targetBucketMinutes);
         }
 
-        int sourceGranularity = chooseSourceGranularityMinutes(from, to, targetBucketMinutes);
-        Instant watermark = readWatermark(WATERMARK_SCOPE_STAGE, sourceGranularity);
-        Instant cutoff = clampCutoff(from, to, watermark);
         boolean tailMergeEnabled = runtimeSettingsService.getBoolean(
             AnalyticsRuntimeSettingsService.KEY_TAIL_MERGE_ENABLED,
             true
         );
-        if (!tailMergeEnabled && !cutoff.isAfter(from)) {
-            return queryRawStageEventPoints(from, to, moduleCode, eventTypeCodes, stageTypeCodes, targetBucketMinutes);
-        }
-
-        List<AggregatePoint> result = new ArrayList<>();
-        if (cutoff.isAfter(from)) {
-            result.addAll(queryRollupStageEventPoints(
-                from,
-                cutoff,
-                moduleCode,
-                eventTypeCodes,
-                stageTypeCodes,
-                sourceGranularity,
-                targetBucketMinutes
-            ));
-        }
-        if (tailMergeEnabled && to.isAfter(cutoff)) {
-            result.addAll(queryRawStageEventPoints(cutoff, to, moduleCode, eventTypeCodes, stageTypeCodes, targetBucketMinutes));
-        }
+        int sourceGranularity = chooseSourceGranularityMinutes(from, to, targetBucketMinutes);
+        List<AggregatePoint> result = queryStageEventPointsWithRollupTail(
+            from,
+            to,
+            moduleCode,
+            eventTypeCodes,
+            stageTypeCodes,
+            sourceGranularity,
+            targetBucketMinutes,
+            tailMergeEnabled
+        );
         List<AggregatePoint> merged = mergeDuplicatePoints(result);
         if (merged.isEmpty()) {
             return queryRawStageEventPoints(from, to, moduleCode, eventTypeCodes, stageTypeCodes, targetBucketMinutes);
@@ -801,6 +794,43 @@ public class AnalyticsTimeRollupService {
         );
     }
 
+    private List<AggregatePoint> queryStagePointsWithRollupTail(
+        Instant from,
+        Instant to,
+        String moduleCode,
+        Set<String> eventTypeCodes,
+        Set<String> stageTypeCodes,
+        int preferredGranularityMinutes,
+        int targetBucketMinutes,
+        boolean tailMergeEnabled
+    ) {
+        List<AggregatePoint> result = new ArrayList<>();
+        Instant cursor = from;
+        for (Integer granularity : descendingSupportedGranularitiesAtMost(preferredGranularityMinutes)) {
+            if (!to.isAfter(cursor)) {
+                break;
+            }
+            Instant watermark = readWatermark(WATERMARK_SCOPE_STAGE, granularity);
+            Instant cutoff = clampCutoff(cursor, to, watermark);
+            if (cutoff.isAfter(cursor)) {
+                result.addAll(queryRollupStagePoints(
+                    cursor,
+                    cutoff,
+                    moduleCode,
+                    eventTypeCodes,
+                    stageTypeCodes,
+                    granularity,
+                    targetBucketMinutes
+                ));
+                cursor = cutoff;
+            }
+        }
+        if (tailMergeEnabled && to.isAfter(cursor)) {
+            result.addAll(queryRawStagePoints(cursor, to, moduleCode, eventTypeCodes, stageTypeCodes, targetBucketMinutes));
+        }
+        return result;
+    }
+
     private List<AggregatePoint> queryRawStagePoints(
         Instant from,
         Instant to,
@@ -969,6 +999,43 @@ public class AnalyticsTimeRollupService {
             params,
             aggregatePointMapper()
         );
+    }
+
+    private List<AggregatePoint> queryStageEventPointsWithRollupTail(
+        Instant from,
+        Instant to,
+        String moduleCode,
+        Set<String> eventTypeCodes,
+        Set<String> stageTypeCodes,
+        int preferredGranularityMinutes,
+        int targetBucketMinutes,
+        boolean tailMergeEnabled
+    ) {
+        List<AggregatePoint> result = new ArrayList<>();
+        Instant cursor = from;
+        for (Integer granularity : descendingSupportedGranularitiesAtMost(preferredGranularityMinutes)) {
+            if (!to.isAfter(cursor)) {
+                break;
+            }
+            Instant watermark = readWatermark(WATERMARK_SCOPE_STAGE, granularity);
+            Instant cutoff = clampCutoff(cursor, to, watermark);
+            if (cutoff.isAfter(cursor)) {
+                result.addAll(queryRollupStageEventPoints(
+                    cursor,
+                    cutoff,
+                    moduleCode,
+                    eventTypeCodes,
+                    stageTypeCodes,
+                    granularity,
+                    targetBucketMinutes
+                ));
+                cursor = cutoff;
+            }
+        }
+        if (tailMergeEnabled && to.isAfter(cursor)) {
+            result.addAll(queryRawStageEventPoints(cursor, to, moduleCode, eventTypeCodes, stageTypeCodes, targetBucketMinutes));
+        }
+        return result;
     }
 
     private List<AggregatePoint> queryRawStageEventPoints(

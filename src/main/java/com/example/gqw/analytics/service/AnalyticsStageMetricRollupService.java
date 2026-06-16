@@ -140,21 +140,21 @@ public class AnalyticsStageMetricRollupService {
             return queryRawMetricSummaries(from, to, moduleCode, eventTypeCodes, stageTypeCode);
         }
 
-        int sourceGranularity = chooseSourceGranularityMinutes(from, to, 1440);
-        Instant watermark = readWatermark(WATERMARK_SCOPE_METRIC, sourceGranularity);
-        Instant cutoff = clampCutoff(from, to, watermark);
         boolean tailMergeEnabled = runtimeSettingsService.getBoolean(
             AnalyticsRuntimeSettingsService.KEY_TAIL_MERGE_ENABLED,
             true
         );
 
-        List<MetricSummaryPoint> result = new ArrayList<>();
-        if (cutoff.isAfter(from)) {
-            result.addAll(queryRollupMetricSummaries(from, cutoff, moduleCode, eventTypeCodes, stageTypeCode, sourceGranularity));
-        }
-        if (tailMergeEnabled && to.isAfter(cutoff)) {
-            result.addAll(queryRawMetricSummaries(cutoff, to, moduleCode, eventTypeCodes, stageTypeCode));
-        }
+        int sourceGranularity = chooseSourceGranularityMinutes(from, to, 1440);
+        List<MetricSummaryPoint> result = queryRollupMetricSummariesWithTail(
+            from,
+            to,
+            moduleCode,
+            eventTypeCodes,
+            stageTypeCode,
+            sourceGranularity,
+            tailMergeEnabled
+        );
         return mergeMetricSummaries(result);
     }
 
@@ -417,6 +417,49 @@ public class AnalyticsStageMetricRollupService {
             params,
             metricSummaryMapper()
         );
+    }
+
+    private List<MetricSummaryPoint> queryRollupMetricSummariesWithTail(
+        Instant from,
+        Instant to,
+        String moduleCode,
+        Collection<String> eventTypeCodes,
+        String stageTypeCode,
+        int preferredGranularityMinutes,
+        boolean tailMergeEnabled
+    ) {
+        List<MetricSummaryPoint> result = new ArrayList<>();
+        Instant cursor = from;
+        for (Integer granularity : descendingSupportedGranularitiesAtMost(preferredGranularityMinutes)) {
+            if (!to.isAfter(cursor)) {
+                break;
+            }
+            Instant watermark = readWatermark(WATERMARK_SCOPE_METRIC, granularity);
+            Instant cutoff = clampCutoff(cursor, to, watermark);
+            if (cutoff.isAfter(cursor)) {
+                result.addAll(queryRollupMetricSummaries(cursor, cutoff, moduleCode, eventTypeCodes, stageTypeCode, granularity));
+                cursor = cutoff;
+            }
+        }
+        if (tailMergeEnabled && to.isAfter(cursor)) {
+            result.addAll(queryRawMetricSummaries(cursor, to, moduleCode, eventTypeCodes, stageTypeCode));
+        }
+        return result;
+    }
+
+    private List<Integer> descendingSupportedGranularitiesAtMost(int maxGranularityMinutes) {
+        List<Integer> result = new ArrayList<>();
+        int safeMax = Math.max(1, maxGranularityMinutes);
+        for (int i = SUPPORTED_GRANULARITIES.size() - 1; i >= 0; i--) {
+            Integer candidate = SUPPORTED_GRANULARITIES.get(i);
+            if (candidate <= safeMax) {
+                result.add(candidate);
+            }
+        }
+        if (result.isEmpty()) {
+            result.add(1);
+        }
+        return result;
     }
 
     private List<MetricSummaryPoint> queryRawMetricSummaries(
