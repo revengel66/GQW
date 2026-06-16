@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Админка - Заказ')}"></head>
+<body>
+<nav th:replace="~{fragments :: adminNavbar}"></nav>
+<main class="container container-wide py-4">
+    <nav class="admin-breadcrumb mb-3" aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a th:href="@{/admin}">Админка</a></li>
+            <li class="breadcrumb-item"><a th:href="@{/admin/orders(status=${orderStatusFilter},type=${orderTypeFilter},sort=${orderSort},q=${orderQuery},dateFrom=${orderDateFrom},dateTo=${orderDateTo})}">Заказы</a></li>
+            <li class="breadcrumb-item active" aria-current="page" th:text="${'Заказ #' + order.id}">Заказ</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <h1 class="h4 mb-0" th:text="${'Заказ #' + order.id}">Заказ</h1>
+        <div class="d-flex align-items-center gap-2">
+            <a class="btn btn-outline-secondary btn-sm"
+               th:href="@{/admin/orders(status=${orderStatusFilter},type=${orderTypeFilter},sort=${orderSort},q=${orderQuery},dateFrom=${orderDateFrom},dateTo=${orderDateTo})}">
+                <i class="bi bi-arrow-left me-1"></i>
+                Назад к списку
+            </a>
+            <form th:action="@{'/admin/orders/' + ${order.id} + '/delete'}" method="post" class="m-0">
+                <input type="hidden" name="returnTo" value="detail">
+                <button class="btn btn-outline-danger btn-sm" type="submit">
+                    <i class="bi bi-trash3 me-1"></i>
+                    Удалить
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="alert alert-success" th:if="${orderSuccess}" th:text="${orderSuccess}"></div>
+    <div class="alert alert-danger" th:if="${orderError}" th:text="${orderError}"></div>
+
+    <section class="glass-card p-4 mb-3">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <div class="small text-muted">Покупатель</div>
+                <div class="fw-semibold" th:text="${order.customerName}"></div>
+                <div class="small"><a th:href="${'mailto:' + order.customerEmail}" th:text="${order.customerEmail}"></a></div>
+                <div class="small text-muted" th:if="${order.customerPhone != null and !#strings.isEmpty(order.customerPhone)}" th:text="${order.customerPhone}"></div>
+                <div class="small mt-1" th:if="${order.user != null}">
+                    <a th:href="@{'/admin/users/' + ${order.user.id}}">Профиль пользователя</a>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="small text-muted">Статус</div>
+                <div th:class="'badge ' + ${orderStatusClassMap[order.status.name()] != null ? orderStatusClassMap[order.status.name()] : 'text-bg-secondary'}"
+                     th:text="${orderStatusRuMap[order.status.name()] != null ? orderStatusRuMap[order.status.name()] : order.status}">
+                </div>
+                <div class="small text-muted mt-2">
+                    Создан: <span th:text="${order.createdAt != null ? #temporals.format(order.createdAt, 'dd.MM.yyyy HH:mm') : '—'}"></span>
+                </div>
+                <div class="small text-muted">
+                    Изменён статус: <span th:text="${orderLastStatusChangedAt != null ? #temporals.format(orderLastStatusChangedAt, 'dd.MM.yyyy HH:mm') : '—'}"></span>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="small text-muted">Тип получения</div>
+                <div th:text="${order.deliveryType == 'DELIVERY' ? 'Доставка' : 'Самовывоз'}"></div>
+                <div class="small text-muted mt-1" th:if="${order.deliveryType == 'DELIVERY' and order.deliveryAddress != null and !#strings.isEmpty(order.deliveryAddress)}" th:text="${order.deliveryAddress}"></div>
+                <div class="small text-muted mt-1" th:if="${order.deliveryType == 'DELIVERY' and order.deliveryDate != null}">
+                    <span th:text="${#temporals.format(order.deliveryDate, 'dd.MM.yyyy')}"></span>
+                    <span th:if="${order.deliveryTime != null}" th:text="${' ' + #temporals.format(order.deliveryTime, 'HH:mm')}"></span>
+                </div>
+                <div class="small text-muted mt-1" th:if="${order.deliveryType != 'DELIVERY' and order.pickupDate != null}">
+                    Самовывоз: <span th:text="${#temporals.format(order.pickupDate, 'dd.MM.yyyy')}"></span>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="small text-muted">Итог</div>
+                <div class="fw-semibold" th:text="${#numbers.formatDecimal(order.totalAmount,1,'COMMA',2,'POINT')} + ' ₽'">0 ₽</div>
+                <div class="small text-muted">Товаров: <span th:text="${orderItemsCount}">0</span></div>
+            </div>
+            <div class="col-12">
+                <form class="row g-2 align-items-end"
+                      th:action="@{'/admin/orders/' + ${order.id} + '/status'}"
+                      method="post">
+                    <input type="hidden" name="returnTo" value="detail">
+                    <input type="hidden" name="orderStatus" th:value="${orderStatusFilter}">
+                    <input type="hidden" name="orderType" th:value="${orderTypeFilter}">
+                    <input type="hidden" name="orderSort" th:value="${orderSort}">
+                    <input type="hidden" name="orderQuery" th:value="${orderQuery}">
+                    <input type="hidden" name="orderDateFrom" th:value="${orderDateFrom}">
+                    <input type="hidden" name="orderDateTo" th:value="${orderDateTo}">
+                    <div class="col-md-4">
+                        <label class="form-label mb-1">Изменить статус</label>
+                        <select class="form-select"
+                                name="status"
+                                onchange="if(this.form.requestSubmit){this.form.requestSubmit();}else{this.form.submit();}">
+                            <option th:each="s : ${statuses}"
+                                    th:value="${s.name()}"
+                                    th:selected="${s == order.status}"
+                                    th:text="${orderStatusRuMap[s.name()] != null ? orderStatusRuMap[s.name()] : s.name()}"></option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <section class="glass-card p-3 p-md-4 mb-3">
+        <div class="fw-semibold mb-2">Состав заказа</div>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Товар</th>
+                    <th>Цена</th>
+                    <th>Количество</th>
+                    <th>Сумма</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="it : ${orderItems}">
+                    <td class="text-muted" th:text="${it.product != null ? it.product.id : '—'}"></td>
+                    <td>
+                        <a th:if="${it.product != null}"
+                           th:href="@{'/admin/products/' + ${it.product.id} + '/edit'}"
+                           th:text="${it.productName}"></a>
+                        <span th:if="${it.product == null}" th:text="${it.productName}"></span>
+                        <a class="small ms-2"
+                           th:if="${it.product != null and it.product.slug != null}"
+                           th:href="@{'/product/' + ${it.product.slug}}"
+                           target="_blank" rel="noopener">
+                            На сайте
+                        </a>
+                    </td>
+                    <td th:text="${#numbers.formatDecimal(it.unitPrice,1,'COMMA',2,'POINT')} + ' ₽'"></td>
+                    <td th:text="${it.quantity}"></td>
+                    <td th:text="${#numbers.formatDecimal(it.unitPrice * it.quantity,1,'COMMA',2,'POINT')} + ' ₽'"></td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="glass-card p-4 mb-3">
+        <div class="fw-semibold mb-2">История статусов</div>
+        <div class="text-muted" th:if="${#lists.isEmpty(orderStatusHistory)}">История статусов пока пуста.</div>
+        <ul class="mb-0 ps-3" th:if="${!#lists.isEmpty(orderStatusHistory)}">
+            <li class="small mb-1" th:each="h : ${orderStatusHistory}">
+                <span th:text="${orderStatusRuMap[h.status.name()] != null ? orderStatusRuMap[h.status.name()] : h.status.name()}"></span>
+                <span class="text-muted ms-2" th:text="${#temporals.format(h.changedAt, 'dd.MM.yyyy HH:mm')}"></span>
+                <span class="text-muted ms-2" th:if="${h.changedBy != null and !#strings.isEmpty(h.changedBy)}" th:text="${h.changedBy}"></span>
+                <span class="text-muted ms-2" th:if="${h.comment != null and !#strings.isEmpty(h.comment)}" th:text="${h.comment}"></span>
+            </li>
+        </ul>
+    </section>
+
+    <section class="glass-card p-4" th:if="${!#lists.isEmpty(orderRequests)}">
+        <div class="fw-semibold mb-2">Связанные заявки</div>
+        <div class="d-grid gap-2">
+            <a class="text-decoration-none border rounded-3 p-2"
+               th:each="req : ${orderRequests}"
+               th:href="@{/admin/support/{id}(id=${req.id},tab='SUPPORT')}">
+                <div class="d-flex align-items-center justify-content-between gap-2">
+                    <span class="fw-semibold" th:text="${'Заявка #' + req.id}"></span>
+                    <span class="small text-muted" th:text="${req.createdAt != null ? #temporals.format(req.createdAt, 'dd.MM.yyyy HH:mm') : ''}"></span>
+                </div>
+                <div class="small text-muted mt-1" th:text="${req.subject != null ? req.subject : 'Заявка'}"></div>
+            </a>
+        </div>
+    </section>
+</main>
+<div th:replace="~{fragments :: scripts}"></div>
+</body>
+</html>

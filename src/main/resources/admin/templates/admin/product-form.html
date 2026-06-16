@@ -1,0 +1,1384 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head(${productFormMode == 'edit' ? 'Админка - Редактирование товара' : 'Админка - Новый товар'})}"></head>
+<body>
+<nav th:replace="~{fragments :: adminNavbar}"></nav>
+<main class="container container-wide py-4">
+    <nav class="admin-breadcrumb mb-3" aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a th:href="@{/admin}">Админка</a></li>
+            <li class="breadcrumb-item"><a th:href="@{/admin/products}">Товары</a></li>
+            <li class="breadcrumb-item active"
+                aria-current="page"
+                th:text="${productFormMode == 'edit' ? 'Редактирование' : 'Создание'}">Создание</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <div class="h4 mb-0" th:text="${productFormMode == 'edit' ? 'Редактирование товара' : 'Создание товара'}">Создание товара</div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <a class="btn btn-outline-secondary btn-sm" th:href="@{/admin/products}">
+                <i class="bi bi-arrow-left me-1"></i>
+                Назад к списку
+            </a>
+            <a class="btn btn-outline-dark btn-sm"
+               th:if="${productFormMode == 'edit' and editingProduct != null and editingProduct.slug != null and !#strings.isEmpty(editingProduct.slug)}"
+               th:href="@{'/product/' + ${editingProduct.slug}}"
+               target="_blank"
+               rel="noopener">
+                <i class="bi bi-box-arrow-up-right me-1"></i>
+                На сайте
+            </a>
+            <form th:if="${productFormMode == 'edit' and editingProduct != null}"
+                  class="m-0"
+                  th:action="@{'/admin/products/' + ${editingProduct.id} + '/duplicate'}"
+                  method="post">
+                <button class="btn btn-outline-primary btn-sm" type="submit">
+                    <i class="bi bi-copy me-1"></i>
+                    Копировать товар
+                </button>
+            </form>
+            <button class="btn btn-primary btn-sm"
+                    id="product-form-submit-btn"
+                    type="button"
+                    th:text="${productFormMode == 'edit' ? 'Сохранить изменения' : 'Сохранить товар'}">
+                Сохранить товар
+            </button>
+        </div>
+    </div>
+
+    <div class="alert alert-success" th:if="${productSuccess}" th:text="${productSuccess}"></div>
+    <div class="alert alert-danger" th:if="${productError}" th:text="${productError}"></div>
+    <div class="alert alert-success" th:if="${characteristicSuccess}" th:text="${characteristicSuccess}"></div>
+    <div class="alert alert-danger" th:if="${characteristicError}" th:text="${characteristicError}"></div>
+    <div class="alert alert-success" th:if="${filterOptionSuccess}" th:text="${filterOptionSuccess}"></div>
+    <div class="alert alert-danger" th:if="${filterOptionError}" th:text="${filterOptionError}"></div>
+
+    <form id="product-form"
+          method="post"
+          enctype="multipart/form-data"
+          th:action="${productFormMode == 'edit'} ? @{'/admin/products/' + ${editingProduct.id}} : @{/admin/products}"
+          th:attr="data-copy-mode=${copySourceProductId != null}">
+        <input th:if="${copySourceProductId != null}" type="hidden" name="copySourceProductId" th:value="${copySourceProductId}">
+
+        <div class="row g-4">
+            <aside class="col-12 col-xl-3">
+                <div class="glass-card p-3 admin-sticky-column">
+                    <div class="catalog-panel-title mb-3">Категории</div>
+                    <div class="small text-muted mb-2">Все категории раскрыты по умолчанию. Выберите одну или несколько.</div>
+                    <div class="admin-tree-list" id="product-category-tree">
+                        <div class="admin-tree-node admin-tree-root-note">
+                            <span class="small text-muted">Категории товара</span>
+                        </div>
+                        <div class="admin-tree-node"
+                             th:each="row : ${categoryRows}"
+                             th:attr="data-id=${row.category.id},data-parent=${row.parentId != null ? row.parentId : ''}">
+                            <div class="admin-tree-node-inner" th:style="'--tree-depth:' + ${row.depth}">
+                                <button class="admin-tree-toggle"
+                                        th:if="${!row.leaf}"
+                                        type="button"
+                                        th:attr="data-tree-toggle=${row.category.id},aria-expanded=true"
+                                        title="Свернуть/развернуть">
+                                    <i class="bi bi-chevron-down"></i>
+                                </button>
+                                <span class="admin-tree-toggle-placeholder" th:if="${row.leaf}"></span>
+                                <label class="form-check mb-0 admin-tree-choice">
+                                    <input class="form-check-input"
+                                           type="checkbox"
+                                           name="categoryIds"
+                                           th:value="${row.category.id}"
+                                           th:checked="${(editingProductCategoryIds != null and editingProductCategoryIds.contains(row.category.id)) or (editingProduct == null and preselectedCategoryId != null and preselectedCategoryId == row.category.id)}">
+                                    <span class="form-check-label admin-tree-label" th:text="${row.category.name}">Категория</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <section class="col-12 col-xl-9">
+                <ul class="nav nav-tabs product-edit-tabs mb-3" id="productEditTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="product-info-tab" data-bs-toggle="tab" data-bs-target="#product-info-pane"
+                                type="button" role="tab" aria-controls="product-info-pane" aria-selected="true">Информация о товаре</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="product-gallery-tab" data-bs-toggle="tab" data-bs-target="#product-gallery-pane"
+                                type="button" role="tab" aria-controls="product-gallery-pane" aria-selected="false">Галерея</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="product-specs-tab" data-bs-toggle="tab" data-bs-target="#product-specs-pane"
+                                type="button" role="tab" aria-controls="product-specs-pane" aria-selected="false">Характеристики и фильтры</button>
+                    </li>
+                    <li class="nav-item" role="presentation" th:if="${productFormMode == 'edit' and editingProduct != null}">
+                        <button class="nav-link" id="product-reviews-tab" data-bs-toggle="tab" data-bs-target="#product-reviews-pane"
+                                type="button" role="tab" aria-controls="product-reviews-pane" aria-selected="false">Отзывы</button>
+                    </li>
+                </ul>
+
+                <div class="tab-content">
+                    <div class="tab-pane fade show active" id="product-info-pane" role="tabpanel" aria-labelledby="product-info-tab">
+                        <div class="glass-card p-4"
+                             th:with="firstImage=${productFormMode == 'edit' and productImages != null and !#lists.isEmpty(productImages) ? productImages.get(0).imageUrl : (copyDraftImageUrls != null and !#lists.isEmpty(copyDraftImageUrls) ? copyDraftImageUrls.get(0) : null)}">
+                            <div class="row g-3">
+                                <div class="col-12 col-lg-8">
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label">Название</label>
+                                            <input class="form-control"
+                                                   id="product-name-input"
+                                                   name="productName"
+                                                   th:value="${editingProduct != null ? editingProduct.name : (copyDraft != null ? copyDraft.name : '')}"
+                                                   required>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Slug</label>
+                                            <input class="form-control"
+                                                   id="product-slug-input"
+                                                   name="productSlug"
+                                                   th:value="${editingProduct != null ? editingProduct.slug : (copyDraft != null ? copyDraft.slug : '')}"
+                                                   required>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-12 col-lg-4">
+                                    <div class="small text-muted mb-2">Превью товара</div>
+                                    <div class="admin-photo-preview-box">
+                                        <img th:if="${firstImage != null}" th:src="${firstImage}" alt="">
+                                        <i th:if="${firstImage == null}" class="bi bi-camera"></i>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label">Артикул</label>
+                                    <input class="form-control"
+                                           name="productArticle"
+                                           th:value="${editingProduct != null ? editingProduct.article : (copyDraft != null ? copyDraft.article : '')}"
+                                           placeholder="Сгенерируется автоматически, если оставить пустым">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Краткое описание</label>
+                                    <input class="form-control"
+                                           name="productShortDescription"
+                                           th:value="${editingProduct != null ? editingProduct.shortDescription : (copyDraft != null ? copyDraft.shortDescription : '')}">
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label">Цена</label>
+                                    <input class="form-control" type="number" step="0.01" min="0" name="productPrice"
+                                           th:value="${editingProduct != null ? editingProduct.price : (copyDraft != null ? copyDraft.price : '')}"
+                                           required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Старая цена</label>
+                                    <input class="form-control" type="number" step="0.01" min="0" name="productOldPrice"
+                                           th:value="${editingProduct != null ? editingProduct.oldPrice : (copyDraft != null ? copyDraft.oldPrice : '')}">
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label d-block">Теги и состояние</label>
+                                    <div class="d-flex flex-wrap gap-3">
+                                        <label class="form-check mb-0">
+                                            <input class="form-check-input" type="checkbox" name="isNew" value="true"
+                                                   th:checked="${editingProduct != null ? editingProduct.isNew : (copyDraft != null and copyDraft.isNew())}">
+                                            <span class="form-check-label">Новинка</span>
+                                        </label>
+                                        <label class="form-check mb-0">
+                                            <input class="form-check-input" type="checkbox" name="isHit" value="true"
+                                                   th:checked="${editingProduct != null ? editingProduct.isHit : (copyDraft != null and copyDraft.isHit())}">
+                                            <span class="form-check-label">Хит</span>
+                                        </label>
+                                        <label class="form-check mb-0">
+                                            <input class="form-check-input" type="checkbox" name="isPublished" value="true"
+                                                   th:checked="${editingProduct != null ? editingProduct.isPublished : (copyDraft == null or copyDraft.isPublished())}">
+                                            <span class="form-check-label">Опубликован</span>
+                                        </label>
+                                        <label class="form-check mb-0">
+                                            <input class="form-check-input" type="checkbox" name="inStock" value="true"
+                                                   th:checked="${editingProduct != null ? editingProduct.inStock : (copyDraft == null or copyDraft.inStock())}">
+                                            <span class="form-check-label">В наличии</span>
+                                        </label>
+                                    </div>
+                                    <div class="small text-muted mt-2">Скидка рассчитывается автоматически по старой цене.</div>
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label">Описание</label>
+                                    <textarea class="form-control"
+                                              id="product-description-editor"
+                                              name="productDescription"
+                                              rows="12"
+                                              th:text="${editingProduct != null ? editingProduct.description : (copyDraft != null ? copyDraft.description : '')}"></textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="glass-card p-4 mt-3"
+                             th:if="${productFormMode == 'edit' and editingProduct != null and productSalesSummary != null}">
+                            <div class="small text-muted">Продажи товара (только проданные)</div>
+                            <div class="mt-1 d-flex flex-wrap gap-3">
+                                <div><strong th:text="${productSalesSummary.totalQuantity}">0</strong> шт.</div>
+                                <div><strong th:text="${productSalesSummary.ordersCount}">0</strong> заказов</div>
+                                <div><strong th:text="${#numbers.formatDecimal(productSalesSummary.totalRevenue,1,'COMMA',2,'POINT')} + ' ₽'">0 ₽</strong></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tab-pane fade" id="product-gallery-pane" role="tabpanel" aria-labelledby="product-gallery-tab">
+                        <div class="glass-card p-4">
+                            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                                <div class="small text-muted">Можно загрузить новые изображения и выбрать существующие из файлового менеджера.</div>
+                                <div class="d-flex gap-2 flex-wrap">
+                                    <button class="btn btn-outline-secondary btn-sm" type="button" id="clear-product-files-btn">Очистить файлы</button>
+                                    <button class="btn btn-outline-secondary btn-sm" type="button" id="clear-library-images-btn">Очистить выбранные</button>
+                                </div>
+                            </div>
+
+                            <div class="row g-2">
+                                <div class="col-12 col-lg-8">
+                                    <input class="form-control"
+                                           type="file"
+                                           name="images"
+                                           id="product-images-input"
+                                           accept=".jpg,.jpeg,.png,.webp"
+                                           multiple>
+                                </div>
+                                <div class="col-12 col-lg-4 d-grid">
+                                    <button class="btn btn-dark" type="button" data-bs-toggle="modal" data-bs-target="#productLibraryModal">
+                                        Открыть файловый менеджер
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div id="product-library-inputs">
+                                <input type="hidden" name="libraryImageUrls" th:each="url : ${copyDraftImageUrls}" th:value="${url}">
+                            </div>
+
+                            <div class="mt-3">
+                                <div class="small text-muted mb-2">Новые файлы</div>
+                                <div class="row g-2" id="product-local-preview"></div>
+                            </div>
+
+                            <div class="mt-3">
+                                <div class="small text-muted mb-2">Выбрано из файлового менеджера</div>
+                                <div class="row g-2" id="product-library-preview">
+                                    <div class="col-6 col-md-4 col-lg-3"
+                                         th:each="url : ${copyDraftImageUrls}"
+                                         th:attr="data-library-preview-url=${url}">
+                                        <div class="admin-gallery-card admin-gallery-card--sm">
+                                            <img th:src="${url}" alt="">
+                                            <button class="btn btn-danger btn-sm admin-gallery-remove js-remove-library-preview"
+                                                    type="button"
+                                                    th:attr="data-url=${url}">
+                                                <i class="bi bi-x-lg"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mt-3"
+                                 th:if="${productFormMode == 'edit' and productImages != null and !#lists.isEmpty(productImages)}">
+                                <div class="small text-muted mb-2">Текущая галерея товара</div>
+                                <div class="row g-2">
+                                    <div class="col-6 col-md-4 col-lg-3" th:each="img : ${productImages}">
+                                        <div class="admin-gallery-card admin-gallery-card--sm">
+                                            <img th:src="${img.imageUrl}" alt="">
+                                            <button class="btn btn-danger btn-sm admin-gallery-remove js-delete-existing-product-image"
+                                                    type="button"
+                                                    th:attr="data-delete-url=@{'/admin/products/' + ${editingProduct.id} + '/images/' + ${img.id} + '/delete'}"
+                                                    title="Удалить изображение">
+                                                <i class="bi bi-x-lg"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tab-pane fade" id="product-specs-pane" role="tabpanel" aria-labelledby="product-specs-tab">
+                        <div class="glass-card p-4">
+                            <div class="fw-semibold mb-3">Характеристики</div>
+                            <div class="small text-muted mb-2">Порядок отображения определяется автоматически.</div>
+                            <div th:if="${productFormMode == 'edit' and editingProduct != null}">
+                                <form class="row g-2 mb-3" method="post" th:action="@{/admin/products/characteristics/save}">
+                                    <input type="hidden" name="productId" th:value="${editingProduct.id}">
+                                    <div class="col-md-5">
+                                        <input class="form-control" name="name" placeholder="Название" required>
+                                    </div>
+                                    <div class="col-md-5">
+                                        <input class="form-control" name="value" placeholder="Значение" required>
+                                    </div>
+                                    <div class="col-md-2 d-grid">
+                                        <button class="btn btn-primary btn-sm" type="submit">Добавить</button>
+                                    </div>
+                                </form>
+                            </div>
+                            <div class="small text-muted" th:if="${productCharacteristics == null or #lists.isEmpty(productCharacteristics)}">Пока нет характеристик.</div>
+                            <div class="d-grid gap-2" th:if="${productCharacteristics != null and !#lists.isEmpty(productCharacteristics)}">
+                                <div class="border rounded-3 p-2" th:each="ch : ${productCharacteristics}">
+                                    <div class="d-flex justify-content-between align-items-start gap-2">
+                                        <div>
+                                            <div class="fw-semibold small" th:text="${ch.name}">Название</div>
+                                            <div class="small text-muted" th:text="${ch.value}">Значение</div>
+                                        </div>
+                                        <div class="d-flex align-items-center gap-1" th:if="${productFormMode == 'edit' and editingProduct != null}">
+                                            <button class="btn btn-outline-secondary btn-sm admin-mini-icon-btn"
+                                                    type="button"
+                                                    data-bs-toggle="collapse"
+                                                    th:attr="data-bs-target=${'#editCharacteristic-' + ch.id}"
+                                                    title="Редактировать">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <form th:action="@{'/admin/products/characteristics/' + ${ch.id} + '/delete'}" method="post" class="m-0">
+                                                <input type="hidden" name="productId" th:value="${editingProduct.id}">
+                                                <button class="btn btn-outline-danger btn-sm admin-mini-icon-btn" type="submit" title="Удалить">
+                                                    <i class="bi bi-trash3"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                    <div class="collapse mt-2" th:attr="id=${'editCharacteristic-' + ch.id}">
+                                        <form class="row g-2" method="post" th:action="@{'/admin/products/characteristics/' + ${ch.id}}">
+                                            <input type="hidden" name="productId" th:value="${editingProduct.id}">
+                                            <div class="col-md-5">
+                                                <input class="form-control form-control-sm" name="name" th:value="${ch.name}" required>
+                                            </div>
+                                            <div class="col-md-5">
+                                                <input class="form-control form-control-sm" name="value" th:value="${ch.value}" required>
+                                            </div>
+                                            <div class="col-md-2 d-grid">
+                                                <button class="btn btn-dark btn-sm" type="submit">Сохранить</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="glass-card p-4 mt-3">
+                            <div class="fw-semibold mb-3">Фильтры товара</div>
+                            <div class="small text-muted mb-2">Коды фильтра и опций скрыты: используются только внутренне. Здесь редактируется только значение.</div>
+                            <div th:if="${productFormMode == 'edit' and editingProduct != null}">
+                                <form class="row g-2 mb-3" method="post" th:action="@{/admin/products/filter-options/save}">
+                                    <input type="hidden" name="productId" th:value="${editingProduct.id}">
+                                    <div class="col-md-5">
+                                        <label class="form-label mb-1">Фильтр</label>
+                                        <select class="form-select" name="filterId" id="product-filter-select" required>
+                                            <option value="">Выберите фильтр</option>
+                                            <option th:each="f : ${availableProductFilters}"
+                                                    th:value="${f.id}"
+                                                    th:text="${f.name}"></option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-5">
+                                        <label class="form-label mb-1">Значение</label>
+                                        <input class="form-control" name="optionValue" id="product-filter-option-input"
+                                               list="product-filter-option-datalist"
+                                               placeholder="Введите значение или выберите существующее"
+                                               required>
+                                        <datalist id="product-filter-option-datalist"></datalist>
+                                    </div>
+                                    <div class="col-md-2 d-grid">
+                                        <label class="form-label mb-1 d-none d-md-block">&nbsp;</label>
+                                        <button class="btn btn-primary btn-sm" type="submit">Добавить</button>
+                                    </div>
+                                </form>
+                            </div>
+
+                            <div class="small text-muted" th:if="${productFilterOptions == null or #lists.isEmpty(productFilterOptions)}">Пока нет опций фильтра.</div>
+                            <div class="d-grid gap-2" th:if="${productFilterOptions != null and !#lists.isEmpty(productFilterOptions)}">
+                                <div class="border rounded-3 p-2" th:each="opt : ${productFilterOptions}">
+                                    <div class="d-flex justify-content-between align-items-start gap-2">
+                                        <div>
+                                            <div class="fw-semibold small" th:text="${opt.filterOption.filter.name}">Фильтр</div>
+                                            <div class="small text-muted" th:text="${opt.filterOption.value}">Значение</div>
+                                        </div>
+                                        <div class="d-flex align-items-center gap-1" th:if="${productFormMode == 'edit' and editingProduct != null}">
+                                            <button class="btn btn-outline-secondary btn-sm admin-mini-icon-btn"
+                                                    type="button"
+                                                    data-bs-toggle="collapse"
+                                                    th:attr="data-bs-target=${'#editFilterOption-' + opt.id}"
+                                                    title="Редактировать">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <form th:action="@{'/admin/products/filter-options/' + ${opt.id} + '/delete'}" method="post" class="m-0">
+                                                <input type="hidden" name="productId" th:value="${editingProduct.id}">
+                                                <button class="btn btn-outline-danger btn-sm admin-mini-icon-btn" type="submit" title="Удалить">
+                                                    <i class="bi bi-trash3"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                    <div class="collapse mt-2"
+                                         th:attr="id=${'editFilterOption-' + opt.id}"
+                                         th:with="filterId=${opt.filterOption.filter.id},optionValues=${filterOptionsByFilterId[filterId]}">
+                                        <form class="row g-2" method="post" th:action="@{'/admin/products/filter-options/' + ${opt.id}}">
+                                            <input type="hidden" name="productId" th:value="${editingProduct.id}">
+                                            <div class="col-md-10">
+                                                <input class="form-control form-control-sm"
+                                                       name="optionValue"
+                                                       th:attr="list=${'product-filter-values-' + filterId}"
+                                                       th:value="${opt.filterOption.value}"
+                                                       required>
+                                                <datalist th:attr="id=${'product-filter-values-' + filterId}">
+                                                    <option th:each="it : ${optionValues}" th:value="${it.value}"></option>
+                                                </datalist>
+                                            </div>
+                                            <div class="col-md-2 d-grid">
+                                                <button class="btn btn-dark btn-sm" type="submit">Сохранить</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tab-pane fade"
+                         id="product-reviews-pane"
+                         role="tabpanel"
+                         aria-labelledby="product-reviews-tab"
+                         th:if="${productFormMode == 'edit' and editingProduct != null}">
+                        <div class="glass-card p-4">
+                            <div class="row g-2 align-items-end mb-3">
+                                <div class="col-md-3">
+                                    <label class="form-label mb-1">Статус</label>
+                                    <select class="form-select" id="product-review-status-filter">
+                                        <option value="ALL">Все</option>
+                                        <option value="pending">На модерации</option>
+                                        <option value="approved">Опубликованные</option>
+                                        <option value="rejected">Отклонённые</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label mb-1">Оценка</label>
+                                    <select class="form-select" id="product-review-rating-filter">
+                                        <option value="0">Все</option>
+                                        <option value="5">5</option>
+                                        <option value="4">4</option>
+                                        <option value="3">3</option>
+                                        <option value="2">2</option>
+                                        <option value="1">1</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-7">
+                                    <label class="form-label mb-1">Поиск</label>
+                                    <input class="form-control" id="product-review-search-filter" placeholder="Текст отзыва, имя, email">
+                                </div>
+                            </div>
+
+                            <div class="text-muted" th:if="${productReviews == null or #lists.isEmpty(productReviews)}">Пока нет отзывов.</div>
+                            <div class="d-grid gap-3" th:if="${productReviews != null and !#lists.isEmpty(productReviews)}" id="product-review-list">
+                                <article class="border rounded-3 p-3 admin-product-review-card"
+                                         th:each="r : ${productReviews}"
+                                         th:attr="data-review-status=${!r.moderated ? 'pending' : (r.approved ? 'approved' : 'rejected')},
+                                                  data-review-rating=${r.rating != null ? r.rating : 0},
+                                                  data-review-search=${(r.text != null ? r.text : '') + ' ' + (r.user != null ? (r.user.fullName != null ? r.user.fullName : r.user.username) : (r.guestName != null ? r.guestName : '')) + ' ' + (r.guestEmail != null ? r.guestEmail : '')}">
+                                    <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
+                                        <div class="fw-semibold"
+                                             th:text="${r.user != null ? (r.user.fullName != null and !#strings.isEmpty(r.user.fullName) ? r.user.fullName : r.user.username) : r.guestName}">
+                                            Пользователь
+                                        </div>
+                                        <div class="small text-muted"
+                                             th:text="${r.createdAt != null ? #temporals.format(r.createdAt, 'dd.MM.yyyy HH:mm') : ''}">
+                                        </div>
+                                    </div>
+                                    <div class="d-flex flex-wrap align-items-center gap-2 mt-1">
+                                        <span class="small text-muted" th:if="${r.rating != null}" th:text="${'Оценка: ' + r.rating + '/5'}"></span>
+                                        <span class="badge text-bg-warning" th:if="${!r.moderated}">На модерации</span>
+                                        <span class="badge text-bg-success" th:if="${r.moderated and r.approved}">Опубликован</span>
+                                        <span class="badge text-bg-secondary" th:if="${r.moderated and !r.approved}">Отклонён</span>
+                                    </div>
+                                    <div class="expandable-text js-expandable-text mt-2" data-collapsed-lines="5">
+                                        <div class="expandable-text-content js-expandable-content" th:text="${r.text}"></div>
+                                        <button class="expandable-text-toggle js-expandable-toggle d-none"
+                                                type="button"
+                                                data-show-text="Показать полностью"
+                                                data-hide-text="Скрыть">Показать полностью</button>
+                                    </div>
+
+                                    <div class="d-flex align-items-center gap-2 mt-3 flex-wrap">
+                                        <form method="post"
+                                              th:if="${!r.approved}"
+                                              th:action="@{'/admin/products/' + ${editingProduct.id} + '/reviews/' + ${r.id} + '/moderate'}"
+                                              class="m-0">
+                                            <input type="hidden" name="approved" value="true">
+                                            <button class="btn btn-outline-success btn-sm admin-mini-icon-btn" type="submit" title="Опубликовать">
+                                                <i class="bi bi-check-lg"></i>
+                                            </button>
+                                        </form>
+                                        <form method="post"
+                                              th:if="${r.approved}"
+                                              th:action="@{'/admin/products/' + ${editingProduct.id} + '/reviews/' + ${r.id} + '/moderate'}"
+                                              class="m-0">
+                                            <input type="hidden" name="approved" value="false">
+                                            <button class="btn btn-outline-secondary btn-sm admin-mini-icon-btn" type="submit" title="Снять публикацию">
+                                                <i class="bi bi-x-lg"></i>
+                                            </button>
+                                        </form>
+                                        <form method="post"
+                                              th:if="${!r.approved}"
+                                              th:action="@{'/admin/products/' + ${editingProduct.id} + '/reviews/' + ${r.id} + '/moderate'}"
+                                              class="m-0">
+                                            <input type="hidden" name="approved" value="false">
+                                            <button class="btn btn-outline-secondary btn-sm admin-mini-icon-btn" type="submit" title="Отклонить">
+                                                <i class="bi bi-dash-lg"></i>
+                                            </button>
+                                        </form>
+                                        <form method="post"
+                                              th:action="@{'/admin/products/' + ${editingProduct.id} + '/reviews/' + ${r.id} + '/delete'}"
+                                              class="m-0">
+                                            <button class="btn btn-outline-danger btn-sm admin-mini-icon-btn" type="submit" title="Удалить отзыв">
+                                                <i class="bi bi-trash3"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+
+                                    <div class="mt-3 ps-3 border-start"
+                                         th:if="${reviewRepliesById != null and reviewRepliesById[r.id] != null and !#lists.isEmpty(reviewRepliesById[r.id])}">
+                                        <div class="small fw-semibold mb-2">Ответы</div>
+                                        <div class="border rounded-2 p-2 mb-2 bg-light-subtle" th:each="reply : ${reviewRepliesById[r.id]}">
+                                            <div class="d-flex align-items-start justify-content-between gap-2">
+                                                <div>
+                                                    <div class="small fw-semibold"
+                                                         th:text="${reply.user != null ? (reply.user.fullName != null and !#strings.isEmpty(reply.user.fullName) ? reply.user.fullName : reply.user.username) : reply.guestName}">
+                                                        Пользователь
+                                                    </div>
+                                                    <div class="small text-muted"
+                                                         th:text="${reply.createdAt != null ? #temporals.format(reply.createdAt, 'dd.MM.yyyy HH:mm') : ''}"></div>
+                                                </div>
+                                                <button class="btn btn-outline-secondary btn-sm admin-mini-icon-btn"
+                                                        type="button"
+                                                        data-bs-toggle="collapse"
+                                                        th:attr="data-bs-target=${'#editReply-' + reply.id}"
+                                                        title="Редактировать ответ">
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
+                                            </div>
+                                            <div class="expandable-text js-expandable-text mt-2" data-collapsed-lines="4">
+                                                <div class="expandable-text-content js-expandable-content" th:text="${reply.text}"></div>
+                                                <button class="expandable-text-toggle js-expandable-toggle d-none"
+                                                        type="button"
+                                                        data-show-text="Показать полностью"
+                                                        data-hide-text="Скрыть">Показать полностью</button>
+                                            </div>
+                                            <div class="collapse mt-2" th:attr="id=${'editReply-' + reply.id}">
+                                                <form method="post"
+                                                      th:action="@{'/admin/products/' + ${editingProduct.id} + '/reviews/' + ${r.id} + '/reply/' + ${reply.id}}">
+                                                    <textarea class="form-control form-control-sm" name="text" rows="3" th:text="${reply.text}" required></textarea>
+                                                    <div class="d-flex justify-content-end mt-2">
+                                                        <button class="btn btn-dark btn-sm" type="submit">Сохранить</button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="mt-3">
+                                        <form method="post"
+                                              th:action="@{'/admin/products/' + ${editingProduct.id} + '/reviews/' + ${r.id} + '/reply'}">
+                                            <div class="small fw-semibold mb-1">Ответ администратора</div>
+                                            <textarea class="form-control form-control-sm" name="text" rows="3" placeholder="Текст ответа" required></textarea>
+                                            <div class="d-flex justify-content-end mt-2">
+                                                <button class="btn btn-dark btn-sm" type="submit">Ответить</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </article>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </form>
+</main>
+
+<div class="modal fade"
+     id="productLibraryModal"
+     tabindex="-1"
+     aria-hidden="true"
+     th:attr="data-selected-folder=${selectedLibraryFolder != null ? selectedLibraryFolder : 'library'}">
+    <div class="modal-dialog modal-fullscreen-xl-down modal-xl modal-dialog-scrollable modal-dialog-centered">
+        <div class="modal-content review-modal-content">
+            <div class="modal-header">
+                <div class="h6 mb-0">Файловый менеджер</div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <aside class="col-12 col-lg-3">
+                        <div class="glass-card p-3 h-100">
+                            <div class="fw-semibold mb-2">Папки</div>
+                            <div id="product-library-folders" class="admin-file-folders">
+                                <button type="button"
+                                        class="admin-file-folder-btn"
+                                        th:classappend="${folder.key == selectedLibraryFolder} ? ' is-active'"
+                                        th:each="folder : ${fileFolders}"
+                                        th:attr="data-folder-key=${folder.key},data-folder-depth=${folder.depth}">
+                                    <span th:text="${folder.label}">Папка</span>
+                                    <span class="small text-muted ms-auto" th:text="${folder.filesCount}">0</span>
+                                </button>
+                            </div>
+                        </div>
+                    </aside>
+                    <section class="col-12 col-lg-5">
+                        <div class="glass-card p-3 h-100">
+                            <div class="row g-2 align-items-end mb-3">
+                                <div class="col-12">
+                                    <label class="form-label mb-1">Загрузить изображения в текущую папку</label>
+                                    <input class="form-control" type="file" id="library-upload-input" accept=".jpg,.jpeg,.png,.webp" multiple>
+                                </div>
+                                <div class="col-12 d-grid">
+                                    <button class="btn btn-dark btn-sm" type="button" id="library-upload-btn">Загрузить</button>
+                                </div>
+                            </div>
+                            <div class="alert alert-danger d-none" id="library-modal-error"></div>
+                            <div id="product-library-grid" class="admin-file-grid">
+                                <button type="button"
+                                        class="admin-file-tile js-library-file-tile"
+                                        th:each="f : ${libraryFiles}"
+                                        th:attr="data-url=${f.url},data-name=${f.name},data-size=${f.size},data-width=${f.width},data-height=${f.height},data-folder=${f.folderKey}">
+                                    <img th:src="${f.url}" alt="">
+                                    <span class="admin-file-tile-name" th:text="${f.name}">file.webp</span>
+                                    <button class="btn btn-danger btn-sm admin-file-delete js-library-file-delete"
+                                            type="button"
+                                            th:attr="data-url=${f.url}"
+                                            title="Удалить файл">
+                                        <i class="bi bi-trash3"></i>
+                                    </button>
+                                </button>
+                            </div>
+                        </div>
+                    </section>
+                    <aside class="col-12 col-lg-4">
+                        <div class="glass-card p-3 h-100">
+                            <div class="fw-semibold mb-2">Информация о файле</div>
+                            <div id="product-library-file-details-empty" class="text-muted small">Выберите изображение для просмотра.</div>
+                            <div id="product-library-file-details" class="d-none">
+                                <img id="product-library-file-preview" class="img-fluid rounded-3 border mb-2" alt="">
+                                <div class="small"><span class="text-muted">Имя:</span> <span id="product-library-file-name"></span></div>
+                                <div class="small"><span class="text-muted">Размер:</span> <span id="product-library-file-size"></span></div>
+                                <div class="small"><span class="text-muted">Разрешение:</span> <span id="product-library-file-dimensions"></span></div>
+                                <div class="small"><span class="text-muted">Папка:</span> <span id="product-library-file-folder"></span></div>
+                            </div>
+                        </div>
+                    </aside>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-dismiss="modal">Отмена</button>
+                <button class="btn btn-primary btn-sm" type="button" id="product-library-apply-btn">Выбрать</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="admin-product-save-error-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Ошибка сохранения</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-0" id="admin-product-save-error-text">Не удалось сохранить данные.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary btn-sm" data-bs-dismiss="modal">Понятно</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div th:replace="~{fragments :: scripts}"></div>
+<script th:src="@{/webjars/tinymce/7.9.1/tinymce.min.js}"></script>
+<script th:inline="javascript">
+    (function () {
+        const csrfToken = document.querySelector("meta[name='_csrf']")?.getAttribute("content");
+        const csrfHeader = document.querySelector("meta[name='_csrf_header']")?.getAttribute("content");
+
+        const form = document.getElementById("product-form");
+        const saveErrorModalEl = document.getElementById("admin-product-save-error-modal");
+        const saveErrorTextEl = document.getElementById("admin-product-save-error-text");
+        if (window.tinymce) {
+            window.tinymce.remove("#product-description-editor");
+            window.tinymce.init({
+                selector: "#product-description-editor",
+                menubar: false,
+                height: 360,
+                branding: false,
+                plugins: "lists link table code autoresize",
+                toolbar: "undo redo | styles | bold italic underline | bullist numlist | alignleft aligncenter alignright | link table | code",
+                content_style: "body { font-family: Manrope, Segoe UI, sans-serif; font-size: 14px; line-height: 1.65; }"
+            });
+        }
+
+        const explicitSubmitButton = document.getElementById("product-form-submit-btn");
+        const defaultSaveErrorText = "Не удалось сохранить данные.";
+        let isProductFormSubmitting = false;
+
+        const showProductSaveError = (message) => {
+            const resolvedMessage = (message || "").trim() || defaultSaveErrorText;
+            if (saveErrorTextEl) {
+                saveErrorTextEl.textContent = resolvedMessage;
+            }
+            if (saveErrorModalEl && window.bootstrap && window.bootstrap.Modal) {
+                window.bootstrap.Modal.getOrCreateInstance(saveErrorModalEl).show();
+                return;
+            }
+            window.alert(resolvedMessage);
+        };
+
+        const submitProductFormAsync = async () => {
+            if (!form || isProductFormSubmitting) {
+                return;
+            }
+            isProductFormSubmitting = true;
+            if (explicitSubmitButton) {
+                explicitSubmitButton.disabled = true;
+            }
+            try {
+                if (window.tinymce) {
+                    window.tinymce.triggerSave();
+                }
+                const action = form.getAttribute("action") || window.location.href;
+                const method = (form.getAttribute("method") || "post").toUpperCase();
+                const formData = new FormData(form);
+                const headers = {"X-Requested-With": "XMLHttpRequest"};
+                if (csrfToken && csrfHeader) {
+                    headers[csrfHeader] = csrfToken;
+                }
+                const response = await fetch(action, {
+                    method,
+                    body: formData,
+                    headers,
+                    redirect: "follow"
+                });
+                if (!response.ok) {
+                    const errorText = (await response.text()).trim();
+                    showProductSaveError(errorText);
+                    return;
+                }
+                window.location.href = response.url || window.location.href;
+            } catch (error) {
+                const message = error instanceof Error ? error.message : defaultSaveErrorText;
+                showProductSaveError(message);
+            } finally {
+                if (explicitSubmitButton) {
+                    explicitSubmitButton.disabled = false;
+                }
+                isProductFormSubmitting = false;
+            }
+        };
+
+        if (form) {
+            form.addEventListener("submit", (event) => {
+                event.preventDefault();
+                submitProductFormAsync();
+            });
+        }
+
+        if (form && explicitSubmitButton) {
+            explicitSubmitButton.addEventListener("click", (event) => {
+                event.preventDefault();
+                submitProductFormAsync();
+            });
+        }
+
+        const nameInput = document.getElementById("product-name-input");
+        const slugInput = document.getElementById("product-slug-input");
+        if (nameInput && slugInput) {
+            const translitMap = {
+                "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e", "ё": "e", "ж": "zh", "з": "z", "и": "i",
+                "й": "y", "к": "k", "л": "l", "м": "m", "н": "n", "о": "o", "п": "p", "р": "r", "с": "s", "т": "t",
+                "у": "u", "ф": "f", "х": "h", "ц": "c", "ч": "ch", "ш": "sh", "щ": "sch", "ъ": "", "ы": "y", "ь": "",
+                "э": "e", "ю": "yu", "я": "ya"
+            };
+            const normalize = (value) => {
+                const lower = String(value || "").trim().toLowerCase();
+                let out = "";
+                for (const ch of lower) {
+                    out += Object.prototype.hasOwnProperty.call(translitMap, ch) ? translitMap[ch] : ch;
+                }
+                return out.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").replace(/-{2,}/g, "-");
+            };
+            let slugTouched = slugInput.value.trim().length > 0;
+            slugInput.addEventListener("input", () => {
+                slugTouched = slugInput.value.trim().length > 0;
+            });
+            nameInput.addEventListener("input", () => {
+                if (!slugTouched) {
+                    slugInput.value = normalize(nameInput.value);
+                }
+            });
+            if (!slugInput.value.trim()) {
+                slugInput.value = normalize(nameInput.value);
+            }
+        }
+
+        const categoryNodes = Array.from(document.querySelectorAll("#product-category-tree .admin-tree-node[data-id]"));
+        const categoryNodeById = new Map();
+        categoryNodes.forEach((node) => {
+            const id = node.getAttribute("data-id");
+            if (id) {
+                categoryNodeById.set(id, node);
+            }
+        });
+        const collapsedCategoryIds = new Set();
+        const hasCollapsedCategoryAncestor = (node) => {
+            let parentId = node.getAttribute("data-parent");
+            while (parentId) {
+                if (collapsedCategoryIds.has(parentId)) {
+                    return true;
+                }
+                const parentNode = categoryNodeById.get(parentId);
+                if (!parentNode) {
+                    break;
+                }
+                parentId = parentNode.getAttribute("data-parent");
+            }
+            return false;
+        };
+        const syncCategoryTree = () => {
+            categoryNodes.forEach((node) => {
+                node.classList.toggle("d-none", hasCollapsedCategoryAncestor(node));
+            });
+            document.querySelectorAll("[data-tree-toggle]").forEach((btn) => {
+                const id = btn.getAttribute("data-tree-toggle");
+                const isCollapsed = id != null && collapsedCategoryIds.has(id);
+                btn.classList.toggle("is-collapsed", isCollapsed);
+                btn.setAttribute("aria-expanded", String(!isCollapsed));
+            });
+        };
+        document.querySelectorAll("[data-tree-toggle]").forEach((btn) => {
+            btn.addEventListener("click", () => {
+                const id = btn.getAttribute("data-tree-toggle");
+                if (!id) {
+                    return;
+                }
+                if (collapsedCategoryIds.has(id)) {
+                    collapsedCategoryIds.delete(id);
+                } else {
+                    collapsedCategoryIds.add(id);
+                }
+                syncCategoryTree();
+            });
+        });
+        syncCategoryTree();
+
+        const imagesInput = document.getElementById("product-images-input");
+        const localPreview = document.getElementById("product-local-preview");
+        const clearFilesBtn = document.getElementById("clear-product-files-btn");
+
+        const renderLocalPreview = () => {
+            if (!imagesInput || !localPreview) {
+                return;
+            }
+            localPreview.innerHTML = "";
+            const files = Array.from(imagesInput.files || []);
+            files.forEach((file) => {
+                const col = document.createElement("div");
+                col.className = "col-6 col-md-4 col-lg-3";
+                const card = document.createElement("div");
+                card.className = "admin-gallery-card admin-gallery-card--sm";
+                const img = document.createElement("img");
+                img.alt = file.name;
+                img.src = URL.createObjectURL(file);
+                card.appendChild(img);
+                col.appendChild(card);
+                localPreview.appendChild(col);
+            });
+        };
+
+        if (imagesInput) {
+            imagesInput.addEventListener("change", renderLocalPreview);
+        }
+        if (clearFilesBtn && imagesInput) {
+            clearFilesBtn.addEventListener("click", () => {
+                imagesInput.value = "";
+                renderLocalPreview();
+            });
+        }
+
+        document.querySelectorAll(".js-delete-existing-product-image").forEach((btn) => {
+            btn.addEventListener("click", async () => {
+                const url = btn.getAttribute("data-delete-url");
+                if (!url) {
+                    return;
+                }
+                const confirmed = window.confirm("Удалить это изображение?");
+                if (!confirmed) {
+                    return;
+                }
+                try {
+                    const response = await fetch(url, {
+                        method: "POST",
+                        headers: csrfToken && csrfHeader ? {[csrfHeader]: csrfToken} : {}
+                    });
+                    if (!response.ok) {
+                        throw new Error("Не удалось удалить изображение.");
+                    }
+                    if (response.url) {
+                        window.location.href = response.url + (response.url.includes("?") ? "&tab=gallery" : "?tab=gallery");
+                    } else {
+                        window.location.reload();
+                    }
+                } catch (error) {
+                    window.alert(error instanceof Error ? error.message : "Ошибка удаления изображения.");
+                }
+            });
+        });
+
+        const filterOptionsByFilterId = /*[[${filterOptionsByFilterId}]]*/ {};
+        const productFilterSelect = document.getElementById("product-filter-select");
+        const productFilterOptionDatalist = document.getElementById("product-filter-option-datalist");
+        const fillFilterValueDatalist = (filterId) => {
+            if (!productFilterOptionDatalist) {
+                return;
+            }
+            productFilterOptionDatalist.innerHTML = "";
+            const items = filterOptionsByFilterId && filterId ? filterOptionsByFilterId[filterId] : null;
+            if (!Array.isArray(items)) {
+                return;
+            }
+            items.forEach((item) => {
+                if (!item || !item.value) {
+                    return;
+                }
+                const option = document.createElement("option");
+                option.value = item.value;
+                productFilterOptionDatalist.appendChild(option);
+            });
+        };
+        if (productFilterSelect) {
+            productFilterSelect.addEventListener("change", () => fillFilterValueDatalist(productFilterSelect.value));
+            fillFilterValueDatalist(productFilterSelect.value);
+        }
+
+        const reviewStatusFilter = document.getElementById("product-review-status-filter");
+        const reviewRatingFilter = document.getElementById("product-review-rating-filter");
+        const reviewSearchFilter = document.getElementById("product-review-search-filter");
+        const reviewCards = Array.from(document.querySelectorAll(".admin-product-review-card"));
+        const applyReviewFilters = () => {
+            if (!reviewCards.length) {
+                return;
+            }
+            const statusValue = reviewStatusFilter ? reviewStatusFilter.value : "ALL";
+            const ratingValue = reviewRatingFilter ? Number(reviewRatingFilter.value || "0") : 0;
+            const query = reviewSearchFilter ? reviewSearchFilter.value.trim().toLowerCase() : "";
+
+            reviewCards.forEach((card) => {
+                const cardStatus = card.getAttribute("data-review-status") || "";
+                const cardRating = Number(card.getAttribute("data-review-rating") || "0");
+                const cardSearch = (card.getAttribute("data-review-search") || "").toLowerCase();
+                const matchStatus = statusValue === "ALL" || cardStatus === statusValue;
+                const matchRating = ratingValue === 0 || cardRating === ratingValue;
+                const matchSearch = query.length === 0 || cardSearch.includes(query);
+                card.classList.toggle("d-none", !(matchStatus && matchRating && matchSearch));
+            });
+        };
+        if (reviewStatusFilter) {
+            reviewStatusFilter.addEventListener("change", applyReviewFilters);
+        }
+        if (reviewRatingFilter) {
+            reviewRatingFilter.addEventListener("change", applyReviewFilters);
+        }
+        if (reviewSearchFilter) {
+            reviewSearchFilter.addEventListener("input", applyReviewFilters);
+        }
+        applyReviewFilters();
+
+        const urlTab = new URLSearchParams(window.location.search).get("tab");
+        if (urlTab) {
+            const tabIdByQuery = {
+                "info": "product-info-tab",
+                "gallery": "product-gallery-tab",
+                "product-gallery-pane": "product-gallery-tab",
+                "specs": "product-specs-tab",
+                "reviews": "product-reviews-tab"
+            };
+            const tabId = tabIdByQuery[urlTab] || tabIdByQuery[urlTab.toLowerCase()];
+            if (tabId) {
+                const tabBtn = document.getElementById(tabId);
+                if (tabBtn) {
+                    const tabInstance = new bootstrap.Tab(tabBtn);
+                    tabInstance.show();
+                }
+            }
+        }
+
+        const libraryInputsWrap = document.getElementById("product-library-inputs");
+        const libraryPreview = document.getElementById("product-library-preview");
+        const clearLibraryBtn = document.getElementById("clear-library-images-btn");
+        const libraryModal = document.getElementById("productLibraryModal");
+        const libraryModalError = document.getElementById("library-modal-error");
+        const libraryFoldersWrap = document.getElementById("product-library-folders");
+        const libraryGrid = document.getElementById("product-library-grid");
+        const libraryUploadInput = document.getElementById("library-upload-input");
+        const libraryUploadBtn = document.getElementById("library-upload-btn");
+        const libraryApplyBtn = document.getElementById("product-library-apply-btn");
+
+        const detailsWrap = document.getElementById("product-library-file-details");
+        const detailsEmpty = document.getElementById("product-library-file-details-empty");
+        const detailsImg = document.getElementById("product-library-file-preview");
+        const detailsName = document.getElementById("product-library-file-name");
+        const detailsSize = document.getElementById("product-library-file-size");
+        const detailsDimensions = document.getElementById("product-library-file-dimensions");
+        const detailsFolder = document.getElementById("product-library-file-folder");
+
+        const selectedLibrary = new Set();
+        if (libraryInputsWrap) {
+            libraryInputsWrap.querySelectorAll("input[name='libraryImageUrls']").forEach((input) => {
+                if (input.value) {
+                    selectedLibrary.add(input.value);
+                }
+            });
+        }
+        const pickerSelected = new Set();
+        let pickerCurrentFolder = (libraryModal && libraryModal.dataset && libraryModal.dataset.selectedFolder)
+            ? libraryModal.dataset.selectedFolder
+            : "library";
+
+        const showLibraryError = (message) => {
+            if (!libraryModalError) {
+                return;
+            }
+            if (!message) {
+                libraryModalError.classList.add("d-none");
+                libraryModalError.textContent = "";
+                return;
+            }
+            libraryModalError.classList.remove("d-none");
+            libraryModalError.textContent = message;
+        };
+
+        const hideFileDetails = () => {
+            if (detailsWrap) {
+                detailsWrap.classList.add("d-none");
+            }
+            if (detailsEmpty) {
+                detailsEmpty.classList.remove("d-none");
+            }
+        };
+
+        const formatBytes = (value) => {
+            const bytes = Number(value || 0);
+            if (bytes <= 0) {
+                return "0 Б";
+            }
+            if (bytes < 1024) {
+                return bytes + " Б";
+            }
+            if (bytes < 1024 * 1024) {
+                return (bytes / 1024).toFixed(1) + " КБ";
+            }
+            return (bytes / (1024 * 1024)).toFixed(2) + " МБ";
+        };
+
+        const showFileDetails = (tile) => {
+            if (!tile || !detailsWrap || !detailsEmpty || !detailsImg || !detailsName || !detailsSize || !detailsDimensions || !detailsFolder) {
+                return;
+            }
+            detailsImg.src = tile.getAttribute("data-url") || "";
+            detailsName.textContent = tile.getAttribute("data-name") || "";
+            detailsSize.textContent = formatBytes(tile.getAttribute("data-size"));
+            const width = tile.getAttribute("data-width");
+            const height = tile.getAttribute("data-height");
+            detailsDimensions.textContent = width && height ? (width + " × " + height) : "—";
+            detailsFolder.textContent = tile.getAttribute("data-folder") || pickerCurrentFolder;
+            detailsWrap.classList.remove("d-none");
+            detailsEmpty.classList.add("d-none");
+        };
+
+        const rebuildLibraryInputs = () => {
+            if (!libraryInputsWrap) {
+                return;
+            }
+            libraryInputsWrap.innerHTML = "";
+            selectedLibrary.forEach((url) => {
+                const input = document.createElement("input");
+                input.type = "hidden";
+                input.name = "libraryImageUrls";
+                input.value = url;
+                libraryInputsWrap.appendChild(input);
+            });
+        };
+
+        const rebuildLibraryPreview = () => {
+            if (!libraryPreview) {
+                return;
+            }
+            libraryPreview.innerHTML = "";
+            selectedLibrary.forEach((url) => {
+                const col = document.createElement("div");
+                col.className = "col-6 col-md-4 col-lg-3";
+                col.setAttribute("data-library-preview-url", url);
+                const card = document.createElement("div");
+                card.className = "admin-gallery-card admin-gallery-card--sm";
+                const img = document.createElement("img");
+                img.src = url;
+                img.alt = "";
+                const removeBtn = document.createElement("button");
+                removeBtn.type = "button";
+                removeBtn.className = "btn btn-danger btn-sm admin-gallery-remove js-remove-library-preview";
+                removeBtn.setAttribute("data-url", url);
+                removeBtn.innerHTML = "<i class='bi bi-x-lg'></i>";
+                card.appendChild(img);
+                card.appendChild(removeBtn);
+                col.appendChild(card);
+                libraryPreview.appendChild(col);
+            });
+        };
+
+        const rebuildAllLibraryUi = () => {
+            rebuildLibraryInputs();
+            rebuildLibraryPreview();
+        };
+
+        const setFolderButtons = (folders, selectedFolder) => {
+            if (!libraryFoldersWrap) {
+                return;
+            }
+            libraryFoldersWrap.innerHTML = "";
+            (folders || []).forEach((folder) => {
+                if (!folder || !folder.key) {
+                    return;
+                }
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.className = "admin-file-folder-btn";
+                btn.dataset.folderKey = folder.key;
+                btn.dataset.folderDepth = String(folder.depth || 0);
+                if (folder.key === selectedFolder) {
+                    btn.classList.add("is-active");
+                }
+                const label = document.createElement("span");
+                label.textContent = folder.label || folder.key;
+                const count = document.createElement("span");
+                count.className = "small text-muted ms-auto";
+                count.textContent = String(folder.filesCount || 0);
+                btn.appendChild(label);
+                btn.appendChild(count);
+                libraryFoldersWrap.appendChild(btn);
+            });
+        };
+
+        const setFileTiles = (files) => {
+            if (!libraryGrid) {
+                return;
+            }
+            libraryGrid.innerHTML = "";
+            (files || []).forEach((f) => {
+                if (!f || !f.url) {
+                    return;
+                }
+                const tile = document.createElement("button");
+                tile.type = "button";
+                tile.className = "admin-file-tile js-library-file-tile";
+                tile.dataset.url = f.url;
+                tile.dataset.name = f.name || "";
+                tile.dataset.size = String(f.size || 0);
+                tile.dataset.width = f.width != null ? String(f.width) : "";
+                tile.dataset.height = f.height != null ? String(f.height) : "";
+                tile.dataset.folder = f.folderKey || pickerCurrentFolder;
+
+                if (pickerSelected.has(f.url)) {
+                    tile.classList.add("is-selected");
+                }
+
+                const img = document.createElement("img");
+                img.src = f.url;
+                img.alt = "";
+                const name = document.createElement("span");
+                name.className = "admin-file-tile-name";
+                name.textContent = f.name || f.url;
+
+                const del = document.createElement("button");
+                del.type = "button";
+                del.className = "btn btn-danger btn-sm admin-file-delete js-library-file-delete";
+                del.dataset.url = f.url;
+                del.title = "Удалить файл";
+                del.innerHTML = "<i class='bi bi-trash3'></i>";
+
+                tile.appendChild(img);
+                tile.appendChild(name);
+                tile.appendChild(del);
+                libraryGrid.appendChild(tile);
+            });
+            hideFileDetails();
+        };
+
+        const fetchLibraryData = async (folder) => {
+            const response = await fetch("/admin/files/list?folder=" + encodeURIComponent(folder), {
+                headers: {"Accept": "application/json"}
+            });
+            const payload = await response.json();
+            if (!response.ok || payload.ok === false) {
+                throw new Error(payload.message || "Не удалось загрузить файловый менеджер");
+            }
+            pickerCurrentFolder = payload.selectedFolder || "library";
+            setFolderButtons(payload.folders || [], pickerCurrentFolder);
+            setFileTiles(payload.files || []);
+        };
+
+        rebuildAllLibraryUi();
+
+        if (libraryPreview) {
+            libraryPreview.addEventListener("click", (event) => {
+                const target = event.target instanceof HTMLElement ? event.target.closest(".js-remove-library-preview") : null;
+                if (!(target instanceof HTMLElement)) {
+                    return;
+                }
+                const url = target.getAttribute("data-url");
+                if (!url) {
+                    return;
+                }
+                selectedLibrary.delete(url);
+                rebuildAllLibraryUi();
+            });
+        }
+
+        if (clearLibraryBtn) {
+            clearLibraryBtn.addEventListener("click", () => {
+                selectedLibrary.clear();
+                rebuildAllLibraryUi();
+            });
+        }
+
+        if (libraryModal) {
+            libraryModal.addEventListener("show.bs.modal", async () => {
+                pickerSelected.clear();
+                showLibraryError("");
+                try {
+                    await fetchLibraryData(pickerCurrentFolder);
+                } catch (error) {
+                    showLibraryError(error instanceof Error ? error.message : "Не удалось загрузить файлы.");
+                }
+            });
+        }
+
+        if (libraryFoldersWrap) {
+            libraryFoldersWrap.addEventListener("click", async (event) => {
+                const target = event.target instanceof HTMLElement ? event.target.closest(".admin-file-folder-btn") : null;
+                if (!(target instanceof HTMLElement)) {
+                    return;
+                }
+                const folderKey = target.dataset.folderKey;
+                if (!folderKey) {
+                    return;
+                }
+                showLibraryError("");
+                try {
+                    await fetchLibraryData(folderKey);
+                } catch (error) {
+                    showLibraryError(error instanceof Error ? error.message : "Не удалось открыть папку.");
+                }
+            });
+        }
+
+        if (libraryGrid) {
+            libraryGrid.addEventListener("click", async (event) => {
+                const deleteBtn = event.target instanceof HTMLElement ? event.target.closest(".js-library-file-delete") : null;
+                if (deleteBtn instanceof HTMLElement) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const url = deleteBtn.dataset.url;
+                    if (!url) {
+                        return;
+                    }
+                    showLibraryError("");
+                    const body = new URLSearchParams();
+                    body.set("url", url);
+                    body.set("folder", pickerCurrentFolder);
+                    try {
+                        const response = await fetch("/admin/files/delete-json", {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/x-www-form-urlencoded",
+                                ...(csrfToken && csrfHeader ? {[csrfHeader]: csrfToken} : {})
+                            },
+                            body: body.toString()
+                        });
+                        const payload = await response.json();
+                        if (!response.ok || payload.ok === false) {
+                            throw new Error(payload.message || "Не удалось удалить файл");
+                        }
+                        selectedLibrary.delete(url);
+                        pickerSelected.delete(url);
+                        pickerCurrentFolder = payload.selectedFolder || pickerCurrentFolder;
+                        setFolderButtons(payload.folders || [], pickerCurrentFolder);
+                        setFileTiles(payload.files || []);
+                        rebuildAllLibraryUi();
+                    } catch (error) {
+                        showLibraryError(error instanceof Error ? error.message : "Ошибка удаления файла.");
+                    }
+                    return;
+                }
+
+                const tile = event.target instanceof HTMLElement ? event.target.closest(".js-library-file-tile") : null;
+                if (!(tile instanceof HTMLElement)) {
+                    return;
+                }
+                const url = tile.dataset.url;
+                if (!url) {
+                    return;
+                }
+                if (pickerSelected.has(url)) {
+                    pickerSelected.delete(url);
+                    tile.classList.remove("is-selected");
+                } else {
+                    pickerSelected.add(url);
+                    tile.classList.add("is-selected");
+                }
+                showFileDetails(tile);
+            });
+        }
+
+        if (libraryUploadBtn && libraryUploadInput) {
+            libraryUploadBtn.addEventListener("click", async () => {
+                showLibraryError("");
+                const files = Array.from(libraryUploadInput.files || []);
+                if (!files.length) {
+                    showLibraryError("Выберите файлы для загрузки.");
+                    return;
+                }
+                const formData = new FormData();
+                files.forEach((file) => formData.append("files", file));
+                formData.append("folder", pickerCurrentFolder);
+                try {
+                    const response = await fetch("/admin/files/upload-json", {
+                        method: "POST",
+                        headers: csrfToken && csrfHeader ? {[csrfHeader]: csrfToken} : {},
+                        body: formData
+                    });
+                    const payload = await response.json();
+                    if (!response.ok || payload.ok === false) {
+                        throw new Error(payload.message || "Не удалось загрузить файлы.");
+                    }
+                    libraryUploadInput.value = "";
+                    pickerCurrentFolder = payload.selectedFolder || pickerCurrentFolder;
+                    setFolderButtons(payload.folders || [], pickerCurrentFolder);
+                    setFileTiles(payload.files || []);
+                } catch (error) {
+                    showLibraryError(error instanceof Error ? error.message : "Ошибка загрузки файлов.");
+                }
+            });
+        }
+
+        if (libraryApplyBtn) {
+            libraryApplyBtn.addEventListener("click", () => {
+                pickerSelected.forEach((url) => selectedLibrary.add(url));
+                rebuildAllLibraryUi();
+                const modal = bootstrap.Modal.getInstance(libraryModal);
+                if (modal) {
+                    modal.hide();
+                }
+            });
+        }
+    })();
+</script>
+</body>
+</html>

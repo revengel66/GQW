@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head(${product.name})}"></head>
+<body>
+<nav th:replace="~{fragments :: navbar}"></nav>
+<main class="container container-wide py-4 pb-5">
+    <nav class="breadcrumbs" aria-label="breadcrumb">
+        <a th:href="@{/}">Главная</a>
+        <span class="breadcrumbs-sep">/</span>
+        <a th:href="@{/catalog}">Каталог</a>
+        <span class="breadcrumbs-sep">/</span>
+        <span th:text="${product.name}"></span>
+    </nav>
+
+    <section class="row g-4 align-items-stretch product-hero-row">
+        <div class="col-lg-6">
+            <div class="glass-card p-3 h-100 d-flex flex-column product-main-card">
+                <div id="productGallery" class="carousel slide">
+                    <div class="carousel-inner">
+                        <div class="carousel-item" th:each="img, iter : ${product.images}" th:classappend="${iter.index == 0 ? ' active' : ''}">
+                            <img class="product-main-image mb-2 d-block w-100"
+                                 th:src="${img.imageUrl != null ? img.imageUrl : '/img/products/placeholder.webp'}"
+                                 alt="">
+                        </div>
+                        <div class="carousel-item active" th:if="${product.images == null or #lists.isEmpty(product.images)}">
+                            <img class="product-main-image mb-2 d-block w-100"
+                                 th:src="${product.primaryImageUrl != null ? product.primaryImageUrl : '/img/products/placeholder.webp'}"
+                                 alt="">
+                        </div>
+                    </div>
+                    <button class="carousel-control-prev" type="button" data-bs-target="#productGallery" data-bs-slide="prev"
+                            th:if="${product.images != null and #lists.size(product.images) > 1}">
+                        <span class="carousel-control-prev-icon"></span>
+                        <span class="visually-hidden">Предыдущее</span>
+                    </button>
+                    <button class="carousel-control-next" type="button" data-bs-target="#productGallery" data-bs-slide="next"
+                            th:if="${product.images != null and #lists.size(product.images) > 1}">
+                        <span class="carousel-control-next-icon"></span>
+                        <span class="visually-hidden">Следующее</span>
+                    </button>
+                    <div class="product-card-badges product-main-badges">
+                        <span class="product-badge badge-hit" th:if="${product.isHit}">Хит</span>
+                        <span class="product-badge badge-new" th:if="${product.isNew}">Новинка</span>
+                        <span class="product-badge badge-discount"
+                              th:if="${product.discountPercent != null}"
+                              th:text="${'-' + product.discountPercent + '%'}"></span>
+                    </div>
+                </div>
+                <div class="d-flex gap-2 flex-wrap mt-1" th:if="${product.images != null and !#lists.isEmpty(product.images)}">
+                    <button class="thumb-btn p-0 border-0 bg-transparent"
+                            type="button"
+                            th:each="img, iter : ${product.images}"
+                            data-bs-target="#productGallery"
+                            th:attr="data-bs-slide-to=${iter.index}, aria-label=${'Фото ' + (iter.index + 1)}">
+                        <img class="thumb"
+                             th:src="${img.imageUrl != null ? img.imageUrl : '/img/products/placeholder.webp'}"
+                             alt="">
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="glass-card p-4 h-100 d-flex flex-column product-info-card" th:with="inCartQty=${cartItemQuantities[product.id] != null ? cartItemQuantities[product.id] : 0}">
+                <h1 class="h3 mb-2" th:text="${product.name}"></h1>
+                <p class="text-muted mb-3"
+                   th:if="${product.shortDescription != null and !#strings.isEmpty(product.shortDescription)}"
+                   th:text="${product.shortDescription}"></p>
+
+                <div class="d-flex align-items-center gap-2 mb-3">
+                    <span class="text-warning"><i class="bi bi-star-fill"></i></span>
+                    <span th:text="${#numbers.formatDecimal(product.ratingAvg,1,'COMMA',1,'POINT')}"></span>
+                    <span class="text-muted" th:text="${'(' + product.reviewCount + ' оценок)'}"></span>
+                </div>
+
+                <div class="mb-3" th:if="${filterOptions != null and !#lists.isEmpty(filterOptions)}">
+                    <div class="small mb-1" th:each="fo,iter : ${filterOptions}" th:if="${iter.index < 6}">
+                        <span class="text-muted" th:text="${fo.filter.name + ':'}"></span>
+                        <span th:text="${' ' + fo.value}"></span>
+                    </div>
+                    <a class="small fw-semibold text-decoration-none"
+                       th:if="${#lists.size(filterOptions) > 6}"
+                       href="#product-specs">Смотреть все</a>
+                </div>
+
+                <div class="product-buy-block mt-auto">
+                    <div class="mb-3">
+                        <div class="text-decoration-line-through text-muted" th:if="${product.oldPrice != null}"
+                             th:text="${#numbers.formatDecimal(product.oldPrice,1,'COMMA',0,'POINT')} + ' ₽'"></div>
+                        <span class="fs-4 fw-bold" th:text="${#numbers.formatDecimal(product.price,1,'COMMA',0,'POINT')} + ' ₽'"></span>
+                        <div class="small text-danger mt-1" th:if="${!product.inStock}">
+                            Товара нет в наличии. Можно добавить только в избранное.
+                        </div>
+                    </div>
+
+                    <div class="product-detail-actions">
+                        <div class="qty-stepper detail-qty-stepper" th:attr="data-product-id=${product.id}">
+                            <button class="qty-btn js-selected-qty-decrement" type="button" aria-label="Уменьшить" th:disabled="${!product.inStock}">
+                                    <i class="bi bi-dash"></i>
+                            </button>
+                            <input class="form-control qty-input js-selected-qty-input"
+                                   type="number"
+                                   min="1"
+                                   value="1"
+                                   th:disabled="${!product.inStock}"
+                                   readonly
+                                   autocomplete="off"
+                                   autocorrect="off"
+                                   autocapitalize="off"
+                                   spellcheck="false">
+                            <button class="qty-btn js-selected-qty-increment" type="button" aria-label="Увеличить" th:disabled="${!product.inStock}">
+                                    <i class="bi bi-plus"></i>
+                            </button>
+                        </div>
+                        <form class="m-0 js-cart-add-form"
+                              th:action="@{/api/cart/add}"
+                              method="post"
+                              th:attr="data-product-id=${product.id}">
+                            <input type="hidden" name="productId" th:value="${product.id}">
+                            <input type="hidden" name="quantity" class="js-cart-add-qty" value="1">
+                            <button class="btn btn-brand cart-add-btn" type="submit" title="В корзину" th:disabled="${!product.inStock}">
+                                <i class="bi bi-cart3"></i>
+                                <span th:text="${product.inStock ? 'В корзину' : 'Нет в наличии'}">В корзину</span>
+                                <span class="product-cart-qty js-product-cart-qty"
+                                      th:classappend="${inCartQty == 0} ? ' d-none'"
+                                      th:text="${inCartQty}"></span>
+                            </button>
+                        </form>
+                        <form class="m-0 js-wishlist-toggle-form"
+                              th:action="@{/api/wishlist/toggle}"
+                              method="post"
+                              th:attr="data-product-id=${product.id}">
+                            <input type="hidden" name="productId" th:value="${product.id}">
+                            <button class="wishlist-icon-btn wishlist-icon-btn-lg js-wishlist-btn"
+                                    th:classappend="${wishlistProductIds != null and wishlistProductIds.contains(product.id)} ? ' is-active'"
+                                    type="submit"
+                                    title="В избранное">
+                                <i th:class="${wishlistProductIds != null and wishlistProductIds.contains(product.id)} ? 'bi bi-heart-fill' : 'bi bi-heart'"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section-gap product-tabs-section">
+        <ul class="nav nav-tabs product-tabs" id="productTabs" role="tablist" th:attr="data-initial-tab=${productInitialTab}">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="description-tab" data-bs-toggle="tab" data-bs-target="#description-pane" type="button" role="tab">
+                    Описание
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="specs-tab" data-bs-toggle="tab" data-bs-target="#specs-pane" type="button" role="tab">
+                    Характеристики
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="reviews-tab" data-bs-toggle="tab" data-bs-target="#reviews-pane" type="button" role="tab">
+                    Отзывы
+                </button>
+            </li>
+        </ul>
+        <div class="tab-content glass-card p-4 border-top-0" id="productTabContent">
+            <div class="tab-pane fade show active" id="description-pane" role="tabpanel" aria-labelledby="description-tab">
+                <div class="product-description-content" th:utext="${productDescriptionHtml}"></div>
+            </div>
+
+            <div class="tab-pane fade" id="specs-pane" role="tabpanel" aria-labelledby="specs-tab">
+                <div id="product-specs">
+                    <h2 class="h6 mb-3">Характеристики</h2>
+                    <ul class="list-group list-group-flush mb-4">
+                        <li class="list-group-item d-flex justify-content-between px-0" th:each="c : ${characteristics}">
+                            <span th:text="${c.name}"></span>
+                            <span class="text-muted" th:text="${c.value}"></span>
+                        </li>
+                    </ul>
+
+                    <ul class="list-group list-group-flush mt-4">
+                        <li class="list-group-item d-flex justify-content-between px-0" th:each="fo : ${filterOptions}">
+                            <span th:text="${fo.filter.name}"></span>
+                            <span class="text-muted" th:text="${fo.value}"></span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="reviews-pane" role="tabpanel" aria-labelledby="reviews-tab">
+                <div class="alert alert-success" th:if="${reviewSuccess}" th:text="${reviewSuccess}"></div>
+                <div class="alert alert-danger" th:if="${reviewError}" th:text="${reviewError}"></div>
+                <div class="reviews-layout">
+                    <aside class="reviews-rating-panel">
+                        <div class="reviews-rating-sticky">
+                            <div class="reviews-rating-summary">
+                                <div class="reviews-rating-value"
+                                     th:text="${#numbers.formatDecimal(reviewRatingAvg,1,'COMMA',2,'POINT')}"></div>
+                                <div class="reviews-rating-stars"
+                                     th:with="rounded=${T(java.lang.Math).round(reviewRatingAvg)}">
+                                    <i th:each="idx : ${#numbers.sequence(1,5)}"
+                                       th:class="${idx <= rounded} ? 'bi bi-star-fill' : 'bi bi-star'"></i>
+                                </div>
+                                <div class="reviews-rating-total"
+                                     th:text="${reviewRatingCount + ' ' + reviewRatingWord}"></div>
+                            </div>
+                            <div class="reviews-rating-bars">
+                                <div class="reviews-rating-row" th:each="bucket : ${reviewRatingBuckets}">
+                                    <span class="reviews-rating-score" th:text="${bucket.score}"></span>
+                                    <div class="progress reviews-rating-progress">
+                                        <div class="progress-bar reviews-rating-progress-bar"
+                                             role="progressbar"
+                                             th:style="${'width:' + bucket.percent + '%'}"
+                                             th:attr="aria-valuenow=${bucket.percent},aria-valuemin=0,aria-valuemax=100"></div>
+                                    </div>
+                                    <span class="reviews-rating-count" th:text="${bucket.count}"></span>
+                                </div>
+                            </div>
+                            <button class="btn btn-brand w-100 mt-3"
+                                    type="button"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#reviewCreateModal">
+                                Добавить отзыв
+                            </button>
+                        </div>
+                    </aside>
+
+                    <div class="reviews-main">
+                        <div class="review-empty" th:if="${reviews == null or #lists.isEmpty(reviews)}">
+                            <div class="review-empty-title">Отзывов ещё нет</div>
+                            <div class="review-empty-subtitle">но другие модели уже получили высокую оценку!</div>
+                        </div>
+
+                        <div class="reviews-list" th:if="${reviews != null and !#lists.isEmpty(reviews)}">
+                        <div class="review-item js-review-item" th:each="r : ${reviews}">
+                            <div class="review-header">
+                                <div class="review-author-wrap">
+                                    <strong class="review-author" th:text="${r.user != null ? (r.user.fullName != null ? r.user.fullName : r.user.username) : (r.guestName != null ? r.guestName : 'Гость')}"></strong>
+                                    <span class="badge text-bg-success ms-2" th:if="${r.purchased}">Покупал товар</span>
+                                </div>
+                                <div class="review-meta">
+                                    <div class="review-stars" th:if="${r.rating != null}">
+                                        <i th:each="idx : ${#numbers.sequence(1,5)}"
+                                           th:class="${idx <= r.rating} ? 'bi bi-star-fill' : 'bi bi-star'"></i>
+                                    </div>
+                                    <span class="review-date" th:text="${#temporals.format(r.createdAt, 'dd.MM.yyyy HH:mm')}"></span>
+                                </div>
+                            </div>
+                            <div class="expandable-text js-expandable-text" data-collapsed-lines="5">
+                                <div class="expandable-text-content js-expandable-content review-text" th:text="${r.text}"></div>
+                                <button class="expandable-text-toggle js-expandable-toggle d-none"
+                                        type="button"
+                                        data-label-more="Показать ещё"
+                                        data-label-less="Скрыть">
+                                    Показать ещё
+                                </button>
+                            </div>
+                            <div class="review-extra" th:if="${(r.usagePeriod != null and !#strings.isEmpty(r.usagePeriod)) or (r.pros != null and !#strings.isEmpty(r.pros)) or (r.cons != null and !#strings.isEmpty(r.cons))}">
+                                <div th:if="${r.usagePeriod != null and !#strings.isEmpty(r.usagePeriod)}">
+                                    <span class="review-extra-label">Использование:</span>
+                                    <span th:text="${r.usagePeriod == 'LT_MONTH' ? 'менее месяца' : (r.usagePeriod == 'UP_TO_YEAR' ? 'не более года' : 'больше года')}"></span>
+                                </div>
+                                <div th:if="${r.pros != null and !#strings.isEmpty(r.pros)}">
+                                    <span class="review-extra-label">Достоинства:</span>
+                                    <div class="expandable-text js-expandable-text mt-1" data-collapsed-lines="3">
+                                        <div class="expandable-text-content js-expandable-content" th:text="${r.pros}"></div>
+                                        <button class="expandable-text-toggle js-expandable-toggle d-none"
+                                                type="button"
+                                                data-label-more="Показать ещё"
+                                                data-label-less="Скрыть">
+                                            Показать ещё
+                                        </button>
+                                    </div>
+                                </div>
+                                <div th:if="${r.cons != null and !#strings.isEmpty(r.cons)}">
+                                    <span class="review-extra-label">Недостатки:</span>
+                                    <div class="expandable-text js-expandable-text mt-1" data-collapsed-lines="3">
+                                        <div class="expandable-text-content js-expandable-content" th:text="${r.cons}"></div>
+                                        <button class="expandable-text-toggle js-expandable-toggle d-none"
+                                                type="button"
+                                                data-label-more="Показать ещё"
+                                                data-label-less="Скрыть">
+                                            Показать ещё
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="review-images" th:if="${r.images != null and !#lists.isEmpty(r.images)}">
+                                <a class="review-image-link"
+                                   th:each="img : ${r.images}"
+                                   th:href="${img.imageUrl}"
+                                   target="_blank"
+                                   rel="noopener noreferrer">
+                                    <img class="review-image-thumb" th:src="${img.imageUrl}" alt="">
+                                </a>
+                            </div>
+
+                            <button class="reply-link-btn"
+                                    type="button"
+                                    data-bs-toggle="collapse"
+                                    th:attr="data-bs-target=${'#reply-form-' + r.id},aria-controls=${'reply-form-' + r.id}"
+                                    aria-expanded="false">
+                                Ответить
+                            </button>
+                            <div class="reply-form-wrap collapse" th:id="${'reply-form-' + r.id}">
+                                <form class="row g-2 mt-1" th:action="@{/review/reply}" method="post">
+                                    <input type="hidden" name="reviewId" th:value="${r.id}">
+                                    <div class="col-md-6" th:if="${currentUser == null}">
+                                        <input class="form-control form-control-sm" name="guestName" placeholder="Ваше имя" required th:value="${guestReviewerName}">
+                                    </div>
+                                    <div class="col-md-6" th:if="${currentUser == null}">
+                                        <input class="form-control form-control-sm" name="guestEmail" placeholder="Email" required th:value="${guestReviewerEmail}">
+                                    </div>
+                                    <div class="col-12">
+                                        <textarea class="form-control form-control-sm" name="text" rows="3" placeholder="Ваш ответ" required></textarea>
+                                    </div>
+                                    <div class="col-12">
+                                        <button class="btn btn-outline-secondary btn-sm" type="submit">Отправить</button>
+                                    </div>
+                                </form>
+                            </div>
+
+                            <div class="reply-thread" th:if="${repliesByReviewId != null and !#lists.isEmpty(repliesByReviewId[r.id])}">
+                                <div class="reply-item" th:each="reply : ${repliesByReviewId[r.id]}">
+                                    <div class="reply-header">
+                                        <strong th:text="${reply.user != null ? (reply.user.fullName != null ? reply.user.fullName : reply.user.username) : (reply.guestName != null ? reply.guestName : 'Пользователь')}"></strong>
+                                        <span class="review-date" th:text="${#temporals.format(reply.createdAt, 'dd.MM.yyyy HH:mm')}"></span>
+                                    </div>
+                                    <div class="expandable-text js-expandable-text" data-collapsed-lines="4">
+                                        <div class="expandable-text-content js-expandable-content" th:text="${reply.text}"></div>
+                                        <button class="expandable-text-toggle js-expandable-toggle d-none"
+                                                type="button"
+                                                data-label-more="Показать ещё"
+                                                data-label-less="Скрыть">
+                                            Показать ещё
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        </div>
+                        <div class="reviews-load-more-wrap" th:if="${reviews != null and #lists.size(reviews) > 10}">
+                            <button class="btn btn-outline-dark js-reviews-load-more" type="button">Показать ещё</button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <section class="section-gap" th:if="${relatedProducts != null and !#lists.isEmpty(relatedProducts)}">
+        <div class="products-slider-wrap">
+            <div class="d-flex justify-content-between align-items-center section-head section-head-slider">
+                <h2 class="section-title mb-0">Сопутствующие товары</h2>
+                <div class="products-slider-controls products-slider-controls-inline">
+                    <button class="slider-nav slider-prev" type="button" aria-label="Предыдущие товары">
+                        <i class="bi bi-chevron-left"></i>
+                    </button>
+                    <button class="slider-nav slider-next" type="button" aria-label="Следующие товары">
+                        <i class="bi bi-chevron-right"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="swiper js-products-slider">
+                <div class="swiper-wrapper">
+                    <div class="swiper-slide" th:each="p : ${relatedProducts}">
+                        <article class="product-card h-100"
+                                 th:with="features=${relatedProductCardFeatures[p.id]}, inCartQty=${cartItemQuantities[p.id] != null ? cartItemQuantities[p.id] : 0}">
+                            <div class="product-card-media-wrap">
+                                <img class="product-card-media"
+                                     th:src="${p.primaryImageUrl != null ? p.primaryImageUrl : '/img/products/placeholder.webp'}"
+                                     alt="">
+                                <div class="product-card-badges">
+                                    <span class="product-badge badge-hit" th:if="${p.isHit}">Хит</span>
+                                    <span class="product-badge badge-new" th:if="${p.isNew}">Новинка</span>
+                                    <span class="product-badge badge-discount" th:if="${p.discountPercent != null}" th:text="${'-' + p.discountPercent + '%'}"></span>
+                                </div>
+                            </div>
+                            <div class="product-card-body">
+                                <div class="product-title">
+                                    <a th:href="@{'/product/' + ${p.slug}}" th:text="${p.name}"></a>
+                                </div>
+                                <div class="small text-danger mb-1" th:if="${!p.inStock}">Нет в наличии</div>
+                                <ul class="product-features" th:if="${features != null and !#lists.isEmpty(features)}">
+                                    <li th:each="ch : ${features}" th:text="${ch.name + ': ' + ch.value}"></li>
+                                </ul>
+                                <div class="product-price-row">
+                                    <div class="product-price-box">
+                                        <div class="product-price-old"
+                                             th:if="${p.oldPrice != null}"
+                                             th:text="${#numbers.formatDecimal(p.oldPrice, 1, 'COMMA', 0, 'POINT')} + ' ₽'"></div>
+                                        <div class="product-price-current"
+                                             th:text="${#numbers.formatDecimal(p.price, 1, 'COMMA', 0, 'POINT')} + ' ₽'"></div>
+                                    </div>
+                                    <div class="product-icon-actions">
+                                        <form class="m-0 js-wishlist-toggle-form"
+                                              th:action="@{/api/wishlist/toggle}"
+                                              method="post"
+                                              th:attr="data-product-id=${p.id}">
+                                            <input type="hidden" name="productId" th:value="${p.id}">
+                                            <button class="wishlist-icon-btn js-wishlist-btn"
+                                                    th:classappend="${wishlistProductIds != null and wishlistProductIds.contains(p.id)} ? ' is-active'"
+                                                    type="submit"
+                                                    title="В избранное">
+                                                <i th:class="${wishlistProductIds != null and wishlistProductIds.contains(p.id)} ? 'bi bi-heart-fill' : 'bi bi-heart'"></i>
+                                            </button>
+                                        </form>
+                                        <form class="m-0 js-cart-toggle-form"
+                                              th:action="@{/api/cart/toggle-one}"
+                                              method="post"
+                                              th:attr="data-product-id=${p.id}">
+                                            <input type="hidden" name="productId" th:value="${p.id}">
+                                            <button class="cart-icon-btn" type="submit" title="В корзину" th:disabled="${!p.inStock}">
+                                                <i class="bi bi-cart3"></i>
+                                                <span class="product-cart-qty js-product-cart-qty"
+                                                      th:classappend="${inCartQty == 0} ? ' d-none'"
+                                                      th:text="${inCartQty}"></span>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </article>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</main>
+<div class="modal fade"
+     id="reviewCreateModal"
+     tabindex="-1"
+     aria-labelledby="reviewCreateModalTitle"
+     aria-hidden="true"
+     th:attr="data-open-on-load=${(reviewError != null) or (openReviewModal != null and openReviewModal)}">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content review-modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title h5 mb-0" id="reviewCreateModalTitle">Добавить отзыв</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                <form class="row g-3 review-form-grid" th:action="@{/review/add}" method="post" enctype="multipart/form-data">
+                    <input type="hidden" name="productId" th:value="${product.id}">
+                    <div class="col-12">
+                        <div class="rating-stars-input" th:with="pid=${product.id}">
+                            <input class="rating-star-input" type="radio" name="rating" th:id="${'rating-' + pid + '-5'}" value="5" required>
+                            <label class="rating-star-label" th:for="${'rating-' + pid + '-5'}" aria-label="5"><i class="bi bi-star"></i></label>
+                            <input class="rating-star-input" type="radio" name="rating" th:id="${'rating-' + pid + '-4'}" value="4">
+                            <label class="rating-star-label" th:for="${'rating-' + pid + '-4'}" aria-label="4"><i class="bi bi-star"></i></label>
+                            <input class="rating-star-input" type="radio" name="rating" th:id="${'rating-' + pid + '-3'}" value="3">
+                            <label class="rating-star-label" th:for="${'rating-' + pid + '-3'}" aria-label="3"><i class="bi bi-star"></i></label>
+                            <input class="rating-star-input" type="radio" name="rating" th:id="${'rating-' + pid + '-2'}" value="2">
+                            <label class="rating-star-label" th:for="${'rating-' + pid + '-2'}" aria-label="2"><i class="bi bi-star"></i></label>
+                            <input class="rating-star-input" type="radio" name="rating" th:id="${'rating-' + pid + '-1'}" value="1">
+                            <label class="rating-star-label" th:for="${'rating-' + pid + '-1'}" aria-label="1"><i class="bi bi-star"></i></label>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <select class="form-select" name="usagePeriod">
+                            <option value="">Я использую товар</option>
+                            <option value="LT_MONTH">Менее месяца</option>
+                            <option value="UP_TO_YEAR">Не более года</option>
+                            <option value="GT_YEAR">Больше года</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6" th:if="${currentUser == null}">
+                        <input class="form-control" name="guestName" placeholder="Ваше имя" required th:value="${guestReviewerName}">
+                    </div>
+                    <div class="col-md-6" th:if="${currentUser == null}">
+                        <input class="form-control" name="guestEmail" placeholder="Email" required th:value="${guestReviewerEmail}">
+                    </div>
+                    <div class="col-12">
+                        <textarea class="form-control" name="text" rows="4" placeholder="Ваш отзыв" required></textarea>
+                    </div>
+                    <div class="col-12">
+                        <input class="form-control" name="pros" maxlength="1024" placeholder="Достоинства">
+                    </div>
+                    <div class="col-12">
+                        <input class="form-control" name="cons" maxlength="1024" placeholder="Недостатки">
+                    </div>
+                    <div class="col-12">
+                        <input class="form-control js-review-images-input"
+                               type="file"
+                               name="images"
+                               accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                               multiple>
+                        <div class="review-images-preview" aria-live="polite"></div>
+                    </div>
+                    <div class="col-12">
+                        <button class="btn btn-brand" type="submit">Отправить отзыв</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<div th:replace="~{fragments :: scripts}"></div>
+<script>
+    (() => {
+        const tabsRoot = document.getElementById("productTabs");
+        if (
+            tabsRoot &&
+            window.bootstrap &&
+            typeof window.bootstrap.Tab === "function"
+        ) {
+            const initialTab = (tabsRoot.dataset.initialTab || "").trim().toLowerCase();
+            if (initialTab === "description" || initialTab === "specs" || initialTab === "reviews") {
+                const tabButton = document.getElementById(initialTab + "-tab");
+                if (tabButton) {
+                    window.bootstrap.Tab.getOrCreateInstance(tabButton).show();
+                }
+            }
+        }
+
+        const wrappers = document.querySelectorAll(".rating-stars-input");
+        wrappers.forEach((wrapper) => {
+            const labels = Array.from(wrapper.querySelectorAll(".rating-star-label"));
+            const inputs = Array.from(wrapper.querySelectorAll(".rating-star-input"));
+            const setRatingVisual = (value) => {
+                labels.forEach((label, index) => {
+                    const score = 5 - index;
+                    const icon = label.querySelector("i");
+                    if (!icon) {
+                        return;
+                    }
+                    if (score <= value) {
+                        icon.classList.remove("bi-star");
+                        icon.classList.add("bi-star-fill");
+                    } else {
+                        icon.classList.remove("bi-star-fill");
+                        icon.classList.add("bi-star");
+                    }
+                });
+            };
+            const current = inputs.find((input) => input.checked);
+            setRatingVisual(current ? Number(current.value) : 0);
+            inputs.forEach((input) => {
+                input.addEventListener("change", () => setRatingVisual(Number(input.value)));
+            });
+            labels.forEach((label, index) => {
+                label.addEventListener("mouseenter", () => setRatingVisual(5 - index));
+            });
+            wrapper.addEventListener("mouseleave", () => {
+                const checked = inputs.find((input) => input.checked);
+                setRatingVisual(checked ? Number(checked.value) : 0);
+            });
+        });
+
+        const reviewImageInputs = document.querySelectorAll(".js-review-images-input");
+        reviewImageInputs.forEach((input) => {
+            const preview = input.parentElement ? input.parentElement.querySelector(".review-images-preview") : null;
+            if (!preview) {
+                return;
+            }
+
+            const selectedFiles = [];
+            const fileKey = (file) => [file.name, file.size, file.lastModified].join("::");
+
+            const syncInputFiles = () => {
+                if (typeof DataTransfer !== "function") {
+                    return;
+                }
+                const dataTransfer = new DataTransfer();
+                selectedFiles.forEach((entry) => dataTransfer.items.add(entry.file));
+                input.files = dataTransfer.files;
+            };
+
+            const clearSelection = () => {
+                selectedFiles.forEach((entry) => URL.revokeObjectURL(entry.url));
+                selectedFiles.length = 0;
+                preview.innerHTML = "";
+                syncInputFiles();
+            };
+
+            const renderPreview = () => {
+                preview.innerHTML = "";
+                selectedFiles.forEach((entry) => {
+                    const item = document.createElement("div");
+                    item.className = "review-image-preview-item";
+
+                    const image = document.createElement("img");
+                    image.className = "review-image-preview-thumb";
+                    image.src = entry.url;
+                    image.alt = entry.file.name;
+                    item.appendChild(image);
+
+                    const removeButton = document.createElement("button");
+                    removeButton.type = "button";
+                    removeButton.className = "review-image-preview-remove";
+                    removeButton.setAttribute("aria-label", "Удалить изображение");
+                    removeButton.innerHTML = '<i class="bi bi-x-lg"></i>';
+                    removeButton.addEventListener("click", () => {
+                        const index = selectedFiles.findIndex((f) => f.key === entry.key);
+                        if (index === -1) {
+                            return;
+                        }
+                        const [removed] = selectedFiles.splice(index, 1);
+                        URL.revokeObjectURL(removed.url);
+                        syncInputFiles();
+                        renderPreview();
+                    });
+                    item.appendChild(removeButton);
+
+                    preview.appendChild(item);
+                });
+            };
+
+            input.addEventListener("change", () => {
+                const files = Array.from(input.files || []).filter((file) => file.type.startsWith("image/"));
+                files.forEach((file) => {
+                    const key = fileKey(file);
+                    const exists = selectedFiles.some((entry) => entry.key === key);
+                    if (exists) {
+                        return;
+                    }
+                    selectedFiles.push({
+                        key,
+                        file,
+                        url: URL.createObjectURL(file)
+                    });
+                });
+                syncInputFiles();
+                renderPreview();
+            });
+
+            input.form?.addEventListener("reset", clearSelection);
+        });
+
+        const reviewModalElement = document.getElementById("reviewCreateModal");
+        if (
+            reviewModalElement &&
+            reviewModalElement.dataset.openOnLoad === "true" &&
+            window.bootstrap &&
+            typeof window.bootstrap.Modal === "function"
+        ) {
+            window.bootstrap.Modal.getOrCreateInstance(reviewModalElement).show();
+        }
+
+        document.querySelectorAll(".reviews-main").forEach((reviewsRoot) => {
+            const reviewItems = Array.from(reviewsRoot.querySelectorAll(".js-review-item"));
+            const loadMoreButton = reviewsRoot.querySelector(".js-reviews-load-more");
+            const pageSize = 10;
+            if (reviewItems.length === 0 || !loadMoreButton) {
+                return;
+            }
+
+            let visibleItems = Math.min(pageSize, reviewItems.length);
+            const syncReviewsPage = () => {
+                reviewItems.forEach((item, index) => {
+                    item.classList.toggle("d-none", index >= visibleItems);
+                });
+                loadMoreButton.classList.toggle("d-none", visibleItems >= reviewItems.length);
+            };
+
+            loadMoreButton.addEventListener("click", () => {
+                visibleItems = Math.min(reviewItems.length, visibleItems + pageSize);
+                syncReviewsPage();
+            });
+            syncReviewsPage();
+        });
+
+        document.querySelectorAll(".product-detail-actions").forEach((actionsBlock) => {
+            const decrementBtn = actionsBlock.querySelector(".js-selected-qty-decrement");
+            const incrementBtn = actionsBlock.querySelector(".js-selected-qty-increment");
+            const qtyInput = actionsBlock.querySelector(".js-selected-qty-input");
+            const addForm = actionsBlock.querySelector(".js-cart-add-form");
+            const addQtyInput = addForm ? addForm.querySelector(".js-cart-add-qty") : null;
+            if (
+                !(decrementBtn instanceof HTMLButtonElement) ||
+                !(incrementBtn instanceof HTMLButtonElement) ||
+                !(qtyInput instanceof HTMLInputElement) ||
+                !(addQtyInput instanceof HTMLInputElement)
+            ) {
+                return;
+            }
+
+            const syncQty = (nextValue) => {
+                const parsed = Number.parseInt(String(nextValue), 10);
+                const safeValue = Number.isFinite(parsed) ? Math.min(99, Math.max(1, parsed)) : 1;
+                qtyInput.value = String(safeValue);
+                addQtyInput.value = String(safeValue);
+            };
+            syncQty(qtyInput.value || "1");
+
+            decrementBtn.addEventListener("click", () => syncQty((Number.parseInt(qtyInput.value || "1", 10) || 1) - 1));
+            incrementBtn.addEventListener("click", () => syncQty((Number.parseInt(qtyInput.value || "1", 10) || 1) + 1));
+        });
+
+        const productTabContent = document.getElementById("productTabContent");
+        const descriptionTabButton = document.getElementById("description-tab");
+        const syncProductTabCorner = () => {
+            if (!productTabContent || !descriptionTabButton) {
+                return;
+            }
+            productTabContent.classList.toggle("no-top-left-radius", descriptionTabButton.classList.contains("active"));
+        };
+        syncProductTabCorner();
+        document.querySelectorAll("#productTabs [data-bs-toggle='tab']").forEach((tabButton) => {
+            tabButton.addEventListener("shown.bs.tab", syncProductTabCorner);
+        });
+    })();
+</script>
+</body>
+</html>

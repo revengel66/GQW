@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Админка')}"></head>
+<body>
+<nav th:replace="~{fragments :: adminNavbar}"></nav>
+<main class="container container-wide py-4">
+    <nav class="admin-breadcrumb mb-3" aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item active" aria-current="page">Админка</li>
+        </ol>
+    </nav>
+
+    <h1 class="h4 mb-3">Панель администратора</h1>
+    <div class="admin-grid mb-4">
+        <article class="glass-card admin-dash-card p-3 p-xl-4">
+            <div class="admin-dash-icon admin-dash-icon-products">
+                <i class="bi bi-box-seam"></i>
+            </div>
+            <div class="admin-dash-title">Товары</div>
+            <div class="admin-dash-value" th:text="${productsCount}">0</div>
+            <div class="admin-dash-links">
+                <a th:href="@{/admin/products}">Управление</a>
+                <a th:href="@{/admin/categories}">Категории</a>
+                <a th:href="@{/admin/filters}">Фильтры</a>
+            </div>
+        </article>
+        <article class="glass-card admin-dash-card p-3 p-xl-4">
+            <span class="admin-dash-badge"
+                  th:classappend="${newOrdersCount == 0} ? ' is-empty'"
+                  th:text="${newOrdersCount}">0</span>
+            <div class="admin-dash-icon admin-dash-icon-orders">
+                <i class="bi bi-receipt-cutoff"></i>
+            </div>
+            <div class="admin-dash-title">Заказы</div>
+            <div class="admin-dash-value" th:text="${ordersCount}">0</div>
+            <div class="admin-dash-links">
+                <a th:href="@{/admin/orders}">Список заказов</a>
+                <a th:href="@{/admin/support}">Заявки по заказам</a>
+            </div>
+        </article>
+        <article class="glass-card admin-dash-card p-3 p-xl-4">
+            <span class="admin-dash-badge"
+                  th:classappend="${newUsersCount == 0} ? ' is-empty'"
+                  th:text="${newUsersCount}">0</span>
+            <div class="admin-dash-icon admin-dash-icon-users">
+                <i class="bi bi-people"></i>
+            </div>
+            <div class="admin-dash-title">Пользователи</div>
+            <div class="admin-dash-value" th:text="${usersCount}">0</div>
+            <div class="admin-dash-links">
+                <a th:href="@{/admin/users}">Пользователи</a>
+                <a th:href="@{/admin/orders}">Их заказы</a>
+            </div>
+        </article>
+        <article class="glass-card admin-dash-card p-3 p-xl-4">
+            <span class="admin-dash-badge"
+                  th:classappend="${newRequestsCount == 0} ? ' is-empty'"
+                  th:text="${newRequestsCount}">0</span>
+            <div class="admin-dash-icon admin-dash-icon-requests">
+                <i class="bi bi-chat-left-text"></i>
+            </div>
+            <div class="admin-dash-title">Заявки</div>
+            <div class="admin-dash-value" th:text="${openRequestsCount}">0</div>
+            <div class="admin-dash-links">
+                <a th:href="@{/admin/support}">Открытые заявки</a>
+                <a th:href="@{/admin/orders}">Проверить заказ</a>
+            </div>
+        </article>
+        <article class="glass-card admin-dash-card p-3 p-xl-4">
+            <span class="admin-dash-badge"
+                  th:classappend="${newReviewsCount == 0} ? ' is-empty'"
+                  th:text="${newReviewsCount}">0</span>
+            <div class="admin-dash-icon admin-dash-icon-reviews">
+                <i class="bi bi-star"></i>
+            </div>
+            <div class="admin-dash-title">Отзывы</div>
+            <div class="admin-dash-value" th:text="${pendingReviewsCount}">0</div>
+            <div class="admin-dash-links">
+                <a th:href="@{/admin/reviews}">На модерации</a>
+                <a th:href="@{/admin/products}">Товары</a>
+            </div>
+        </article>
+    </div>
+
+    <section class="glass-card p-3 p-md-4 mb-4">
+        <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-3">
+            <div>
+                <div class="h6 mb-1">Статистика продаж</div>
+                <div class="small text-muted">Период: <span th:text="${#temporals.format(dashboardFromDate, 'dd.MM.yyyy')}"></span> - <span th:text="${#temporals.format(dashboardToDate, 'dd.MM.yyyy')}"></span></div>
+            </div>
+            <form class="row g-2 align-items-end admin-period-form" method="get" th:action="@{/admin}">
+                <div class="col-sm-4">
+                    <label class="form-label mb-1 small">С</label>
+                    <input class="form-control form-control-sm" type="date" name="from" th:value="${dashboardFromDate}">
+                </div>
+                <div class="col-sm-4">
+                    <label class="form-label mb-1 small">По</label>
+                    <input class="form-control form-control-sm" type="date" name="to" th:value="${dashboardToDate}">
+                </div>
+                <div class="col-sm-4 d-grid">
+                    <button class="btn btn-dark btn-sm" type="submit">Показать</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="d-flex flex-wrap gap-2 mb-3">
+            <a class="btn btn-outline-secondary btn-sm"
+               th:classappend="${dashboardPeriod == '7d'} ? ' active'"
+               th:href="@{/admin(period='7d')}">7 дней</a>
+            <a class="btn btn-outline-secondary btn-sm"
+               th:classappend="${dashboardPeriod == '30d' or dashboardPeriod == ''} ? ' active'"
+               th:href="@{/admin(period='30d')}">30 дней</a>
+            <a class="btn btn-outline-secondary btn-sm"
+               th:classappend="${dashboardPeriod == '90d'} ? ' active'"
+               th:href="@{/admin(period='90d')}">90 дней</a>
+        </div>
+
+        <div class="admin-sales-grid mb-3">
+            <article class="admin-sales-card">
+                <div class="admin-sales-label">Продажи (за период)</div>
+                <div class="admin-sales-value" th:text="${periodCompletedOrdersCount}">0</div>
+            </article>
+            <article class="admin-sales-card">
+                <div class="admin-sales-label">Выручка (за период)</div>
+                <div class="admin-sales-value" th:text="${#numbers.formatDecimal(periodRevenue,1,'COMMA',2,'POINT')} + ' ₽'">0 ₽</div>
+            </article>
+            <article class="admin-sales-card">
+                <div class="admin-sales-label">Средний чек</div>
+                <div class="admin-sales-value" th:text="${#numbers.formatDecimal(periodAverageCheck,1,'COMMA',2,'POINT')} + ' ₽'">0 ₽</div>
+            </article>
+            <article class="admin-sales-card">
+                <div class="admin-sales-label">Всего заказов в периоде</div>
+                <div class="admin-sales-value" th:text="${periodOrdersCount}">0</div>
+            </article>
+            <article class="admin-sales-card">
+                <div class="admin-sales-label">В работе / отменено</div>
+                <div class="admin-sales-value" th:text="${periodInProgressOrdersCount + ' / ' + periodCancelledOrdersCount}">0 / 0</div>
+            </article>
+            <article class="admin-sales-card">
+                <div class="admin-sales-label">Доставка / самовывоз</div>
+                <div class="admin-sales-value" th:text="${periodDeliveryCount + ' / ' + periodPickupCount}">0 / 0</div>
+            </article>
+        </div>
+
+        <div class="admin-status-chart">
+            <div class="small fw-semibold mb-2">Распределение статусов в выбранном периоде</div>
+            <div class="d-grid gap-2">
+                <div class="admin-status-row" th:each="row : ${dashboardStatusStats}">
+                    <div class="admin-status-head">
+                        <span th:text="${row.label}">Статус</span>
+                        <span class="text-muted" th:text="${row.count + ' (' + row.percent + '%)'}">0 (0%)</span>
+                    </div>
+                    <div class="progress" role="progressbar" aria-label="status progress" aria-valuemin="0" aria-valuemax="100"
+                         th:attr="aria-valuenow=${row.percent}">
+                        <div class="progress-bar"
+                             th:style="'width:' + ${row.percent} + '%'"
+                             th:text="${row.percent + '%'}">0%</div>
+                    </div>
+                </div>
+            </div>
+            <div class="small text-muted mt-3">
+                За всё время: <span th:text="${totalCompletedOrdersCount}">0</span> продаж,
+                выручка <span th:text="${#numbers.formatDecimal(totalRevenue,1,'COMMA',2,'POINT')} + ' ₽'">0 ₽</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="glass-card p-3 p-md-4 mb-4">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div>
+                <div class="h6 mb-1">Учётные данные администратора</div>
+                <div class="small text-muted">
+                    Текущий логин: <span class="fw-semibold" th:text="${adminUsername}">admin</span>
+                </div>
+            </div>
+            <button class="btn btn-outline-dark"
+                    type="button"
+                    data-bs-toggle="modal"
+                    data-bs-target="#adminCredentialsModal">
+                Изменить учётные данные
+            </button>
+        </div>
+        <div class="alert alert-danger mt-3 mb-0" th:if="${credentialsError}" th:text="${credentialsError}"></div>
+    </section>
+
+    <div class="modal fade" id="adminCredentialsModal" tabindex="-1" aria-labelledby="adminCredentialsLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content review-modal-content">
+                <div class="modal-header">
+                    <div class="modal-title h6 mb-0" id="adminCredentialsLabel">Изменить учётные данные</div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                </div>
+                <div class="modal-body">
+                    <form class="row g-3" method="post" th:action="@{/admin/credentials}">
+                        <div class="col-12">
+                            <label class="form-label mb-1">Логин</label>
+                            <input class="form-control" name="username" th:value="${adminUsername}" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label mb-1">Новый пароль</label>
+                            <input class="form-control" name="password" type="password" placeholder="Новый пароль" required>
+                        </div>
+                        <div class="col-12 d-grid">
+                            <button class="btn btn-dark" type="submit">Сохранить</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+<div th:replace="~{fragments :: scripts}"></div>
+<th:block th:if="${credentialsError}">
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var modalEl = document.getElementById('adminCredentialsModal');
+            if (!modalEl || typeof bootstrap === 'undefined') {
+                return;
+            }
+            var modal = new bootstrap.Modal(modalEl);
+            modal.show();
+        });
+    </script>
+</th:block>
+</body>
+</html>
+

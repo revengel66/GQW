@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Корзина')}"></head>
+<body>
+<nav th:replace="~{fragments :: navbar}"></nav>
+<main class="container container-wide py-4">
+    <h1 class="h4 mb-3">Корзина</h1>
+    <div class="alert alert-danger" th:if="${cartError}" th:text="${cartError}"></div>
+    <div class="glass-card p-4">
+        <div th:if="${#lists.isEmpty(items)}" class="text-muted">Корзина пока пуста.</div>
+        <div th:if="${!#lists.isEmpty(items)}">
+            <table class="table align-middle">
+                <thead>
+                <tr>
+                    <th>Товар</th>
+                    <th>Цена</th>
+                    <th>Кол-во</th>
+                    <th>Сумма</th>
+                    <th class="text-end pe-0"></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="it : ${items}"
+                    class="js-cart-row"
+                    th:attr="data-product-id=${it.product.id},data-unit-price=${it.product.price}">
+                    <td>
+                        <div class="d-flex align-items-center gap-3">
+                            <img class="cart-item-thumb"
+                                 th:src="${it.product.primaryImageUrl != null ? it.product.primaryImageUrl : '/img/products/placeholder.webp'}"
+                                 alt="">
+                            <a th:href="@{'/product/' + ${it.product.slug}}" th:text="${it.product.name}"></a>
+                        </div>
+                    </td>
+                    <td th:text="${#numbers.formatDecimal(it.product.price,1,'COMMA',0,'POINT')} + ' ₽'"></td>
+                    <td>
+                        <div class="qty-stepper">
+                            <form class="m-0 js-cart-decrement-form"
+                                  th:action="@{/api/cart/decrement}"
+                                  method="post"
+                                  th:attr="data-product-id=${it.product.id}">
+                                <input type="hidden" name="productId" th:value="${it.product.id}">
+                                <button class="qty-btn" type="submit" aria-label="Уменьшить">
+                                    <i class="bi bi-dash"></i>
+                                </button>
+                            </form>
+                            <input class="form-control form-control-sm qty-input js-product-qty-input"
+                                   type="number"
+                                   min="0"
+                                   th:value="${it.quantity}"
+                                   readonly
+                                   th:attr="data-product-id=${it.product.id}">
+                            <form class="m-0 js-cart-increment-form"
+                                  th:action="@{/api/cart/increment}"
+                                  method="post"
+                                  th:attr="data-product-id=${it.product.id}">
+                                <input type="hidden" name="productId" th:value="${it.product.id}">
+                                <button class="qty-btn" type="submit" aria-label="Увеличить">
+                                    <i class="bi bi-plus"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                    <td class="js-cart-line-total"
+                        th:attr="data-product-id=${it.product.id}"
+                        th:text="${#numbers.formatDecimal(it.product.price * it.quantity,1,'COMMA',0,'POINT')} + ' ₽'"></td>
+                    <td class="text-end pe-0">
+                        <form th:action="@{/cart/remove}" method="post">
+                            <input type="hidden" name="itemId" th:value="${it.id}">
+                            <button class="btn btn-outline-danger btn-sm cart-remove-btn" type="submit" title="Удалить">
+                                <i class="bi bi-trash3"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+            <div class="d-flex justify-content-between align-items-center mt-3">
+                <div class="h5 mb-0">Итого: <span id="cart-total-amount" th:text="${#numbers.formatDecimal(total,1,'COMMA',0,'POINT')} + ' ₽'"></span></div>
+                <a class="btn btn-primary" th:href="@{/checkout}">Оформить заказ</a>
+            </div>
+        </div>
+    </div>
+</main>
+<div th:replace="~{fragments :: scripts}"></div>
+</body>
+</html>
+

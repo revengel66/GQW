@@ -1,0 +1,89 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '4.0.4'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.example'
+version = '0.0.1-SNAPSHOT'
+description = 'gqw'
+
+// Keep Gradle outputs in an ASCII-only path to avoid Windows/JVM argfile
+// classpath decoding issues for projects located in Cyrillic directories.
+layout.buildDirectory.set(file("${System.getProperty('user.home')}/.gqw-build/${rootProject.name}"))
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+configurations {
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation 'org.webjars.npm:tinymce:7.9.1'
+    compileOnly 'org.projectlombok:lombok'
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+    runtimeOnly 'org.postgresql:postgresql'
+    annotationProcessor 'org.projectlombok:lombok'
+    testImplementation 'org.springframework.security:spring-security-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    testImplementation 'org.junit.platform:junit-platform-suite-api'
+    testRuntimeOnly 'org.junit.platform:junit-platform-suite-engine'
+    testRuntimeOnly 'com.h2database:h2'
+    implementation project(':gqw-analytics-module')
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+tasks.withType(JavaExec).configureEach {
+    jvmArgs += [
+        '-Dfile.encoding=UTF-8',
+        '-Dstdout.encoding=UTF-8',
+        '-Dstderr.encoding=UTF-8',
+        '-Dsun.stdout.encoding=UTF-8',
+        '-Dsun.stderr.encoding=UTF-8'
+    ]
+}
+
+tasks.register('freePort8080', Exec) {
+    onlyIf { org.gradle.internal.os.OperatingSystem.current().isWindows() }
+    commandLine 'powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', '''
+        $conn = Get-NetTCPConnection -LocalPort 8080 -State Listen -ErrorAction SilentlyContinue
+        if ($null -eq $conn) { Write-Host "Port 8080 is already free."; exit 0 }
+        $pids = $conn | Select-Object -ExpandProperty OwningProcess -Unique
+        foreach ($pid in $pids) {
+            taskkill /PID $pid /F | Out-Null
+        }
+        Start-Sleep -Seconds 1
+        Write-Host "Port 8080 listener processes terminated: $($pids -join ',')"
+    '''
+}
+
+tasks.named('bootRun') {
+    dependsOn tasks.named('freePort8080')
+    dependsOn project(':gqw-analytics-module').tasks.named('classes')
+    classpath = classpath.filter {
+        !it.name.startsWith('gqw-analytics-module-') || !it.name.endsWith('.jar')
+    } + project(':gqw-analytics-module').sourceSets.main.output
+}

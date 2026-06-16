@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Админка - Заявка')}"></head>
+<body>
+<nav th:replace="~{fragments :: adminNavbar}"></nav>
+<main class="container container-wide py-4">
+    <nav class="admin-breadcrumb mb-3" aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a th:href="@{/admin}">Админка</a></li>
+            <li class="breadcrumb-item"><a th:href="@{/admin/support(tab=${tab},status=${status},sort=${sort},q=${q},dateFrom=${dateFrom},dateTo=${dateTo})}">Заявки</a></li>
+            <li class="breadcrumb-item active" aria-current="page" th:text="${'Заявка #' + supportRequest.id}">Заявка</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <h1 class="h4 mb-0" th:text="${'Заявка #' + supportRequest.id}">Заявка</h1>
+        <a class="btn btn-outline-secondary btn-sm"
+           th:href="@{/admin/support(tab=${tab},status=${status},sort=${sort},q=${q},dateFrom=${dateFrom},dateTo=${dateTo})}">
+            <i class="bi bi-arrow-left me-1"></i>
+            Назад к списку
+        </a>
+    </div>
+
+    <div class="alert alert-success" th:if="${supportSuccess}" th:text="${supportSuccess}"></div>
+    <div class="alert alert-danger" th:if="${supportError}" th:text="${supportError}"></div>
+
+    <section class="glass-card p-4 mb-3">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <div class="small text-muted">Тема</div>
+                <div class="fw-semibold" th:text="${supportRequest.subject != null ? supportRequest.subject : 'Заявка'}">Заявка</div>
+            </div>
+            <div class="col-md-6">
+                <div class="small text-muted">Статус</div>
+                <span th:class="'badge ' + ${supportStatusClassMap[requestStatus] != null ? supportStatusClassMap[requestStatus] : 'text-bg-secondary'}"
+                      th:text="${supportStatusRuMap[requestStatus] != null ? supportStatusRuMap[requestStatus] : requestStatus}"></span>
+            </div>
+            <div class="col-md-6">
+                <div class="small text-muted">Автор</div>
+                <div class="fw-semibold" th:text="${supportRequest.name}">Имя</div>
+                <div class="small" th:if="${supportRequest.email != null and !#strings.isEmpty(supportRequest.email)}">
+                    <a th:href="${'mailto:' + supportRequest.email}" th:text="${supportRequest.email}"></a>
+                </div>
+                <div class="small text-muted" th:if="${supportRequest.phone != null and !#strings.isEmpty(supportRequest.phone)}" th:text="${supportRequest.phone}"></div>
+                <div class="small mt-1" th:if="${supportRequest.user != null}">
+                    <a th:href="@{'/admin/users/' + ${supportRequest.user.id}}">
+                        Профиль пользователя
+                    </a>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="small text-muted">Дата обращения</div>
+                <div th:text="${supportRequest.createdAt != null ? #temporals.format(supportRequest.createdAt, 'dd.MM.yyyy HH:mm') : '—'}">—</div>
+                <div class="small mt-1" th:if="${supportRequest.order != null}">
+                    Заказ:
+                    <a th:href="@{'/admin/orders/' + ${supportRequest.order.id}}" th:text="${'#' + supportRequest.order.id}"></a>
+                </div>
+            </div>
+            <div class="col-12">
+                <form class="row g-2 align-items-end"
+                      method="post"
+                      th:action="@{'/admin/support/' + ${supportRequest.id} + '/status'}">
+                    <input type="hidden" name="returnTo" value="detail">
+                    <input type="hidden" name="tab" th:value="${tab}">
+                    <input type="hidden" name="listStatus" th:value="${status}">
+                    <input type="hidden" name="sort" th:value="${sort}">
+                    <input type="hidden" name="q" th:value="${q}">
+                    <input type="hidden" name="dateFrom" th:value="${dateFrom}">
+                    <input type="hidden" name="dateTo" th:value="${dateTo}">
+                    <div class="col-md-4">
+                        <label class="form-label mb-1">Изменить статус</label>
+                        <select class="form-select"
+                                name="status"
+                                onchange="if(this.form.requestSubmit){this.form.requestSubmit();}else{this.form.submit();}">
+                            <option value="NEW" th:selected="${requestStatus == 'NEW'}">Новая</option>
+                            <option value="IN_PROGRESS" th:selected="${requestStatus == 'IN_PROGRESS'}">В обработке</option>
+                            <option value="PROCESSED" th:selected="${requestStatus == 'PROCESSED'}">Обработана</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <section class="glass-card p-4 mb-3">
+        <div class="fw-semibold mb-2">Переписка</div>
+        <div class="border rounded-3 p-3 mb-3 bg-body-tertiary">
+            <div class="small text-muted mb-1">Клиент</div>
+            <div class="small text-muted mb-2" th:text="${supportRequest.createdAt != null ? #temporals.format(supportRequest.createdAt, 'dd.MM.yyyy HH:mm') : ''}"></div>
+            <div class="mb-0" th:text="${supportRequest.message}"></div>
+        </div>
+
+        <div class="border rounded-3 p-3 mb-3" th:if="${supportRequest.adminReply != null and !#strings.isEmpty(supportRequest.adminReply)}">
+            <div class="small text-muted mb-1">Ответ администратора</div>
+            <div th:text="${supportRequest.adminReply}"></div>
+        </div>
+
+        <form method="post" th:action="@{'/admin/support/' + ${supportRequest.id} + '/reply'}">
+            <input type="hidden" name="tab" th:value="${tab}">
+            <input type="hidden" name="status" th:value="${status}">
+            <input type="hidden" name="sort" th:value="${sort}">
+            <input type="hidden" name="q" th:value="${q}">
+            <input type="hidden" name="dateFrom" th:value="${dateFrom}">
+            <input type="hidden" name="dateTo" th:value="${dateTo}">
+
+            <label class="form-label">Ответ</label>
+            <textarea class="form-control mb-2"
+                      name="adminReply"
+                      rows="4"
+                      placeholder="Введите ответ клиенту"
+                      required
+                      th:text="${supportRequest.adminReply}"></textarea>
+            <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
+                <label class="form-check mb-0">
+                    <input class="form-check-input" type="checkbox" name="markProcessed" value="true">
+                    <span class="form-check-label">Сразу пометить как обработанную</span>
+                </label>
+                <button class="btn btn-primary btn-sm" type="submit">Сохранить ответ</button>
+            </div>
+        </form>
+    </section>
+
+    <section class="glass-card p-4" th:if="${order != null}">
+        <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-2">
+            <div class="fw-semibold">Информация по заказу</div>
+            <a class="btn btn-outline-primary btn-sm"
+               th:href="@{'/admin/orders/' + ${order.id}}">
+                <i class="bi bi-box-arrow-up-right me-1"></i>
+                Открыть заказ
+            </a>
+        </div>
+        <div class="row g-2 mb-3">
+            <div class="col-md-4">
+                <div class="small text-muted">Заказ</div>
+                <div th:text="${'#' + order.id}"></div>
+            </div>
+            <div class="col-md-4">
+                <div class="small text-muted">Статус</div>
+                <span th:class="'badge ' + ${orderStatusClassMap[order.status.name()] != null ? orderStatusClassMap[order.status.name()] : 'text-bg-secondary'}"
+                      th:text="${orderStatusRuMap[order.status.name()] != null ? orderStatusRuMap[order.status.name()] : order.status}"></span>
+            </div>
+            <div class="col-md-4">
+                <div class="small text-muted">Сумма</div>
+                <div th:text="${#numbers.formatDecimal(order.totalAmount,1,'COMMA',2,'POINT')} + ' ₽'">0 ₽</div>
+            </div>
+            <div class="col-md-6">
+                <div class="small text-muted">Получатель</div>
+                <div th:text="${order.customerName}"></div>
+            </div>
+            <div class="col-md-6">
+                <div class="small text-muted">Контакты</div>
+                <div th:text="${order.customerEmail}"></div>
+                <div class="small text-muted" th:if="${order.customerPhone != null and !#strings.isEmpty(order.customerPhone)}" th:text="${order.customerPhone}"></div>
+            </div>
+            <div class="col-12" th:if="${order.deliveryAddress != null and !#strings.isEmpty(order.deliveryAddress)}">
+                <div class="small text-muted">Адрес</div>
+                <div th:text="${order.deliveryAddress}"></div>
+            </div>
+        </div>
+
+        <div class="table-responsive mb-3" th:if="${!#lists.isEmpty(orderItems)}">
+            <table class="table table-sm align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>Товар</th>
+                    <th>Цена</th>
+                    <th>Кол-во</th>
+                    <th>Сумма</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="it : ${orderItems}">
+                    <td>
+                        <a th:if="${it.product != null}"
+                           th:href="@{'/admin/products/' + ${it.product.id} + '/edit'}"
+                           th:text="${it.productName}"></a>
+                        <span th:if="${it.product == null}" th:text="${it.productName}"></span>
+                    </td>
+                    <td th:text="${#numbers.formatDecimal(it.unitPrice,1,'COMMA',2,'POINT')} + ' ₽'"></td>
+                    <td th:text="${it.quantity}"></td>
+                    <td th:text="${#numbers.formatDecimal(it.unitPrice * it.quantity,1,'COMMA',2,'POINT')} + ' ₽'"></td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div>
+            <div class="small text-muted mb-1">История статусов</div>
+            <ul class="mb-0 ps-3">
+                <li class="small mb-1" th:each="h : ${orderStatusHistory}">
+                    <span th:text="${orderStatusRuMap[h.status.name()] != null ? orderStatusRuMap[h.status.name()] : h.status.name()}"></span>
+                    <span class="text-muted ms-2" th:text="${h.changedAt != null ? #temporals.format(h.changedAt, 'dd.MM.yyyy HH:mm') : ''}"></span>
+                </li>
+            </ul>
+        </div>
+    </section>
+</main>
+<div th:replace="~{fragments :: scripts}"></div>
+</body>
+</html>

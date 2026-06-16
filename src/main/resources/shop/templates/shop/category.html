@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head(${category.name})}"></head>
+<body>
+<nav th:replace="~{fragments :: navbar}"></nav>
+<main class="container container-wide py-4 pb-5">
+    <nav class="breadcrumbs" aria-label="breadcrumb">
+        <a th:href="@{/}">Главная</a>
+        <span class="breadcrumbs-sep">/</span>
+        <a th:href="@{/catalog}">Каталог</a>
+        <span class="breadcrumbs-sep">/</span>
+        <span th:text="${category.name}"></span>
+    </nav>
+
+    <section class="section-head">
+        <h1 class="section-title mb-0" th:text="${category.name}"></h1>
+    </section>
+
+    <div class="catalog-layout">
+        <aside class="catalog-sidebar">
+            <div class="glass-card p-3">
+                <div class="h6 mb-3 catalog-panel-title">Категории</div>
+                <div class="catalog-sections">
+                    <div class="catalog-section-item"
+                         th:each="node,iter : ${categoryTree}"
+                         th:with="hasChildren=${node.children != null and !#lists.isEmpty(node.children)},
+                                  hasCurrentChild=${hasChildren and #lists.contains(node.children.![category.slug], category.slug)},
+                                  isOpen=${node.category.slug == category.slug or hasCurrentChild}">
+                        <div class="catalog-section-head">
+                            <a class="catalog-section-link"
+                               th:classappend="${node.category.slug == category.slug} ? ' is-active'"
+                               th:href="@{'/category/' + ${node.category.slug}}"
+                               th:text="${node.category.name}"></a>
+                            <button class="catalog-section-toggle"
+                                    th:if="${hasChildren}"
+                                    type="button"
+                                    data-bs-toggle="collapse"
+                                    th:attr="data-bs-target=${'#catCollapse-' + iter.index},aria-controls=${'catCollapse-' + iter.index},aria-expanded=${isOpen}">
+                                <i class="bi bi-chevron-down"></i>
+                            </button>
+                        </div>
+                        <div class="collapse catalog-section-children"
+                             th:if="${hasChildren}"
+                             th:classappend="${isOpen} ? ' show'"
+                             th:attr="id=${'catCollapse-' + iter.index}">
+                            <div class="catalog-section-child" th:each="child : ${node.children}">
+                                <a class="catalog-section-child-link"
+                                   th:classappend="${child.category.slug == category.slug} ? ' is-active'"
+                                   th:href="@{'/category/' + ${child.category.slug}}"
+                                   th:text="${child.category.name}"></a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card p-3 filters-panel">
+                <div class="h6 mb-3 filters-panel-title">Фильтры</div>
+                <form method="get" class="row g-2 js-category-filter-form">
+                    <input type="hidden" name="page" value="0">
+                    <input type="hidden" name="sort" th:value="${sort}">
+                    <input type="hidden" name="q" th:value="${q}">
+                    <input type="hidden" name="inStockOnly" value="false">
+                    <div class="col-12">
+                        <div class="form-check">
+                            <input class="form-check-input"
+                                   id="in-stock-only"
+                                   type="checkbox"
+                                   name="inStockOnly"
+                                   value="true"
+                                   th:checked="${inStockOnly}">
+                            <label class="form-check-label" for="in-stock-only">Только в наличии</label>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label mb-1">Цена</label>
+                        <div class="price-range js-price-range"
+                             th:attr="data-min=${priceRangeMin},data-max=${priceRangeMax}">
+                            <input type="hidden" name="minPrice" class="js-price-range-hidden-min" th:value="${priceSelectedMin}">
+                            <input type="hidden" name="maxPrice" class="js-price-range-hidden-max" th:value="${priceSelectedMax}">
+                            <div class="price-range-sliders">
+                                <div class="price-range-track"></div>
+                                <div class="price-range-progress js-price-range-progress"></div>
+                                <input class="price-range-input js-price-range-input-min"
+                                       type="range"
+                                       step="1"
+                                       th:attr="min=${priceRangeMin},max=${priceRangeMax},value=${priceSelectedMin}">
+                                <input class="price-range-input js-price-range-input-max"
+                                       type="range"
+                                       step="1"
+                                       th:attr="min=${priceRangeMin},max=${priceRangeMax},value=${priceSelectedMax}">
+                            </div>
+                            <div class="price-range-values">
+                                <span class="js-price-range-value-min"></span>
+                                <span class="js-price-range-value-max"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-12" th:if="${filterFacets != null and !#lists.isEmpty(filterFacets)}">
+                        <div class="filter-group" th:each="facet : ${filterFacets}">
+                            <div class="filter-group-title" th:text="${facet.name}"></div>
+                            <div class="form-check" th:each="option : ${facet.options}">
+                                <input class="form-check-input js-category-filter-option"
+                                       type="checkbox"
+                                       name="optionIds"
+                                       th:value="${option.id}"
+                                       th:checked="${option.selected}"
+                                       th:disabled="${option.disabled}">
+                                <label class="form-check-label" th:text="${option.value + ' (' + option.count + ')'}"></label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-6 d-grid">
+                        <button class="btn btn-brand btn-sm" type="submit">Применить</button>
+                    </div>
+                    <div class="col-6 d-grid">
+                        <a class="btn btn-outline-secondary btn-sm" th:href="@{'/category/' + ${category.slug}}">Сбросить</a>
+                    </div>
+                </form>
+            </div>
+        </aside>
+
+        <section>
+            <div class="catalog-topline mb-3">
+                <div class="text-muted mb-0" th:text="${'Найдено: ' + pageData.totalElements}"></div>
+                <div class="dropdown catalog-sort-dropdown">
+                    <span class="catalog-sort-label">Сортировка:</span>
+                    <button class="btn btn-link dropdown-toggle catalog-sort-toggle"
+                            type="button"
+                            data-bs-toggle="dropdown"
+                            aria-expanded="false">
+                        <span th:switch="${sort}">
+                            <span th:case="'name_asc'">По алфавиту A-Z</span>
+                            <span th:case="'name_desc'">По алфавиту Z-A</span>
+                            <span th:case="'price_asc'">Цена по возрастанию</span>
+                            <span th:case="'price_desc'">Цена по убыванию</span>
+                            <span th:case="*">По умолчанию</span>
+                        </span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li>
+                            <a class="dropdown-item"
+                               th:classappend="${sort == null or sort == 'date_desc'} ? ' active'"
+                               th:href="@{/category/{slug}(slug=${category.slug},page=0,size=${pageData.size},sort='date_desc',q=${q},minPrice=${minPrice},maxPrice=${maxPrice},optionIds=${selectedOptionIds},inStockOnly=${inStockOnly})}">По умолчанию</a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item"
+                               th:classappend="${sort == 'name_asc'} ? ' active'"
+                               th:href="@{/category/{slug}(slug=${category.slug},page=0,size=${pageData.size},sort='name_asc',q=${q},minPrice=${minPrice},maxPrice=${maxPrice},optionIds=${selectedOptionIds},inStockOnly=${inStockOnly})}">По алфавиту A-Z</a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item"
+                               th:classappend="${sort == 'name_desc'} ? ' active'"
+                               th:href="@{/category/{slug}(slug=${category.slug},page=0,size=${pageData.size},sort='name_desc',q=${q},minPrice=${minPrice},maxPrice=${maxPrice},optionIds=${selectedOptionIds},inStockOnly=${inStockOnly})}">По алфавиту Z-A</a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item"
+                               th:classappend="${sort == 'price_asc'} ? ' active'"
+                               th:href="@{/category/{slug}(slug=${category.slug},page=0,size=${pageData.size},sort='price_asc',q=${q},minPrice=${minPrice},maxPrice=${maxPrice},optionIds=${selectedOptionIds},inStockOnly=${inStockOnly})}">Цена по возрастанию</a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item"
+                               th:classappend="${sort == 'price_desc'} ? ' active'"
+                               th:href="@{/category/{slug}(slug=${category.slug},page=0,size=${pageData.size},sort='price_desc',q=${q},minPrice=${minPrice},maxPrice=${maxPrice},optionIds=${selectedOptionIds},inStockOnly=${inStockOnly})}">Цена по убыванию</a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            <div class="text-muted mb-3" th:if="${#lists.isEmpty(pageData.content)}">По выбранным фильтрам товары не найдены.</div>
+
+            <div class="catalog-products-grid" th:if="${!#lists.isEmpty(pageData.content)}">
+                <article class="product-card h-100"
+                         th:each="p : ${pageData.content}"
+                         th:with="features=${productCardFeatures[p.id]}, inCartQty=${cartItemQuantities[p.id] != null ? cartItemQuantities[p.id] : 0}">
+                    <div class="product-card-media-wrap">
+                        <img class="product-card-media"
+                             th:src="${p.primaryImageUrl != null ? p.primaryImageUrl : '/img/products/placeholder.webp'}"
+                             alt="">
+                        <div class="product-card-badges">
+                            <span class="product-badge badge-hit" th:if="${p.isHit}">Хит</span>
+                            <span class="product-badge badge-new" th:if="${p.isNew}">Новинка</span>
+                            <span class="product-badge badge-discount"
+                                  th:if="${p.discountPercent != null}"
+                                  th:text="${'-' + p.discountPercent + '%'}"></span>
+                        </div>
+                    </div>
+                    <div class="product-card-body">
+                        <div class="product-title">
+                            <a th:href="@{'/product/' + ${p.slug}}" th:text="${p.name}"></a>
+                        </div>
+                        <div class="small text-danger mb-1" th:if="${!p.inStock}">Нет в наличии</div>
+                        <ul class="product-features" th:if="${features != null and !#lists.isEmpty(features)}">
+                            <li th:each="ch : ${features}" th:text="${ch.name + ': ' + ch.value}"></li>
+                        </ul>
+                        <div class="product-price-row">
+                            <div class="product-price-box">
+                                <div class="product-price-old"
+                                     th:if="${p.oldPrice != null}"
+                                     th:text="${#numbers.formatDecimal(p.oldPrice, 1, 'COMMA', 0, 'POINT')} + ' ₽'"></div>
+                                <div class="product-price-current"
+                                     th:text="${#numbers.formatDecimal(p.price, 1, 'COMMA', 0, 'POINT')} + ' ₽'"></div>
+                            </div>
+                            <div class="product-icon-actions">
+                                <form class="m-0 js-wishlist-toggle-form"
+                                      th:action="@{/api/wishlist/toggle}"
+                                      method="post"
+                                      th:attr="data-product-id=${p.id}">
+                                    <input type="hidden" name="productId" th:value="${p.id}">
+                                    <button class="wishlist-icon-btn js-wishlist-btn"
+                                            th:classappend="${wishlistProductIds != null and wishlistProductIds.contains(p.id)} ? ' is-active'"
+                                            type="submit"
+                                            title="В избранное">
+                                        <i th:class="${wishlistProductIds != null and wishlistProductIds.contains(p.id)} ? 'bi bi-heart-fill' : 'bi bi-heart'"></i>
+                                    </button>
+                                </form>
+                                <form class="m-0 js-cart-toggle-form"
+                                      th:action="@{/api/cart/toggle-one}"
+                                      method="post"
+                                      th:attr="data-product-id=${p.id}">
+                                    <input type="hidden" name="productId" th:value="${p.id}">
+                                    <button class="cart-icon-btn" type="submit" title="В корзину"
+                                            th:disabled="${!p.inStock}">
+                                        <i class="bi bi-cart3"></i>
+                                        <span class="product-cart-qty js-product-cart-qty"
+                                              th:classappend="${inCartQty == 0} ? ' d-none'"
+                                              th:text="${inCartQty}"></span>
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </article>
+            </div>
+
+            <nav class="mt-4" th:if="${pageData.totalPages > 1}">
+                <ul class="pagination-squares">
+                    <li>
+                        <a th:classappend="${!pageData.hasPrevious()} ? ' is-disabled'"
+                           th:href="@{/category/{slug}(slug=${category.slug},page=0,size=${pageData.size},sort=${sort},q=${q},minPrice=${minPrice},maxPrice=${maxPrice},optionIds=${selectedOptionIds},inStockOnly=${inStockOnly})}">&lt;&lt;</a>
+                    </li>
+                    <li>
+                        <a th:classappend="${!pageData.hasPrevious()} ? ' is-disabled'"
+                           th:href="@{/category/{slug}(slug=${category.slug},page=${pageData.number - 1},size=${pageData.size},sort=${sort},q=${q},minPrice=${minPrice},maxPrice=${maxPrice},optionIds=${selectedOptionIds},inStockOnly=${inStockOnly})}">&lt;</a>
+                    </li>
+                    <li th:each="pageNum : ${#numbers.sequence(0, pageData.totalPages - 1)}">
+                        <a th:if="${pageNum != pageData.number}"
+                           th:href="@{/category/{slug}(slug=${category.slug},page=${pageNum},size=${pageData.size},sort=${sort},q=${q},minPrice=${minPrice},maxPrice=${maxPrice},optionIds=${selectedOptionIds},inStockOnly=${inStockOnly})}"
+                           th:text="${pageNum + 1}"></a>
+                        <span class="is-active" th:if="${pageNum == pageData.number}" th:text="${pageNum + 1}"></span>
+                    </li>
+                    <li>
+                        <a th:classappend="${!pageData.hasNext()} ? ' is-disabled'"
+                           th:href="@{/category/{slug}(slug=${category.slug},page=${pageData.number + 1},size=${pageData.size},sort=${sort},q=${q},minPrice=${minPrice},maxPrice=${maxPrice},optionIds=${selectedOptionIds},inStockOnly=${inStockOnly})}">&gt;</a>
+                    </li>
+                    <li>
+                        <a th:classappend="${!pageData.hasNext()} ? ' is-disabled'"
+                           th:href="@{/category/{slug}(slug=${category.slug},page=${pageData.totalPages - 1},size=${pageData.size},sort=${sort},q=${q},minPrice=${minPrice},maxPrice=${maxPrice},optionIds=${selectedOptionIds},inStockOnly=${inStockOnly})}">&gt;&gt;</a>
+                    </li>
+                </ul>
+            </nav>
+        </section>
+    </div>
+</main>
+<div th:replace="~{fragments :: scripts}"></div>
+</body>
+</html>
